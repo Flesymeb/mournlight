@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="WeaponDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+weapon_id = &"warden_lantern"
+display_name = "Warden Lantern"
+strategy = "focused_bolt"
+base_damage = 26.0
+base_cooldown = 0.82
+base_range = 11.5
+base_area = 0.45
+base_count = 1
+max_rank = 4
+rank_modifiers = Array[Dictionary]([{
+"damage_add": 8.0,
+"range_add": 1.5
+}, {
+"cooldown_mult": 0.78,
+"damage_add": 5.0
+}, {
+"damage_mult": 1.18,
+"range_add": 1.0
+}])

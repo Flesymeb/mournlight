@@ -8,9 +8,12 @@ extends Camera3D
 @export var lead_distance := 2.4
 @export var lead_damping := 5.0
 @export var arena_limit := Vector2(12.5, 9.5)
+@export var occlusion_guard_height := 23.0
+@export var occlusion_guard_distance := 8.5
 
 var movement_velocity := Vector3.ZERO
 var framing_target := Vector3.ZERO
+var occlusion_guard_active := false
 var _lead := Vector3.ZERO
 
 func _ready() -> void:
@@ -31,7 +34,17 @@ func _process(delta: float) -> void:
 	framing_target = target.global_position + _lead
 	framing_target.x = clampf(framing_target.x, -arena_limit.x, arena_limit.x)
 	framing_target.z = clampf(framing_target.z, -arena_limit.y, arena_limit.y)
-	var desired_position := framing_target + Vector3(0.0, follow_height, follow_distance)
+	# The complete imported cemetery stays intact. These two product-owned
+	# sight-lane zones steepen the camera when the Warden reaches the back of
+	# the central mausoleum or the northeast tree instead of hiding the actor.
+	var target_position := target.global_position
+	occlusion_guard_active = (
+		(target_position.z < 0.5 and absf(target_position.x) < 4.2)
+		or (absf(target_position.x) > 4.4 and target_position.z < 2.0)
+	)
+	var effective_height := occlusion_guard_height if occlusion_guard_active else follow_height
+	var effective_distance := occlusion_guard_distance if occlusion_guard_active else follow_distance
+	var desired_position := framing_target + Vector3(0.0, effective_height, effective_distance)
 	global_position = global_position.lerp(desired_position, 1.0 - exp(-follow_damping * delta))
 	look_at(framing_target + Vector3(0.0, 0.65, 0.0), Vector3.UP)
 
@@ -46,6 +59,9 @@ func _mcp_state() -> Dictionary:
 		"movement_velocity": movement_velocity,
 		"follow_height": follow_height,
 		"follow_distance": follow_distance,
+		"occlusion_guard_active": occlusion_guard_active,
+		"occlusion_guard_height": occlusion_guard_height,
+		"occlusion_guard_distance": occlusion_guard_distance,
 		"lead_distance": lead_distance,
 		"fov": fov,
 	}

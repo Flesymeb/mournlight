@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "license_notice": "The following authored assets are used under Creative Commons Attribution 4.0. Titles and linked Sketchfab model pages identify and credit their respective creators; no endorsement is implied.",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "assets": [
+    {
+      "title": "Low Poly Graveyard",
+      "source": "https://sketchfab.com/3d-models/low-poly-graveyard-bfa0014419ec4295addfa46bd7e21c7b",
+      "asset_id": "bfa0014419ec4295addfa46bd7e21c7b",
+      "license": "CC BY 4.0",
+      "sha256": "adde2aaf6d361d8437a79c60561bcb30d8427bae38df17047d2fe77f96811616",
+      "receipt": "res://assets/authored/low_poly_graveyard.glb.receipt.json",
+      "binding": "res://scenes/world/cemetery_garden.tscn",
+      "integration": "One intact authored environment instance under one whole-package calibration transform."
+    },
+    {
+      "title": "Frost Mage",
+      "source": "https://sketchfab.com/3d-models/frost-mage-0fa86d697034424486af4a06324e12b9",
+      "asset_id": "0fa86d697034424486af4a06324e12b9",
+      "license": "CC BY 4.0",
+      "sha256": "a83991646c53628e6b3190b4cdac168ab2aaedc8cc91ac5cbed1e4796cb949cf",
+      "receipt": "res://assets/authored/frost_mage.glb.receipt.json",
+      "binding": "res://scenes/player/warden.tscn",
+      "integration": "One intact authored animated character instance under one whole-package calibration transform."
+    },
+    {
+      "title": "Simple Stylized Lantern (HandPainted)",
+      "source": "https://sketchfab.com/3d-models/simple-stylized-lantern-handpainted-7d6c859014ca42e5af0c093c2ecafa33",
+      "asset_id": "7d6c859014ca42e5af0c093c2ecafa33",
+      "license": "CC BY 4.0",
+      "sha256": "fb4a8f303342eafdd633864bd56a1bbfc648387e00a1ececf268369fdc9b8e01",
+      "receipt": "res://assets/authored/warden_lantern.glb.receipt.json",
+      "binding": "res://scenes/player/warden.tscn",
+      "integration": "One intact authored lantern instance attached through the product-owned Warden presentation root."
+    },
+    {
+      "title": "Stylized Possessed Lantern",
+      "source": "https://sketchfab.com/3d-models/stylized-possessed-lantern-e60a72a4d9de4349ae6b8f6c8976e094",
+      "asset_id": "e60a72a4d9de4349ae6b8f6c8976e094",
+      "license": "CC BY 4.0",
+      "sha256": "20861b1ca7a44ece27259cd82ea1f4bd999e1b3ddfb81ec54dbdd3610d139e6f",
+      "receipt": "res://assets/authored/hostile_lantern.glb.receipt.json",
+      "binding": "res://scenes/combat/combat_target.tscn",
+      "integration": "One intact authored hostile presentation instance used only as the minimum placed legal combat recipient."
+    }
+  ]
+}

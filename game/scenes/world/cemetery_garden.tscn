@@ -1,0 +1,103 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/authored/low_poly_graveyard.glb" id="1_cemetery"]
+
+[sub_resource type="BoxShape3D" id="GroundShape"]
+size = Vector3(32, 0.7, 24)
+
+[sub_resource type="BoxShape3D" id="NorthSouthShape"]
+size = Vector3(32.8, 2.2, 0.7)
+
+[sub_resource type="BoxShape3D" id="EastWestShape"]
+size = Vector3(0.7, 2.2, 24)
+
+[sub_resource type="BoxShape3D" id="MausoleumShape"]
+size = Vector3(4.6, 3.8, 3.4)
+
+[sub_resource type="CylinderShape3D" id="TreeShape"]
+radius = 1.05
+height = 3.2
+
+[node name="CemeteryGarden" type="Node3D" groups=["authored_environment"]]
+
+[node name="PackageTransform" type="Node3D" parent="."]
+position = Vector3(0.28, 0.02, -147.12)
+scale = Vector3(2.2, 2.2, 2.2)
+
+[node name="AuthoredCemeteryPackage" parent="PackageTransform" instance=ExtResource("1_cemetery")]
+
+[node name="OuterDatum" type="Node3D" parent="."]
+
+[node name="GroundCollision" type="StaticBody3D" parent="OuterDatum"]
+collision_layer = 1
+collision_mask = 1
+
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/GroundCollision"]
+position = Vector3(0, -0.38, 0)
+shape = SubResource("GroundShape")
+
+[node name="NorthBoundary" type="StaticBody3D" parent="OuterDatum"]
+position = Vector3(0, 1.1, -12)
+collision_layer = 1
+collision_mask = 1
+
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/NorthBoundary"]
+shape = SubResource("NorthSouthShape")
+
+[node name="SouthBoundary" type="StaticBody3D" parent="OuterDatum"]
+position = Vector3(0, 1.1, 12)
+collision_layer = 1
+collision_mask = 1
+
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/SouthBoundary"]
+shape = SubResource("NorthSouthShape")
+
+[node name="EastBoundary" type="StaticBody3D" parent="OuterDatum"]
+position = Vector3(16, 1.1, 0)
+collision_layer = 1
+collision_mask = 1
+
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/EastBoundary"]
+shape = SubResource("EastWestShape")
+
+[node name="WestBoundary" type="StaticBody3D" parent="OuterDatum"]
+position = Vector3(-16, 1.1, 0)
+collision_layer = 1
+collision_mask = 1
+
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/WestBoundary"]
+shape = SubResource("EastWestShape")
+
+[node name="MausoleumCollision" type="StaticBody3D" parent="OuterDatum"]
+position = Vector3(0.1, 1.9, -1.1)
+collision_layer = 1
+collision_mask = 1
+
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/MausoleumCollision"]
+shape = SubResource("MausoleumShape")
+
+[node name="NortheastTreeCollision" type="StaticBody3D" parent="OuterDatum"]
+position = Vector3(5.2, 1.6, -2.8)
+collision_layer = 1
+collision_mask = 1
+
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/NortheastTreeCollision"]
+shape = SubResource("TreeShape")
+
+[node name="PlayerSpawn" type="Marker3D" parent="OuterDatum" groups=["spawn_anchor"]]
+position = Vector3(0, 0.05, 3)
+
+[node name="KeeperLanternPostAnchor" type="Marker3D" parent="OuterDatum" groups=["landmark_anchor"]]
+position = Vector3(-4.8, 0, 1.8)
+
+[node name="SmallMausoleumAnchor" type="Marker3D" parent="OuterDatum" groups=["landmark_anchor"]]
+position = Vector3(8.6, 0, -7.4)
+
+[node name="CrackedMoonBellAnchor" type="Marker3D" parent="OuterDatum" groups=["landmark_anchor"]]
+position = Vector3(-10.2, 0, -7.5)
+
+[node name="TargetAnchorA" type="Marker3D" parent="OuterDatum" groups=["combat_anchor"]]
+position = Vector3(4.8, 0, 1.6)
+
+[node name="TargetAnchorB" type="Marker3D" parent="OuterDatum" groups=["combat_anchor"]]
+position = Vector3(-5.4, 0, -1.8)

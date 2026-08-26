@@ -1,0 +1,41 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/wandering_wisp_presentation.gd" id="1_script"]
+
+[sub_resource type="StandardMaterial3D" id="MatWisp"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.72, 0.83, 1, 0.82)
+emission_enabled = true
+emission = Color(0.28, 0.38, 0.95, 1)
+emission_energy_multiplier = 2.3
+
+[sub_resource type="SphereMesh" id="WispCore"]
+material = SubResource("MatWisp")
+radius = 0.18
+height = 0.36
+radial_segments = 10
+rings = 5
+
+[sub_resource type="PrismMesh" id="WispTail"]
+material = SubResource("MatWisp")
+size = Vector3(0.18, 0.42, 0.08)
+
+[node name="WanderingWisp" type="Node3D" groups=["friendly_attack"]]
+script = ExtResource("1_script")
+
+[node name="Core" type="MeshInstance3D" parent="."]
+mesh = SubResource("WispCore")
+cast_shadow = 0
+
+[node name="Tail" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.24, 0.08)
+rotation_degrees = Vector3(0, 0, 22)
+mesh = SubResource("WispTail")
+cast_shadow = 0
+
+[node name="Glow" type="OmniLight3D" parent="."]
+light_color = Color(0.38, 0.48, 1, 1)
+light_energy = 0.8
+omni_range = 1.8
+shadow_enabled = false

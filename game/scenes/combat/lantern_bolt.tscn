@@ -1,0 +1,95 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://scripts/combat/bolt_presentation.gd" id="1"]
+
+[sub_resource type="StandardMaterial3D" id="MatBolt"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.83, 0.95, 1, 0.86)
+emission_enabled = true
+emission = Color(0.22, 0.72, 1, 1)
+emission_energy_multiplier = 3.2
+
+[sub_resource type="StandardMaterial3D" id="MatGold"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(1, 0.72, 0.23, 0.72)
+emission_enabled = true
+emission = Color(1, 0.35, 0.035, 1)
+emission_energy_multiplier = 2.4
+
+[sub_resource type="SphereMesh" id="CoreMesh"]
+material = SubResource("MatBolt")
+radius = 0.16
+height = 0.32
+radial_segments = 12
+rings = 6
+
+[sub_resource type="CylinderMesh" id="TrailMesh"]
+material = SubResource("MatGold")
+top_radius = 0.035
+bottom_radius = 0.12
+height = 0.65
+radial_segments = 8
+
+[sub_resource type="TorusMesh" id="HaloMesh"]
+material = SubResource("MatBolt")
+inner_radius = 0.18
+outer_radius = 0.24
+rings = 14
+ring_segments = 5
+
+[sub_resource type="PrismMesh" id="ForkMesh"]
+material = SubResource("MatGold")
+size = Vector3(0.22, 0.48, 0.1)
+
+[sub_resource type="CapsuleMesh" id="CometMesh"]
+material = SubResource("MatBolt")
+radius = 0.1
+height = 0.58
+radial_segments = 10
+rings = 4
+
+[sub_resource type="SphereMesh" id="ImpactMesh"]
+material = SubResource("MatGold")
+radius = 0.38
+height = 0.76
+radial_segments = 12
+rings = 6
+
+[node name="LanternBolt" type="Node3D" groups=["mcp_watch", "friendly_attack"]]
+script = ExtResource("1")
+
+[node name="Core" type="MeshInstance3D" parent="."]
+mesh = SubResource("CoreMesh")
+cast_shadow = 0
+
+[node name="Trail" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0, 0.3)
+rotation_degrees = Vector3(90, 0, 0)
+mesh = SubResource("TrailMesh")
+cast_shadow = 0
+
+[node name="VariantFork" type="MeshInstance3D" parent="."]
+rotation_degrees = Vector3(0, 0, 45)
+mesh = SubResource("ForkMesh")
+cast_shadow = 0
+visible = false
+
+[node name="VariantHalo" type="MeshInstance3D" parent="."]
+rotation_degrees = Vector3(90, 0, 0)
+mesh = SubResource("HaloMesh")
+cast_shadow = 0
+visible = false
+
+[node name="VariantComet" type="MeshInstance3D" parent="."]
+rotation_degrees = Vector3(90, 0, 0)
+mesh = SubResource("CometMesh")
+cast_shadow = 0
+visible = false
+
+[node name="Impact" type="MeshInstance3D" parent="."]
+mesh = SubResource("ImpactMesh")
+cast_shadow = 0
+visible = false
+

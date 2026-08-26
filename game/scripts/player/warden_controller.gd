@@ -11,6 +11,7 @@ enum DashPhase { READY, ANTICIPATION, ACTIVE, RECOVERY, COOLDOWN }
 @export var acceleration := 24.0
 @export var deceleration := 32.0
 @export var turn_speed := 12.0
+@export var movement_plane_y := 0.05
 @export_category("Dash")
 @export var dash_speed := 16.5
 @export var anticipation_duration := 0.12
@@ -25,14 +26,11 @@ enum DashPhase { READY, ANTICIPATION, ACTIVE, RECOVERY, COOLDOWN }
 @export var dash_phase := "ready"
 @export var dash_cooldown_remaining := 0.0
 @export var dash_invulnerable := false
+@export var plane_error := 0.0
 
 @onready var presentation_root: Node3D = $PresentationRoot
-@onready var cloak: Node3D = $PresentationRoot/Cloak
-@onready var arm_left: Node3D = $PresentationRoot/ArmLeft
-@onready var arm_right: Node3D = $PresentationRoot/ArmRight
-@onready var boot_left: Node3D = $PresentationRoot/BootLeft
-@onready var boot_right: Node3D = $PresentationRoot/BootRight
-@onready var lantern: Node3D = $PresentationRoot/ArmRight/Lantern
+@onready var model_pivot: Node3D = $PresentationRoot/ModelPivot
+@onready var lantern: Node3D = $PresentationRoot/LanternPivot
 @onready var dash_aura: MeshInstance3D = $DashAura
 @onready var active_ring: MeshInstance3D = $ActiveRing
 
@@ -42,14 +40,18 @@ var _dash_direction := Vector3.FORWARD
 var _last_move_direction := Vector3.FORWARD
 var _dash_was_pressed := false
 var _visual_time := 0.0
-var _base_cloak_position := Vector3.ZERO
+var _base_model_position := Vector3.ZERO
 var _base_lantern_position := Vector3.ZERO
+var _authored_animation: AnimationPlayer
 
 func _ready() -> void:
 	motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
 	max_slides = 6
-	_base_cloak_position = cloak.position
+	movement_plane_y = global_position.y
+	_base_model_position = model_pivot.position
 	_base_lantern_position = lantern.position
+	_authored_animation = _find_animation_player(model_pivot)
+	_play_authored_idle()
 	_set_dash_phase(DashPhase.READY, 0.0)
 	reset_input_latch()
 
@@ -60,7 +62,10 @@ func _physics_process(delta: float) -> void:
 		_last_move_direction = desired_direction
 	_update_dash_state(delta, desired_direction)
 	_update_authoritative_velocity(delta, desired_direction)
+	global_position.y = movement_plane_y
 	move_and_slide()
+	plane_error = global_position.y - movement_plane_y
+	global_position.y = movement_plane_y
 	velocity.y = 0.0
 	planar_velocity = Vector3(velocity.x, 0.0, velocity.z)
 	locomotion_state = "locomotion" if planar_velocity.length_squared() > 0.08 else "idle"
@@ -145,12 +150,8 @@ func _update_facing_and_animation(delta: float) -> void:
 		presentation_root.rotation.y = lerp_angle(presentation_root.rotation.y, target_angle, 1.0 - exp(-turn_speed * delta))
 	var stride := clampf(planar_speed / movement_speed, 0.0, 1.0)
 	var cycle := sin(_visual_time * 10.0) * stride
-	boot_left.rotation.x = cycle * 0.5
-	boot_right.rotation.x = -cycle * 0.5
-	arm_left.rotation.x = -cycle * 0.35
-	arm_right.rotation.x = cycle * 0.22 - 0.15
-	cloak.rotation.x = -0.05 - stride * 0.12
-	cloak.position = _base_cloak_position + Vector3(0.0, abs(cycle) * 0.035, 0.0)
+	model_pivot.rotation.x = -stride * 0.055
+	model_pivot.position = _base_model_position + Vector3(0.0, abs(cycle) * 0.026, 0.0)
 	lantern.position = _base_lantern_position + Vector3(0.0, sin(_visual_time * 3.2) * 0.025, 0.0)
 	if _dash_phase_id == DashPhase.ANTICIPATION:
 		presentation_root.scale = presentation_root.scale.lerp(Vector3(1.16, 0.78, 1.16), 1.0 - exp(-18.0 * delta))
@@ -162,6 +163,28 @@ func _update_facing_and_animation(delta: float) -> void:
 		presentation_root.scale = presentation_root.scale.lerp(Vector3(1.08, 0.9, 1.08), 1.0 - exp(-12.0 * delta))
 	else:
 		presentation_root.scale = presentation_root.scale.lerp(Vector3.ONE, 1.0 - exp(-14.0 * delta))
+
+func _find_animation_player(root: Node) -> AnimationPlayer:
+	if root is AnimationPlayer:
+		return root
+	for child in root.get_children():
+		var found := _find_animation_player(child)
+		if found:
+			return found
+	return null
+
+func _play_authored_idle() -> void:
+	if not _authored_animation:
+		return
+	var animations := _authored_animation.get_animation_list()
+	for preferred in [&"standby", &"idle", &"Idle", &"Take 001"]:
+		if animations.has(preferred):
+			_authored_animation.play(preferred)
+			return
+	for animation_name in animations:
+		if String(animation_name) != "RESET":
+			_authored_animation.play(animation_name)
+			return
 
 func reset_input_latch() -> void:
 	_dash_was_pressed = Input.is_action_pressed("dash")
@@ -188,4 +211,7 @@ func _mcp_state() -> Dictionary:
 		"dash_invulnerable": dash_invulnerable,
 		"movement_speed": movement_speed,
 		"dash_speed": dash_speed,
+		"movement_plane_y": movement_plane_y,
+		"plane_error": plane_error,
+		"authored_animation": String(_authored_animation.current_animation) if _authored_animation else "none",
 	}

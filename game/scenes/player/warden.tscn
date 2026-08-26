@@ -1,122 +1,53 @@
-[gd_scene load_steps=21 format=3]
+[gd_scene load_steps=22 format=3]
 
 [ext_resource type="Script" path="res://scripts/player/warden_controller.gd" id="1_controller"]
-
-[sub_resource type="StandardMaterial3D" id="MatCloak"]
-albedo_color = Color(0.075, 0.09, 0.17, 1)
-roughness = 0.82
-
-[sub_resource type="StandardMaterial3D" id="MatCloakEdge"]
-albedo_color = Color(0.18, 0.23, 0.38, 1)
-roughness = 0.72
-
-[sub_resource type="StandardMaterial3D" id="MatBrass"]
-albedo_color = Color(0.48, 0.29, 0.09, 1)
-metallic = 0.7
-roughness = 0.35
-
-[sub_resource type="StandardMaterial3D" id="MatLantern"]
-albedo_color = Color(1, 0.54, 0.09, 1)
-emission_enabled = true
-emission = Color(1, 0.26, 0.025, 1)
-emission_energy_multiplier = 4.0
-roughness = 0.22
-
-[sub_resource type="StandardMaterial3D" id="MatFace"]
-albedo_color = Color(0.72, 0.75, 0.68, 1)
-roughness = 0.8
-
-[sub_resource type="StandardMaterial3D" id="MatDark"]
-albedo_color = Color(0.025, 0.035, 0.07, 1)
-roughness = 0.9
-
-[sub_resource type="StandardMaterial3D" id="MatAura"]
-transparency = 1
-albedo_color = Color(1, 0.56, 0.12, 0.22)
-emission_enabled = true
-emission = Color(1, 0.24, 0.03, 1)
-emission_energy_multiplier = 2.4
-shading_mode = 0
-
-[sub_resource type="StandardMaterial3D" id="MatActive"]
-transparency = 1
-albedo_color = Color(0.29, 0.96, 0.92, 0.75)
-emission_enabled = true
-emission = Color(0.07, 0.72, 0.88, 1)
-emission_energy_multiplier = 5.0
-shading_mode = 0
+[ext_resource type="PackedScene" path="res://assets/authored/frost_mage.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/authored/warden_lantern.glb" id="3_lantern"]
+[ext_resource type="Script" path="res://scripts/weapons/weapon_inventory.gd" id="4_inventory"]
+[ext_resource type="Script" path="res://scripts/combat/attack_runtime.gd" id="5_attack"]
+[ext_resource type="Script" path="res://scripts/weapons/warden_lantern_runtime.gd" id="6_lantern_runtime"]
+[ext_resource type="Script" path="res://scripts/weapons/gravespade_runtime.gd" id="7_spade_runtime"]
+[ext_resource type="Script" path="res://scripts/weapons/wandering_wisps_runtime.gd" id="8_wisps_runtime"]
+[ext_resource type="Resource" path="res://resources/weapons/warden_lantern.tres" id="9_lantern_def"]
+[ext_resource type="Resource" path="res://resources/weapons/gravespade.tres" id="10_spade_def"]
+[ext_resource type="Resource" path="res://resources/weapons/wandering_wisps.tres" id="11_wisps_def"]
+[ext_resource type="PackedScene" path="res://scenes/combat/lantern_bolt.tscn" id="12_bolt"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/gravespade_sweep.tscn" id="13_sweep"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/wandering_wisps.tscn" id="14_wisp"]
 
 [sub_resource type="CapsuleShape3D" id="PlayerShape"]
 radius = 0.42
 height = 1.55
 
-[sub_resource type="CylinderMesh" id="CloakMesh"]
-material = SubResource("MatCloak")
-top_radius = 0.35
-bottom_radius = 0.62
-height = 1.25
-radial_segments = 10
-rings = 3
+[sub_resource type="StandardMaterial3D" id="MatAura"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(1, 0.56, 0.12, 0.2)
+emission_enabled = true
+emission = Color(1, 0.24, 0.03, 1)
+emission_energy_multiplier = 2.4
 
-[sub_resource type="TorusMesh" id="CloakEdgeMesh"]
-material = SubResource("MatCloakEdge")
-inner_radius = 0.48
-outer_radius = 0.58
-rings = 10
-ring_segments = 4
-
-[sub_resource type="SphereMesh" id="HeadMesh"]
-material = SubResource("MatFace")
-radius = 0.34
-height = 0.68
-radial_segments = 10
-rings = 6
-
-[sub_resource type="SphereMesh" id="HoodMesh"]
-material = SubResource("MatCloakEdge")
-radius = 0.47
-height = 0.76
-radial_segments = 10
-rings = 6
-
-[sub_resource type="CapsuleMesh" id="LimbMesh"]
-material = SubResource("MatCloakEdge")
-radius = 0.11
-height = 0.62
-radial_segments = 8
-rings = 3
-
-[sub_resource type="CapsuleMesh" id="BootMesh"]
-material = SubResource("MatDark")
-radius = 0.14
-height = 0.42
-radial_segments = 8
-rings = 3
-
-[sub_resource type="BoxMesh" id="LanternFrameMesh"]
-material = SubResource("MatBrass")
-size = Vector3(0.32, 0.46, 0.28)
-
-[sub_resource type="CylinderMesh" id="LanternGlowMesh"]
-material = SubResource("MatLantern")
-top_radius = 0.11
-bottom_radius = 0.15
-height = 0.31
-radial_segments = 8
-
-[sub_resource type="TorusMesh" id="RingMesh"]
-material = SubResource("MatActive")
-inner_radius = 0.72
-outer_radius = 0.82
-rings = 20
-ring_segments = 5
+[sub_resource type="StandardMaterial3D" id="MatActive"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.29, 0.96, 0.92, 0.72)
+emission_enabled = true
+emission = Color(0.07, 0.72, 0.88, 1)
+emission_energy_multiplier = 4.0
 
 [sub_resource type="CylinderMesh" id="AuraMesh"]
 material = SubResource("MatAura")
 top_radius = 1.0
 bottom_radius = 1.0
 height = 0.035
-radial_segments = 24
+radial_segments = 28
+
+[sub_resource type="TorusMesh" id="RingMesh"]
+material = SubResource("MatActive")
+inner_radius = 0.72
+outer_radius = 0.82
+rings = 24
+ring_segments = 6
 
 [node name="Warden" type="CharacterBody3D" groups=["mcp_watch", "player"]]
 process_mode = 1
@@ -127,12 +58,6 @@ collision_mask = 1
 [node name="Collider" type="CollisionShape3D" parent="."]
 position = Vector3(0, 0.82, 0)
 shape = SubResource("PlayerShape")
-
-[node name="GroundShadow" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.035, 0)
-scale = Vector3(0.72, 1, 0.5)
-mesh = SubResource("AuraMesh")
-cast_shadow = 0
 
 [node name="DashAura" type="MeshInstance3D" parent="."]
 position = Vector3(0, 0.06, 0)
@@ -148,69 +73,51 @@ visible = false
 
 [node name="PresentationRoot" type="Node3D" parent="."]
 
-[node name="Cloak" type="Node3D" parent="PresentationRoot"]
-position = Vector3(0, 0.78, 0)
+[node name="ModelPivot" type="Node3D" parent="PresentationRoot"]
 
-[node name="Body" type="MeshInstance3D" parent="PresentationRoot/Cloak"]
-mesh = SubResource("CloakMesh")
+[node name="AssetTransform" type="Node3D" parent="PresentationRoot/ModelPivot"]
+position = Vector3(-0.188, 0.748, -6.1)
+scale = Vector3(0.04, 0.04, 0.04)
 
-[node name="Hem" type="MeshInstance3D" parent="PresentationRoot/Cloak"]
-position = Vector3(0, -0.6, 0)
-mesh = SubResource("CloakEdgeMesh")
+[node name="AuthoredFrostMage" parent="PresentationRoot/ModelPivot/AssetTransform" instance=ExtResource("2_model")]
 
-[node name="Head" type="MeshInstance3D" parent="PresentationRoot"]
-position = Vector3(0, 1.5, 0.01)
-mesh = SubResource("HeadMesh")
+[node name="LanternPivot" type="Node3D" parent="PresentationRoot"]
+position = Vector3(0.62, 0.92, 0.18)
+scale = Vector3(0.08, 0.08, 0.08)
 
-[node name="Hood" type="MeshInstance3D" parent="PresentationRoot"]
-position = Vector3(0, 1.55, 0.11)
-scale = Vector3(1.08, 1, 1.08)
-mesh = SubResource("HoodMesh")
+[node name="AuthoredLantern" parent="PresentationRoot/LanternPivot" instance=ExtResource("3_lantern")]
 
-[node name="Face" type="MeshInstance3D" parent="PresentationRoot"]
-position = Vector3(0, 1.47, 0.31)
-scale = Vector3(0.68, 0.52, 0.28)
-mesh = SubResource("HeadMesh")
-
-[node name="ArmLeft" type="Node3D" parent="PresentationRoot"]
-position = Vector3(-0.46, 0.95, 0)
-rotation = Vector3(0, 0, -0.22)
-
-[node name="Mesh" type="MeshInstance3D" parent="PresentationRoot/ArmLeft"]
-mesh = SubResource("LimbMesh")
-
-[node name="ArmRight" type="Node3D" parent="PresentationRoot"]
-position = Vector3(0.46, 0.97, 0.02)
-rotation = Vector3(-0.15, 0, 0.22)
-
-[node name="Mesh" type="MeshInstance3D" parent="PresentationRoot/ArmRight"]
-mesh = SubResource("LimbMesh")
-
-[node name="Lantern" type="Node3D" parent="PresentationRoot/ArmRight"]
-position = Vector3(0.04, -0.53, 0.04)
-
-[node name="Frame" type="MeshInstance3D" parent="PresentationRoot/ArmRight/Lantern"]
-mesh = SubResource("LanternFrameMesh")
-
-[node name="Glow" type="MeshInstance3D" parent="PresentationRoot/ArmRight/Lantern"]
-mesh = SubResource("LanternGlowMesh")
-
-[node name="Light" type="OmniLight3D" parent="PresentationRoot/ArmRight/Lantern"]
+[node name="WarmLight" type="OmniLight3D" parent="PresentationRoot/LanternPivot"]
+position = Vector3(0, 0.15, 0)
 light_color = Color(1, 0.52, 0.16, 1)
 light_energy = 2.4
 omni_range = 5.2
 shadow_enabled = true
 
-[node name="BootLeft" type="Node3D" parent="PresentationRoot"]
-position = Vector3(-0.22, 0.25, 0.08)
+[node name="Weapons" type="Node3D" parent="."]
 
-[node name="Mesh" type="MeshInstance3D" parent="PresentationRoot/BootLeft"]
-rotation = Vector3(1.5708, 0, 0)
-mesh = SubResource("BootMesh")
+[node name="WeaponInventory" type="Node" parent="Weapons" groups=["mcp_watch"]]
+script = ExtResource("4_inventory")
+definitions = Array[WeaponDefinition]([ExtResource("9_lantern_def"), ExtResource("10_spade_def"), ExtResource("11_wisps_def")])
 
-[node name="BootRight" type="Node3D" parent="PresentationRoot"]
-position = Vector3(0.22, 0.25, 0.08)
+[node name="AttackRuntime" type="Node" parent="Weapons" groups=["mcp_watch"]]
+script = ExtResource("5_attack")
 
-[node name="Mesh" type="MeshInstance3D" parent="PresentationRoot/BootRight"]
-rotation = Vector3(1.5708, 0, 0)
-mesh = SubResource("BootMesh")
+[node name="WardenLanternRuntime" type="Node3D" parent="Weapons" groups=["mcp_watch"]]
+position = Vector3(0.58, 1.0, 0.18)
+script = ExtResource("6_lantern_runtime")
+bolt_scene = ExtResource("12_bolt")
+
+[node name="Audio" type="AudioStreamPlayer3D" parent="Weapons/WardenLanternRuntime"]
+unit_size = 5.0
+max_distance = 28.0
+max_polyphony = 4
+
+[node name="GravespadeRuntime" type="Node3D" parent="Weapons" groups=["mcp_watch"]]
+position = Vector3(0, 0.08, 0)
+script = ExtResource("7_spade_runtime")
+sweep_scene = ExtResource("13_sweep")
+
+[node name="WanderingWispsRuntime" type="Node3D" parent="Weapons" groups=["mcp_watch"]]
+script = ExtResource("8_wisps_runtime")
+wisp_scene = ExtResource("14_wisp")
