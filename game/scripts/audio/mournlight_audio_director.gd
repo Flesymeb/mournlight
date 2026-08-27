@@ -10,6 +10,8 @@ var voice_priorities: Array[int] = []
 var voice_semantics: Array[String] = []
 var semantic_counts: Dictionary = {}
 var rejected_counts: Dictionary = {}
+var missing_source_counts: Dictionary = {}
+var bounded_drop_counts: Dictionary = {}
 var music_state := "silent"
 var _variation_cursor: Dictionary = {}
 var _footstep_clock := 0.0
@@ -53,8 +55,10 @@ func _bind_events() -> void:
 	controller.state_changed.connect(_on_state_changed)
 	var attack := controller.get_node_or_null("World/Warden/Weapons/AttackRuntime")
 	if attack:
-		attack.attack_authorized.connect(func(event: Dictionary) -> void: play_semantic("weapon_" + String(event.get("weapon_id", "warden_lantern"))))
-		attack.hit_resolved.connect(func(_event: Dictionary) -> void: play_semantic("impact"))
+		attack.attack_authorized.connect(func(event: Dictionary) -> void:
+			play_semantic("weapon_" + String(event.get("weapon_id", "warden_lantern")) + "_onset"))
+		attack.hit_resolved.connect(func(event: Dictionary) -> void:
+			play_semantic("weapon_" + String(event.get("weapon_id", "warden_lantern")) + "_impact"))
 	var health := controller.get_node_or_null("World/Warden/HealthComponent")
 	if health:
 		health.hurt.connect(func(_event: Dictionary) -> void: play_semantic("warden_hurt"))
@@ -114,6 +118,7 @@ func _stop_music() -> void:
 func play_semantic(id: String) -> bool:
 	var streams := _streams_for(id)
 	if streams.is_empty():
+		missing_source_counts[id] = int(missing_source_counts.get(id, 0)) + 1
 		rejected_counts[id] = int(rejected_counts.get(id, 0)) + 1
 		return false
 	var owners: Dictionary = library.get_meta("owners", {}) if library else {}
@@ -124,7 +129,7 @@ func play_semantic(id: String) -> bool:
 	var priority := int(priorities.get(id, 25))
 	var voice_index := _claim_voice(owner, priority, int(owner_limits.get(owner, 1)))
 	if voice_index < 0:
-		rejected_counts[id] = int(rejected_counts.get(id, 0)) + 1
+		bounded_drop_counts[id] = int(bounded_drop_counts.get(id, 0)) + 1
 		return false
 	var cursor := int(_variation_cursor.get(id, 0))
 	var stream: AudioStream = streams[cursor % streams.size()]
@@ -180,6 +185,8 @@ func reset_for_run() -> void:
 		_release_voice(index)
 	semantic_counts.clear()
 	rejected_counts.clear()
+	missing_source_counts.clear()
+	bounded_drop_counts.clear()
 	_variation_cursor.clear()
 	_footstep_clock = 0.0
 
@@ -206,5 +213,6 @@ func _mcp_state() -> Dictionary:
 			active_by_owner[owner] = int(active_by_owner.get(owner, 0)) + 1
 	return {"music_state":music_state,"music_playing":music.playing,"active_effect_voices":playing,
 		"voice_limit":voices.size(),"active_by_owner":active_by_owner,"semantic_counts":semantic_counts,
-		"rejected_counts":rejected_counts,"library_bound":library != null,
+		"rejected_counts":rejected_counts,"missing_source_counts":missing_source_counts,
+		"bounded_drop_counts":bounded_drop_counts,"library_bound":library != null,
 		"source_revision":String(library.get_meta("source_revision", "")) if library else ""}

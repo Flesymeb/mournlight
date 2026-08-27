@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/enemies/authored/gargoyle_stone_warden.glb" id="1"]
+[ext_resource type="PackedScene" path="res://assets/enemies/authored/possessed_lantern.glb" id="2"]
+
+[node name="WispbatPresentation" type="Node3D"]
+
+[node name="VariantA" type="Node3D" parent="."]
+position = Vector3(0, 0.42, 0)
+scale = Vector3(78, 78, 78)
+[node name="MoonGargoyle" parent="VariantA" instance=ExtResource("1")]
+
+[node name="VariantB" type="Node3D" parent="."]
+position = Vector3(0, 0.48, 0)
+scale = Vector3(0.0085, 0.0085, 0.0085)
+[node name="SoulLanternFlier" parent="VariantB" instance=ExtResource("2")]

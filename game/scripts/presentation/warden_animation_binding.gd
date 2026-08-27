@@ -4,43 +4,45 @@ extends Node
 signal semantic_state_changed(previous: String, current: String)
 
 const REQUIRED_STATES := ["idle", "move", "dash", "cast", "hurt", "death", "victory"]
-const CLIP_TOKENS := {
-	"idle":["idle"], "move":["walk", "run", "locomotion"], "dash":["dash", "dodge", "roll"],
-	"cast":["cast", "spell", "attack", "shoot"], "hurt":["hurt", "hit", "damage", "impact"],
-	"death":["death", "die", "dead"], "victory":["victory", "celebrate", "dance", "cheer"],
-}
 
 var player: AnimationPlayer
 var semantic_clips: Dictionary = {}
+var explicit_profile_mappings: Dictionary = {}
 var semantic_state := "idle"
 var previous_state := ""
 var event_hold := 0.0
 var binding_valid := false
 var missing_semantics: Array[String] = []
 var rejected_source_clips: Array[String] = []
+var profile_id := "unbound"
 
-func bind(root: Node) -> void:
+func bind(root: Node, profile: Resource) -> void:
 	player = _find_player(root)
 	semantic_clips.clear()
+	explicit_profile_mappings.clear()
 	missing_semantics.clear()
 	rejected_source_clips.clear()
 	binding_valid = false
+	profile_id = "missing_profile"
+	if profile:
+		profile_id = String(profile.get_meta("profile_id", "unnamed"))
+		explicit_profile_mappings = (profile.get_meta("semantic_clips", {}) as Dictionary).duplicate(true)
 	if not player:
 		missing_semantics.assign(REQUIRED_STATES)
 		return
-	var clips := player.get_animation_list()
+	var available := player.get_animation_list()
 	for semantic in REQUIRED_STATES:
-		var resolved := _resolve_clip(clips, semantic)
-		if resolved == &"":
+		var exact_name := StringName(explicit_profile_mappings.get(semantic, ""))
+		if exact_name == &"" or not player.has_animation(exact_name):
 			missing_semantics.append(semantic)
 		else:
-			semantic_clips[semantic] = resolved
+			semantic_clips[semantic] = exact_name
 	var distinct := {}
 	for clip in semantic_clips.values():
 		distinct[String(clip)] = true
 	binding_valid = missing_semantics.is_empty() and distinct.size() == REQUIRED_STATES.size()
 	if not binding_valid:
-		for clip in clips:
+		for clip in available:
 			rejected_source_clips.append(String(clip))
 		player.stop()
 		return
@@ -82,14 +84,6 @@ func reset() -> void:
 	event_hold = 0.0
 	set_semantic("idle", true)
 
-func _resolve_clip(clips: PackedStringArray, semantic: String) -> StringName:
-	for clip in clips:
-		var normalized := String(clip).to_lower()
-		for token in CLIP_TOKENS[semantic]:
-			if normalized.contains(token):
-				return clip
-	return &""
-
 func _find_player(node: Node) -> AnimationPlayer:
 	if node is AnimationPlayer:
 		return node
@@ -102,5 +96,6 @@ func _find_player(node: Node) -> AnimationPlayer:
 func get_snapshot() -> Dictionary:
 	return {"semantic_state":semantic_state,"previous_state":previous_state,
 		"resolved_clip":String(semantic_clips.get(semantic_state, &"")),"clip_map":semantic_clips,
+		"explicit_profile_mappings":explicit_profile_mappings,"profile_id":profile_id,
 		"binding_valid":binding_valid,"event_hold":event_hold,"missing_semantics":missing_semantics,
 		"rejected_source_clips":rejected_source_clips,"truthful_fail_closed":not binding_valid}

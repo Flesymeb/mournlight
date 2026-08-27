@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/enemies/authored/myconid_spore_priest.glb" id="1"]
+[ext_resource type="PackedScene" path="res://assets/enemies/authored/myconid_spore_priest_female.glb" id="2"]
+
+[node name="MosslingPresentation" type="Node3D"]
+
+[node name="VariantA" type="Node3D" parent="."]
+scale = Vector3(1.7, 1.7, 1.7)
+[node name="MyconidGuardian" parent="VariantA" instance=ExtResource("1")]
+
+[node name="VariantB" type="Node3D" parent="."]
+scale = Vector3(1.65, 1.65, 1.65)
+[node name="MyconidSporeCaster" parent="VariantB" instance=ExtResource("2")]

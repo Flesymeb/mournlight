@@ -1,4 +1,4 @@
-[gd_scene load_steps=25 format=3]
+[gd_scene load_steps=26 format=3]
 
 [ext_resource type="Script" path="res://scripts/player/warden_controller.gd" id="1_controller"]
 [ext_resource type="PackedScene" path="res://assets/authored/frost_mage.glb" id="2_model"]
@@ -15,6 +15,7 @@
 [ext_resource type="PackedScene" path="res://scenes/weapons/gravespade_sweep.tscn" id="13_sweep"]
 [ext_resource type="PackedScene" path="res://scenes/weapons/wandering_wisps.tscn" id="14_wisp"]
 [ext_resource type="Script" path="res://scripts/player/warden_health.gd" id="15_health"]
+[ext_resource type="Resource" path="res://resources/presentation/warden_animation_profile.tres" id="16_animation_profile"]
 
 [sub_resource type="CapsuleShape3D" id="PlayerShape"]
 radius = 0.42
@@ -70,6 +71,7 @@ process_mode = 1
 script = ExtResource("1_controller")
 collision_layer = 1
 collision_mask = 1
+animation_profile = ExtResource("16_animation_profile")
 
 [node name="Collider" type="CollisionShape3D" parent="."]
 position = Vector3(0, 0.82, 0)

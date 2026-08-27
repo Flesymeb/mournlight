@@ -65,6 +65,74 @@
         "walking.ogg": "51d44e4ce2e06607f7be1bb7fe60d7630c78fdbcd608e7c65d5a8910cc88680c",
         "weapon_change.ogg": "0b39e0f0d733cae3c44a838d67ab8c8510cf3b245016e398a7eb9ab13cda1449"
       }
+    },
+    {
+      "title": "Myconid Spore-Priest",
+      "source": "https://sketchfab.com/3d-models/myconid-spore-priest-dbb1d96780ef40debdbe29472a345503",
+      "asset_id": "dbb1d96780ef40debdbe29472a345503",
+      "license": "CC BY 4.0",
+      "sha256": "a3a19d77a2346d7efc31e2a834a17a2c04e7722c7a91d7373b3884ac8fa56330",
+      "receipt": "res://assets/enemies/authored/myconid_spore_priest.glb.receipt.json",
+      "binding": "res://scenes/enemies/presentation/mossling_presenter.tscn",
+      "integration": "Intact authored rigged source retained as deterministic Mossling and Bone Slinger wrapper variants."
+    },
+    {
+      "title": "Myconid Spore-Priest Female",
+      "source": "https://sketchfab.com/3d-models/myconid-spore-priest-female-99417ed650044e7f8a3a37da8a639eef",
+      "asset_id": "99417ed650044e7f8a3a37da8a639eef",
+      "license": "CC BY 4.0",
+      "sha256": "109192e54d62acc7e173bbb6d3ca1d4dc43d27fa7c9d2b7df73a5fd0eaa9f1c4",
+      "receipt": "res://assets/enemies/authored/myconid_spore_priest_female.glb.receipt.json",
+      "binding": "res://scenes/enemies/presentation/mossling_presenter.tscn",
+      "integration": "Intact authored rigged source retained as the deterministic alternate Mossling and Bone Slinger wrapper variant."
+    },
+    {
+      "title": "Undead Skeleton Warrior – Cursed 3D Model",
+      "source": "https://sketchfab.com/3d-models/undead-skeleton-warrior-cursed-3d-model-e4e2a55fb36a42f6973397ff5e46bef3",
+      "asset_id": "e4e2a55fb36a42f6973397ff5e46bef3",
+      "license": "CC BY 4.0",
+      "sha256": "9b480fd2415c9ce7584f7da4c15841d29f1c1ac683c77d9ff2466c2d9160659a",
+      "receipt": "res://assets/enemies/authored/undead_skeleton_warrior.glb.receipt.json",
+      "binding": "res://scenes/enemies/presentation/bone_slinger_presenter.tscn",
+      "integration": "Intact authored skeleton source retained under one product-owned wrapper transform."
+    },
+    {
+      "title": "The Gargoyle Stone-Warden",
+      "source": "https://sketchfab.com/3d-models/the-gargoyle-stone-warden-51bb0c401ca9465ab3f4478c88bde20c",
+      "asset_id": "51bb0c401ca9465ab3f4478c88bde20c",
+      "license": "CC BY 4.0",
+      "sha256": "336c09fe4200b882bc8fea116a9c12114ca68ba7eb229f057cdf37f1b6f6630d",
+      "receipt": "res://assets/enemies/authored/gargoyle_stone_warden.glb.receipt.json",
+      "binding": "res://scenes/enemies/presentation/wispbat_presenter.tscn",
+      "integration": "Intact authored winged source reused at role-specific authored wrapper scales for flying and elite silhouettes."
+    },
+    {
+      "title": "Stylized Possessed Lantern ordinary-role binding",
+      "source": "https://sketchfab.com/3d-models/stylized-possessed-lantern-e60a72a4d9de4349ae6b8f6c8976e094",
+      "asset_id": "e60a72a4d9de4349ae6b8f6c8976e094",
+      "license": "CC BY 4.0",
+      "sha256": "20861b1ca7a44ece27259cd82ea1f4bd999e1b3ddfb81ec54dbdd3610d139e6f",
+      "receipt": "res://assets/enemies/authored/possessed_lantern.glb.receipt.json",
+      "binding": "res://scenes/enemies/presentation/wispbat_presenter.tscn",
+      "integration": "Intact authored mechanical soul-lantern source bound as deterministic ordinary-role variants without changing the preserved Bellkeeper scene."
+    },
+    {
+      "title": "Mournlight fantasy weapon semantic SFX",
+      "source": "https://github.com/WynnSystems907/COBRA-FPS-Feelkit and https://github.com/QueenChristina/gd-dialog",
+      "asset_id": "cobra-fps-feel-kit@f87f4f1695f2165e1458af6ebee2ae158e804184 + gd-dialog@reference-pool-current",
+      "license": "Pixabay Content License recordings; MIT source projects",
+      "sha256": "f50140522ea9701f73d1699836bfdf7b0cbd06fe868775c1592effaa75a0ce1e",
+      "receipt": "res://assets/audio_semantic/mournlight_weapons/COBRA_LICENSE",
+      "binding": "res://resources/audio/mournlight_audio_library.tres",
+      "integration": "Six bounded non-firearm recordings provide distinct onset and impact identity for Lantern, Gravespade, and Wandering Wisps.",
+      "runtime_files": {
+        "lantern_onset.mp3": "f50140522ea9701f73d1699836bfdf7b0cbd06fe868775c1592effaa75a0ce1e",
+        "lantern_impact.mp3": "4980bb4a61597e4da7ff365872993cfdae068fd82e234c96739daa35e15743ee",
+        "gravespade_onset.mp3": "f8f92bb55fd1e0b9c45b131f323fdfd705e01ba3bb87ca42a1d52d9e73fd3d8b",
+        "gravespade_impact.mp3": "c5853618e427d8b7eb2de66dcc4f930fdb1f6ed6f3b313f713cc5e214a15ebbb",
+        "wisps_onset.wav": "c19e786aa1c04dd1b8b29e007bbcb6ab7a43fb18331cb38748c10c6a9d6938ae",
+        "wisps_impact.wav": "d41af74ffb4ed1be0a3900efaf9f6cddf38d7678625aef63f5dfb868a1f767e9"
+      }
     }
   ]
 }

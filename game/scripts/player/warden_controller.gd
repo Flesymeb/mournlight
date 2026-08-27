@@ -27,6 +27,7 @@ enum DashPhase { READY, ANTICIPATION, ACTIVE, RECOVERY, COOLDOWN }
 @export var dash_cooldown_remaining := 0.0
 @export var dash_invulnerable := false
 @export var plane_error := 0.0
+@export var animation_profile: Resource
 
 @onready var presentation_root: Node3D = $PresentationRoot
 @onready var model_pivot: Node3D = $PresentationRoot/ModelPivot
@@ -56,7 +57,7 @@ func _ready() -> void:
 	animation_binding = WardenAnimationBinding.new()
 	animation_binding.name = "SemanticAnimationBinding"
 	add_child(animation_binding)
-	animation_binding.bind(model_pivot)
+	animation_binding.bind(model_pivot, animation_profile)
 	var attack_runtime := get_node_or_null("Weapons/AttackRuntime")
 	if attack_runtime:
 		attack_runtime.attack_authorized.connect(func(_event: Dictionary) -> void: animation_binding.trigger("cast", 0.34))

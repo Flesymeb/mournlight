@@ -1,0 +1,8 @@
+[gd_resource type="Resource" format=3]
+
+[resource]
+resource_name = "Warden explicit semantic animation profile"
+metadata/profile_id = "warden.frost_mage.explicit.v1"
+metadata/source_scene = "res://assets/authored/frost_mage.glb"
+metadata/semantic_clips = {"cast":"","dash":"","death":"","hurt":"","idle":"","move":"","victory":""}
+metadata/validation_note = "The bound Frost Mage exposes no semantically identifiable clips. Empty exact mappings intentionally fail closed; no token inference or unrelated fallback is permitted."

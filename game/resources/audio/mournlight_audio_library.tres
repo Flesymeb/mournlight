@@ -1,4 +1,4 @@
-[gd_resource type="Resource" load_steps=17 format=3]
+[gd_resource type="Resource" load_steps=23 format=3]
 
 [ext_resource type="AudioStream" path="res://assets/audio_library/Music/Marksmans_Mayhem.ogg" id="1_music"]
 [ext_resource type="AudioStream" path="res://assets/audio_library/SFX/163441__under7dude__man-getting-hit.wav" id="2_hurt"]
@@ -16,15 +16,24 @@
 [ext_resource type="AudioStream" path="res://ui/menus/maaack/addons/fps_menu_skin/audio/ui_focus.wav" id="14_ui_focus"]
 [ext_resource type="AudioStream" path="res://ui/menus/maaack/addons/fps_menu_skin/audio/ui_confirm.wav" id="15_ui_confirm"]
 [ext_resource type="AudioStream" path="res://ui/menus/maaack/addons/fps_menu_skin/audio/ui_back.wav" id="16_ui_back"]
+[ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/lantern_onset.mp3" id="17_lantern_onset"]
+[ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/lantern_impact.mp3" id="18_lantern_impact"]
+[ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/gravespade_onset.mp3" id="19_spade_onset"]
+[ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/gravespade_impact.mp3" id="20_spade_impact"]
+[ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/wisps_onset.wav" id="21_wisps_onset"]
+[ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/wisps_impact.wav" id="22_wisps_impact"]
 
 [resource]
 resource_name = "Mournlight Semantic Audio Library"
 metadata/music = Array[AudioStream]([ExtResource("1_music")])
-metadata/weapon_warden_lantern = Array[AudioStream]([])
-metadata/weapon_gravespade = Array[AudioStream]([])
-metadata/weapon_wandering_wisps = Array[AudioStream]([])
+metadata/weapon_warden_lantern_onset = Array[AudioStream]([ExtResource("17_lantern_onset")])
+metadata/weapon_warden_lantern_impact = Array[AudioStream]([ExtResource("18_lantern_impact")])
+metadata/weapon_gravespade_onset = Array[AudioStream]([ExtResource("19_spade_onset")])
+metadata/weapon_gravespade_impact = Array[AudioStream]([ExtResource("20_spade_impact")])
+metadata/weapon_wandering_wisps_onset = Array[AudioStream]([ExtResource("21_wisps_onset")])
+metadata/weapon_wandering_wisps_impact = Array[AudioStream]([ExtResource("22_wisps_impact")])
 metadata/rejected_weapon_auditions = Array[AudioStream]([ExtResource("3_lantern"), ExtResource("4_wisps"), ExtResource("5_spade"), ExtResource("6_land"), ExtResource("9_jump_b"), ExtResource("10_jump_c")])
-metadata/disabled_semantics = {"weapon_gravespade":"No licensed gravespade recording passed semantic review.","weapon_warden_lantern":"Firearm-derived blaster audition rejected by the frozen audio rule.","weapon_wandering_wisps":"Firearm-derived repeater audition rejected by the frozen audio rule."}
+metadata/disabled_semantics = {}
 metadata/impact = Array[AudioStream]([ExtResource("12_impact"), ExtResource("6_land")])
 metadata/warden_hurt = Array[AudioStream]([ExtResource("2_hurt")])
 metadata/footstep = Array[AudioStream]([ExtResource("7_walk")])
@@ -40,9 +49,9 @@ metadata/enemy_death = Array[AudioStream]([ExtResource("13_destroy")])
 metadata/boss_phase = Array[AudioStream]([ExtResource("11_warning"), ExtResource("13_destroy")])
 metadata/death = Array[AudioStream]([ExtResource("2_hurt"), ExtResource("13_destroy")])
 metadata/victory = Array[AudioStream]([ExtResource("8_jump_a"), ExtResource("9_jump_b"), ExtResource("10_jump_c")])
-metadata/owners = {"boss_phase":"critical","dash":"movement","death":"critical","enemy_death":"impacts","enemy_warning":"warnings","footstep":"movement","impact":"impacts","pickup":"rewards","ui_back":"ui","ui_confirm":"ui","ui_focus":"ui","upgrade_confirm":"critical","upgrade_open":"critical","victory":"critical","warden_hurt":"critical","weapon_gravespade":"gravespade","weapon_warden_lantern":"lantern","weapon_wandering_wisps":"wisps"}
-metadata/priorities = {"boss_phase":100,"dash":55,"death":100,"enemy_death":35,"enemy_warning":85,"footstep":10,"impact":20,"pickup":60,"ui_back":70,"ui_confirm":75,"ui_focus":45,"upgrade_confirm":95,"upgrade_open":90,"victory":100,"warden_hurt":100,"weapon_gravespade":45,"weapon_warden_lantern":45,"weapon_wandering_wisps":45}
-metadata/volumes_db = {"boss_phase":-4.0,"dash":-10.0,"death":-3.0,"enemy_death":-13.0,"enemy_warning":-8.0,"footstep":-22.0,"impact":-17.0,"pickup":-11.0,"ui_back":-12.0,"ui_confirm":-10.0,"ui_focus":-18.0,"upgrade_confirm":-7.0,"upgrade_open":-10.0,"victory":-4.0,"warden_hurt":-5.0,"weapon_gravespade":-10.0,"weapon_warden_lantern":-12.0,"weapon_wandering_wisps":-15.0}
+metadata/owners = {"boss_phase":"critical","dash":"movement","death":"critical","enemy_death":"impacts","enemy_warning":"warnings","footstep":"movement","impact":"impacts","pickup":"rewards","ui_back":"ui","ui_confirm":"ui","ui_focus":"ui","upgrade_confirm":"critical","upgrade_open":"critical","victory":"critical","warden_hurt":"critical","weapon_gravespade_impact":"gravespade","weapon_gravespade_onset":"gravespade","weapon_warden_lantern_impact":"lantern","weapon_warden_lantern_onset":"lantern","weapon_wandering_wisps_impact":"wisps","weapon_wandering_wisps_onset":"wisps"}
+metadata/priorities = {"boss_phase":100,"dash":55,"death":100,"enemy_death":35,"enemy_warning":85,"footstep":10,"impact":20,"pickup":60,"ui_back":70,"ui_confirm":75,"ui_focus":45,"upgrade_confirm":95,"upgrade_open":90,"victory":100,"warden_hurt":100,"weapon_gravespade_impact":48,"weapon_gravespade_onset":52,"weapon_warden_lantern_impact":48,"weapon_warden_lantern_onset":52,"weapon_wandering_wisps_impact":42,"weapon_wandering_wisps_onset":46}
+metadata/volumes_db = {"boss_phase":-4.0,"dash":-10.0,"death":-3.0,"enemy_death":-13.0,"enemy_warning":-8.0,"footstep":-22.0,"impact":-17.0,"pickup":-11.0,"ui_back":-12.0,"ui_confirm":-10.0,"ui_focus":-18.0,"upgrade_confirm":-7.0,"upgrade_open":-10.0,"victory":-4.0,"warden_hurt":-5.0,"weapon_gravespade_impact":-10.0,"weapon_gravespade_onset":-9.0,"weapon_warden_lantern_impact":-12.0,"weapon_warden_lantern_onset":-11.0,"weapon_wandering_wisps_impact":-16.0,"weapon_wandering_wisps_onset":-15.0}
 metadata/owner_limits = {"critical":3,"gravespade":2,"impacts":3,"lantern":2,"movement":2,"rewards":2,"ui":2,"warnings":2,"wisps":2}
-metadata/source_revision = "kenney-starter-kit-fps@185fd2326d74a5cf858cffc616f87cf9696f9cc0"
-metadata/source_license = "MIT"
+metadata/source_revision = "cobra-fps-feel-kit@f87f4f1695f2165e1458af6ebee2ae158e804184 + gd-dialog@reference-pool-current"
+metadata/source_license = "Pixabay Content License recordings; MIT source projects"
