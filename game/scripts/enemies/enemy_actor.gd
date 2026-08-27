@@ -29,6 +29,7 @@ var _lifetime := 0.0
 var _flank_sign := 1.0
 var _pool_return_pending := false
 var retirement_count := 0
+var neighbor_registry: EnemyNeighborRegistry
 
 func _ready() -> void:
 	add_to_group("combat_targets")
@@ -40,10 +41,13 @@ func _ready() -> void:
 	visible = false
 	collider.disabled = true
 
-func activate(next_profile: EnemyProfile, next_target: WardenController, at_position: Vector3, generation: int) -> void:
+func activate(next_profile: EnemyProfile, next_target: WardenController, at_position: Vector3, generation: int, registry: EnemyNeighborRegistry = null) -> void:
+	if is_instance_valid(neighbor_registry):
+		neighbor_registry.unregister_actor(stable_id, spawn_generation)
 	profile = next_profile
 	target = next_target
 	spawn_generation = generation
+	neighbor_registry = registry
 	_lifetime = 0.0
 	attack_serial = 0
 	hurt_count = 0
@@ -66,9 +70,13 @@ func activate(next_profile: EnemyProfile, next_target: WardenController, at_posi
 	collider.disabled = false
 	_set_state("spawn", 0.55)
 	set_physics_process(true)
+	if is_instance_valid(neighbor_registry):
+		neighbor_registry.register_actor(self)
 	lifecycle_event.emit(_event("spawn", {"position": global_position, "role_id": String(profile.role_id)}))
 
 func return_to_pool() -> void:
+	if is_instance_valid(neighbor_registry):
+		neighbor_registry.unregister_actor(stable_id, spawn_generation)
 	set_physics_process(false)
 	velocity = Vector3.ZERO
 	target = null
@@ -81,6 +89,7 @@ func return_to_pool() -> void:
 	lane_cue.visible = false
 	_pool_return_pending = false
 	lifecycle_event.emit(_event("pool_return"))
+	neighbor_registry = null
 
 func retire_from_pressure(reason: String, reconciliation_id: int) -> Dictionary:
 	if state == "pooled":
@@ -138,9 +147,8 @@ func _steer_approach(delta: float) -> void:
 	if profile.attack_kind == "flank" and to_target.length() > 2.4:
 		desired = (desired + Vector3(-desired.z, 0.0, desired.x) * _flank_sign * 0.62).normalized()
 	var separation := Vector3.ZERO
-	for other in get_tree().get_nodes_in_group("active_enemies"):
-		if other == self or not (other is EnemyActor):
-			continue
+	var neighbors: Array[EnemyActor] = neighbor_registry.query_neighbors(self, profile.separation_radius) if is_instance_valid(neighbor_registry) else []
+	for other in neighbors:
 		var away: Vector3 = global_position - other.global_position
 		away.y = 0.0
 		var distance := away.length()

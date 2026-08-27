@@ -183,6 +183,19 @@ func reset_for_run() -> void:
 	_variation_cursor.clear()
 	_footstep_clock = 0.0
 
+func retire_run_ownership(route: String, generation: int) -> Dictionary:
+	var stopped_effects := 0
+	var owners_before: Array[String] = []
+	for index in voices.size():
+		if voices[index].playing:
+			stopped_effects += 1
+			owners_before.append(voice_owners[index])
+		voices[index].stop()
+		_release_voice(index)
+	_stop_music()
+	_footstep_clock = 0.0
+	return {"route":route, "generation":generation, "stopped_effects":stopped_effects, "owners_before":owners_before, "active_effect_voices":0, "music_state":music_state, "music_playing":music.playing}
+
 func _mcp_state() -> Dictionary:
 	var playing := 0
 	var active_by_owner: Dictionary = {}

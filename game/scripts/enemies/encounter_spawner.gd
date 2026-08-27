@@ -34,6 +34,7 @@ var _elite_every := 0
 var _reconciliation_serial := 0
 var retired_total := 0
 var last_reconciliation_receipt: Dictionary = {}
+var neighbor_registry: EnemyNeighborRegistry
 
 const LANES := [
 	Vector3(-10.2, 0.05, -7.8), Vector3(-4.2, 0.05, -8.8),
@@ -43,6 +44,8 @@ const LANES := [
 ]
 
 func _ready() -> void:
+	neighbor_registry = EnemyNeighborRegistry.new()
+	add_child(neighbor_registry)
 	for index in range(pool_size):
 		var actor := enemy_scene.instantiate() as EnemyActor
 		actor.stable_id = StringName("enemy.pool.%02d" % index)
@@ -85,6 +88,7 @@ func stop_encounter() -> void:
 		if actor.state != "pooled":
 			actor.remove_from_group("active_enemies")
 			actor.return_to_pool()
+	neighbor_registry.clear()
 	_emit_snapshot()
 
 func reset_encounter() -> void:
@@ -104,6 +108,7 @@ func reset_encounter() -> void:
 	for actor in _pool:
 		actor.remove_from_group("active_enemies")
 		actor.return_to_pool()
+	neighbor_registry.clear()
 
 func _process(delta: float) -> void:
 	if not active:
@@ -129,7 +134,7 @@ func _spawn_one(role_offset: int) -> bool:
 		_generation_by_id[actor.stable_id] = generation
 		var selected_profile := _select_profile(_wave_spawned + role_offset)
 		actor.add_to_group("active_enemies")
-		actor.activate(selected_profile, player, position, generation)
+		actor.activate(selected_profile, player, position, generation, neighbor_registry)
 		spawned_total += 1
 		_wave_spawned += 1
 		_spawn_cursor = (lane_index + 1) % LANES.size()
@@ -245,9 +250,12 @@ func _on_enemy_defeated(actor: EnemyActor, event: Dictionary) -> void:
 	report.role_id = String(actor.profile.role_id)
 	enemy_defeated.emit(report)
 	_emit_snapshot()
+	var defeated_generation := actor.spawn_generation
 	var tween := create_tween()
 	tween.tween_interval(0.78)
 	tween.tween_callback(func() -> void:
+		if not is_instance_valid(actor) or actor.spawn_generation != defeated_generation or actor.state != "death":
+			return
 		actor.remove_from_group("active_enemies")
 		actor.return_to_pool()
 		_emit_snapshot()
@@ -279,6 +287,7 @@ func get_snapshot() -> Dictionary:
 		"wave_id": _wave_id, "wave_spawned": _wave_spawned, "spawn_budget": _spawn_budget,
 		"composition_weights": _composition_weights, "elite_every": _elite_every,
 		"retired": retired_total, "last_reconciliation": last_reconciliation_receipt,
+		"neighbor_registry": neighbor_registry.get_snapshot() if is_instance_valid(neighbor_registry) else {},
 	}
 
 func _mcp_state() -> Dictionary:

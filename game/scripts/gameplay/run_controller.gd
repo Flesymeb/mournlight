@@ -39,6 +39,9 @@ var state_history: Array[String] = []
 var last_snapshot: Dictionary = {}
 var _snapshot_clock := 0.0
 var _last_health := 100.0
+var teardown_receipt: Dictionary = {}
+var _teardown_generation := 0
+var _teardown_active := false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -60,7 +63,7 @@ func _ready() -> void:
 	world.attack_runtime.hit_resolved.connect(_on_player_hit_resolved)
 	warden.dash_phase_changed.connect(_on_dash_changed)
 	if OS.has_feature("editor"):
-		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_result_failure", &"validation_prepare_result_victory"]:
+		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_draft", &"validation_prepare_result_failure", &"validation_prepare_result_victory"]:
 			if not InputMap.has_action(action):
 				InputMap.add_action(action)
 	_enter_title()
@@ -82,6 +85,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_prepare_validation_wave(4)
 		get_viewport().set_input_as_handled()
 		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"validation_prepare_draft"):
+		_open_upgrade_draft()
+		get_viewport().set_input_as_handled()
+		return
 	if OS.has_feature("editor") and event.is_action_pressed(&"validation_prepare_result_failure"):
 		_prepare_validation_result("failure")
 		get_viewport().set_input_as_handled()
@@ -98,6 +105,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func start_run() -> void:
+	_teardown_run("fresh_start", "defensive_start_cleanup")
+	_begin_run()
+
+func _begin_run() -> void:
 	get_tree().paused = false
 	_transition("initializing")
 	run_serial += 1
@@ -111,8 +122,6 @@ func start_run() -> void:
 	outcome = ""
 	selected_upgrades.clear()
 	boss_snapshot.clear()
-	if is_instance_valid(boss): boss.queue_free()
-	boss = null
 	result_committed = false
 	terminal_snapshot.clear()
 	draft_controller.reset()
@@ -132,26 +141,13 @@ func start_run() -> void:
 	_emit_snapshot()
 
 func retry_run() -> void:
+	_teardown_run("retry", "player_retry")
 	_transition("retrying")
-	get_tree().paused = false
-	spawner.stop_encounter()
-	wave_director.reset()
-	draft_controller.reset()
-	draft_view.close()
-	if is_instance_valid(boss): boss.queue_free()
-	boss = null
-	start_run()
+	_begin_run()
 
 func _enter_title() -> void:
-	get_tree().paused = false
-	spawner.stop_encounter()
-	wave_director.reset()
-	if is_instance_valid(boss):
-		boss.queue_free()
-	boss = null
+	_teardown_run("title", "return_to_title")
 	boss_snapshot.clear()
-	world.reset_session()
-	world.set_session_active(false)
 	hud.clear_snapshot()
 	_transition("title")
 	shell.set_mode("hidden")
@@ -180,12 +176,8 @@ func _on_warden_failed(event: Dictionary) -> void:
 	result_committed = true
 	outcome = "failure"
 	_commit_terminal_snapshot("failure")
-	spawner.stop_encounter()
-	wave_director.terminate("failure")
-	world.set_session_active(false)
-	if is_instance_valid(boss):
-		boss.terminate("failure")
 	if warden.animation_binding: warden.animation_binding.trigger("death",999.0)
+	_teardown_run("result", "failure")
 	get_tree().paused = true
 	_transition("failure")
 	_emit_snapshot()
@@ -279,7 +271,7 @@ func _open_upgrade_draft() -> void:
 	warden.reset_input_latch()
 	_transition("draft")
 	get_tree().paused = true
-	draft_controller.open_draft()
+	draft_controller.open_draft(inventory, health, warden)
 
 func _on_draft_opened(cards: Array[Dictionary]) -> void:
 	draft_view.present(cards)
@@ -314,8 +306,11 @@ func _spawn_bellkeeper() -> void:
 	boss.configure(warden)
 	boss.boss_changed.connect(_on_boss_changed)
 	boss.defeated.connect(_on_boss_defeated)
-	boss.phase_shifted.connect(func(_phase: int) -> void: audio_director.play_semantic("boss_phase"))
+	boss.phase_shifted.connect(_on_boss_phase_shifted)
 	boss_snapshot = boss.get_snapshot()
+
+func _on_boss_phase_shifted(_phase: int) -> void:
+	audio_director.play_semantic("boss_phase")
 
 func _on_boss_changed(snapshot: Dictionary) -> void:
 	boss_snapshot = snapshot.duplicate(true)
@@ -327,9 +322,7 @@ func _on_boss_defeated(_event: Dictionary) -> void:
 	result_committed = true
 	outcome = "victory"
 	_commit_terminal_snapshot("victory")
-	spawner.stop_encounter()
-	wave_director.terminate("victory")
-	world.set_session_active(false)
+	_teardown_run("result", "victory")
 	get_tree().paused = true
 	_transition("victory")
 	if warden.animation_binding: warden.animation_binding.trigger("victory",999.0)
@@ -348,6 +341,69 @@ func _commit_terminal_snapshot(terminal_outcome: String) -> void:
 	terminal_snapshot["committed"] = true
 	terminal_snapshot["commit_run_serial"] = run_serial
 	terminal_snapshot = terminal_snapshot.duplicate(true)
+
+func _teardown_run(route: String, reason: String) -> Dictionary:
+	if _teardown_active:
+		return teardown_receipt.duplicate(true)
+	_teardown_active = true
+	_teardown_generation += 1
+	get_tree().paused = false
+	draft_controller.reset()
+	draft_view.close()
+	if route == "result":
+		wave_director.terminate(reason)
+	else:
+		wave_director.reset()
+	spawner.stop_encounter()
+	var boss_retirement := {"active":false, "state":"absent", "reason":reason, "completion_generation":_teardown_generation}
+	if not is_instance_valid(boss) and int(teardown_receipt.get("run_serial", -1)) == run_serial:
+		var previous_boss_retirement: Dictionary = teardown_receipt.get("boss_retirement", {})
+		if String(previous_boss_retirement.get("state", "")).begins_with("retired_"):
+			boss_retirement = previous_boss_retirement.duplicate(true)
+	if is_instance_valid(boss):
+		boss_retirement = boss.retire_run_actor(reason, _teardown_generation)
+		boss_snapshot = boss.get_snapshot().duplicate(true)
+		if boss.boss_changed.is_connected(_on_boss_changed):
+			boss.boss_changed.disconnect(_on_boss_changed)
+		if boss.defeated.is_connected(_on_boss_defeated):
+			boss.defeated.disconnect(_on_boss_defeated)
+		if boss.phase_shifted.is_connected(_on_boss_phase_shifted):
+			boss.phase_shifted.disconnect(_on_boss_phase_shifted)
+		boss.queue_free()
+	boss = null
+	world.set_session_active(false)
+	world.reset_session()
+	var retired_attack_presentations := _retire_run_group("friendly_attack")
+	var audio_retirement := audio_director.retire_run_ownership(route, _teardown_generation)
+	var encounter := spawner.get_snapshot()
+	teardown_receipt = {
+		"run_serial":run_serial, "route":route, "reason":reason,
+		"boss_retirement":boss_retirement, "boss_reference_cleared":boss == null,
+		"active_enemy_group_count":get_tree().get_nodes_in_group("active_enemies").size(),
+		"spawner_live":encounter.get("live", -1), "spawner_pooled":encounter.get("pooled", -1),
+		"spawner_registered":(encounter.get("neighbor_registry", {}) as Dictionary).get("registered_count", -1),
+		"world_active":world.session_active, "tree_paused":get_tree().paused,
+		"retired_attack_presentations":retired_attack_presentations,
+		"remaining_attack_presentations":get_tree().get_nodes_in_group("friendly_attack").size(),
+		"audio_retirement":audio_retirement, "terminal_snapshot_preserved":not terminal_snapshot.is_empty(),
+		"completion_generation":_teardown_generation, "complete":true,
+	}
+	_teardown_active = false
+	return teardown_receipt.duplicate(true)
+
+func _retire_run_group(group_name: StringName) -> int:
+	var retired := 0
+	for node in get_tree().get_nodes_in_group(group_name):
+		if not is_instance_valid(node):
+			continue
+		retired += 1
+		if node is Node3D:
+			(node as Node3D).visible = false
+		node.process_mode = Node.PROCESS_MODE_DISABLED
+		node.remove_from_group(group_name)
+		if not node.is_queued_for_deletion():
+			node.queue_free()
+	return retired
 
 func _transition(next_state: String) -> void:
 	if run_state == next_state:
@@ -374,9 +430,11 @@ func _prepare_validation_result(validation_outcome: String) -> void:
 	if not OS.has_feature("editor") or run_state not in ["active","boss"]:
 		return
 	inventory.prepare_legal_build("representative")
+	var lantern := inventory.get_stats(&"warden_lantern")
+	var spade := inventory.get_stats(&"gravespade")
+	var wisps := inventory.get_stats(&"wandering_wisps")
 	selected_upgrades = [
-		{"id":"lantern_focus","title":"Focused Flame","rank_label":"R2","concrete_change":"+25% DAMAGE"},
-		{"id":"dash_cooldown","title":"Moonstep","rank_label":"R1","concrete_change":"15% FASTER DASH"},
+		{"id":"representative_build","title":"Three-weapon Vigil","rank_label":"MAX","concrete_change":"Lantern %.0f • Spade %.0f • Wisps %.0f" % [lantern.damage, spade.damage, wisps.damage]},
 	]
 	defeated_enemies = maxi(defeated_enemies,18)
 	damage_dealt = maxi(damage_dealt,742)
@@ -398,6 +456,7 @@ func _emit_snapshot() -> void:
 func _mcp_state() -> Dictionary:
 	var wave_state := wave_director.get_snapshot()
 	return {
+		"authoritative_teardown":teardown_receipt,
 		"run_state": run_state, "run_serial": run_serial, "run_elapsed": run_elapsed,
 		"experience": experience, "experience_threshold": experience_threshold, "level": level,
 		"defeated_enemies": defeated_enemies, "damage_taken": damage_taken,
@@ -405,6 +464,7 @@ func _mcp_state() -> Dictionary:
 		"wave":{"wave":wave_state.get("wave",0),"wave_count":wave_state.get("wave_count",5),"phase":wave_state.get("phase","idle"),"title":wave_state.get("title","")},
 		"boss":{"active":boss_snapshot.get("active",false),"health":boss_snapshot.get("health",0.0),"health_maximum":boss_snapshot.get("health_maximum",0.0),"phase":boss_snapshot.get("phase",0)},"quit_requested":quit_requested,
 		"result_committed": result_committed, "terminal_snapshot_digest": _terminal_snapshot_digest(), "state_history": state_history,
+		"upgrade_draft":draft_controller.get_snapshot(), "teardown_receipt":teardown_receipt,
 		"tree_paused": get_tree().paused, "shell_mode": shell.mode,
 		"shell_return_mode": shell.return_mode, "shell_action_latched": shell.action_latched,
 		"shell_focus": String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none",

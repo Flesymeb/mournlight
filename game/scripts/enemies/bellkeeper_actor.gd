@@ -8,6 +8,7 @@ signal phase_shifted(phase: int)
 @onready var health: HealthComponent = $HealthComponent
 @onready var telegraph: MeshInstance3D = $Telegraph
 @onready var presentation: Node3D = $Presentation
+@onready var collider: CollisionShape3D = $Collider
 var target: WardenController
 var state := "entrance"
 var phase := 1
@@ -21,6 +22,8 @@ var bell_wave_count := 0
 var lane_pressure_count := 0
 var phase_shift_count := 0
 var _telegraph_direction := Vector3.FORWARD
+var _retirement_receipt: Dictionary = {}
+var _death_tween: Tween
 
 func _ready() -> void:
 	add_to_group("combat_targets")
@@ -37,6 +40,12 @@ func configure(next_target: WardenController) -> void:
 	state = "entrance"
 	phase = 1
 	committed = false
+	_retirement_receipt.clear()
+	visible = true
+	collider.disabled = false
+	collision_layer = 1
+	collision_mask = 1
+	process_mode = Node.PROCESS_MODE_INHERIT
 	telegraph_kind = "bell_wave"
 	vulnerable = false
 	bell_wave_count = 0
@@ -130,22 +139,45 @@ func _on_died(event: Dictionary) -> void:
 	remove_from_group("active_enemies")
 	velocity = Vector3.ZERO
 	telegraph.visible = false
-	var tween := create_tween()
-	tween.tween_property(presentation, "scale", Vector3(1.4, 0.15, 1.4), 0.75)
+	_death_tween = create_tween()
+	_death_tween.tween_property(presentation, "scale", Vector3(1.4, 0.15, 1.4), 0.75)
 	defeated.emit(event)
 	boss_changed.emit(get_snapshot())
 
 func terminate(reason: String) -> void:
-	if committed:
-		return
+	retire_run_actor(reason, 0)
+
+func retire_run_actor(reason: String, completion_generation: int) -> Dictionary:
+	if not _retirement_receipt.is_empty():
+		return _retirement_receipt.duplicate(true)
 	committed = true
-	state = "terminated_" + reason
+	state = "retired_" + reason
 	vulnerable = false
+	target = null
 	velocity = Vector3.ZERO
+	attack_clock = 0.0
+	state_clock = 0.0
 	telegraph.visible = false
+	visible = false
 	set_physics_process(false)
+	set_process(false)
+	process_mode = Node.PROCESS_MODE_DISABLED
+	collider.disabled = true
+	collision_layer = 0
+	collision_mask = 0
 	remove_from_group("active_enemies")
+	remove_from_group("combat_targets")
+	if is_instance_valid(_death_tween):
+		_death_tween.kill()
+	_retirement_receipt = {
+		"stable_id":"boss.bellkeeper", "reason":reason, "completion_generation":completion_generation,
+		"active":false, "state":state, "visible":visible, "physics_enabled":is_physics_processing(),
+		"collision_layer":collision_layer, "collision_mask":collision_mask,
+		"in_active_group":is_in_group("active_enemies"), "in_combat_group":is_in_group("combat_targets"),
+		"telegraph_visible":telegraph.visible,
+	}
 	boss_changed.emit(get_snapshot())
+	return _retirement_receipt.duplicate(true)
 
 func is_legal_target() -> bool:
 	return not committed and health.is_alive() and vulnerable

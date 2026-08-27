@@ -13,6 +13,7 @@ var sweep_count := 0
 var presentation_variant := -1
 var last_target_id := ""
 var _emitting := false
+var _runtime_generation := 0
 
 func _physics_process(delta: float) -> void:
 	if not inventory.is_equipped(weapon_id):
@@ -29,6 +30,7 @@ func _physics_process(delta: float) -> void:
 		attack_phase = "ready_no_target"
 
 func _emit_sweep(primary_target: Node3D, stats: Dictionary) -> void:
+	var generation := _runtime_generation
 	_emitting = true
 	attack_phase = "anticipation"
 	last_target_id = String(primary_target.get_stable_id())
@@ -37,6 +39,8 @@ func _emit_sweep(primary_target: Node3D, stats: Dictionary) -> void:
 	if direction.length_squared() > 0.001:
 		global_rotation.y = atan2(direction.x, direction.z)
 	await get_tree().create_timer(0.14).timeout
+	if generation != _runtime_generation:
+		return
 	if not is_instance_valid(primary_target) or not primary_target.is_legal_target():
 		attack_phase = "rejected"
 		_emitting = false
@@ -64,9 +68,20 @@ func _emit_sweep(primary_target: Node3D, stats: Dictionary) -> void:
 			attack_runtime.resolve_hit(event, target)
 	attack_phase = "impact"
 	await get_tree().create_timer(0.16).timeout
+	if generation != _runtime_generation:
+		return
 	attack_phase = "recovery"
 	attack_runtime.finish_attack(String(event.attack_id))
 	cooldown_remaining = float(stats.cooldown)
+	_emitting = false
+
+func reset_runtime() -> void:
+	_runtime_generation += 1
+	cooldown_remaining = 0.35
+	attack_phase = "unequipped" if not inventory.is_equipped(weapon_id) else "cooldown"
+	sweep_count = 0
+	presentation_variant = -1
+	last_target_id = ""
 	_emitting = false
 
 func _mcp_state() -> Dictionary:

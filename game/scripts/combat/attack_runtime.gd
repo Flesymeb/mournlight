@@ -37,7 +37,7 @@ func authorize(weapon_id: StringName, target: Node3D, stats: Dictionary, hit_pol
 	}
 	_hit_ledgers[attack_id] = {}
 	authorized_count += 1
-	last_event = event
+	last_event = event.duplicate(true)
 	attack_authorized.emit(event)
 	return event
 
@@ -59,7 +59,7 @@ func resolve_hit(attack_event: Dictionary, target: Node3D) -> Dictionary:
 	if result.get("accepted", false):
 		hit_count += 1
 		result.phase = "impact"
-		last_event = result
+		last_event = result.duplicate(true)
 		hit_resolved.emit(result)
 	return result
 
@@ -75,7 +75,7 @@ func reject_attack(weapon_id: StringName, reason: String) -> Dictionary:
 func _reject(weapon_id: StringName, reason: String) -> Dictionary:
 	rejection_count += 1
 	var event := {"accepted": false, "weapon_id": String(weapon_id), "rejection_reason": reason, "phase": "rejected"}
-	last_event = event
+	last_event = event.duplicate(true)
 	attack_rejected.emit(event)
 	return event
 

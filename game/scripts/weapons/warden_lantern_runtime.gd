@@ -19,6 +19,7 @@ var resolved_hit_count := 0
 var presentation_variant := -1
 var last_attack_id := ""
 var _emitting := false
+var _runtime_generation := 0
 
 func _ready() -> void:
 	audio_player.stop()
@@ -39,10 +40,13 @@ func _physics_process(delta: float) -> void:
 	_emit_attack(target, stats)
 
 func _emit_attack(target: Node3D, stats: Dictionary) -> void:
+	var generation := _runtime_generation
 	_emitting = true
 	attack_phase = "anticipation"
 	selected_target_id = String(target.get_stable_id())
 	await get_tree().create_timer(0.11).timeout
+	if generation != _runtime_generation:
+		return
 	if not is_instance_valid(target) or not target.is_inside_tree() or not target.is_legal_target():
 		attack_runtime.reject_attack(weapon_id, "target_invalid_during_anticipation")
 		attack_phase = "rejected"
@@ -63,17 +67,22 @@ func _emit_attack(target: Node3D, stats: Dictionary) -> void:
 		get_tree().current_scene.add_child(bolt)
 		bolt.configure(global_position, target.global_position, event, presentation_variant)
 	await get_tree().create_timer(0.18 + TRAVEL_VARIANTS[presentation_variant]).timeout
+	if generation != _runtime_generation:
+		return
 	attack_phase = "impact"
 	var result := attack_runtime.resolve_hit(event, target)
 	if result.get("accepted", false):
 		resolved_hit_count += 1
 	await get_tree().create_timer(0.12).timeout
+	if generation != _runtime_generation:
+		return
 	attack_phase = "recovery"
 	attack_runtime.finish_attack(String(event.attack_id))
 	cooldown_remaining = float(stats.cooldown)
 	_emitting = false
 
 func reset_runtime() -> void:
+	_runtime_generation += 1
 	cooldown_remaining = 0.18
 	attack_phase = "cooldown"
 	selected_target_id = ""

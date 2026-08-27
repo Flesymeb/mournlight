@@ -64,6 +64,18 @@ func rank_up(weapon_id: StringName) -> void:
 	_ranks[weapon_id] = mini(definition.max_rank, maxi(1, int(_ranks.get(weapon_id, 0))) + 1)
 	build_changed.emit(get_snapshot())
 
+func apply_rank_projection(weapon_id: StringName, result_rank: int, expected_current_rank: int) -> bool:
+	var definition := get_definition(weapon_id)
+	if not definition or get_rank(weapon_id) != expected_current_rank:
+		return false
+	if result_rank != expected_current_rank + 1 or result_rank < 1 or result_rank > definition.max_rank:
+		return false
+	if not equipped_weapon_ids.has(weapon_id):
+		equipped_weapon_ids.append(weapon_id)
+	_ranks[weapon_id] = result_rank
+	build_changed.emit(get_snapshot())
+	return true
+
 func get_snapshot() -> Dictionary:
 	var weapons: Array[Dictionary] = []
 	for definition in definitions:
