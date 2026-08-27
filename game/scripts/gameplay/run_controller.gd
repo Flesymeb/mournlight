@@ -39,6 +39,7 @@ var state_history: Array[String] = []
 var last_snapshot: Dictionary = {}
 var _snapshot_clock := 0.0
 var _last_health := 100.0
+var _health_accounting_suspended := false
 var teardown_receipt: Dictionary = {}
 var _teardown_generation := 0
 var _teardown_active := false
@@ -48,6 +49,15 @@ var _terminal_handoff_release_frames := 0
 var terminal_handoff_receipt: Dictionary = {}
 var _validation_setup_generation := 0
 var validation_density_receipt: Dictionary = {}
+var validation_profile_receipt: Dictionary = {}
+var validation_profile_sample: Dictionary = {}
+var validation_retry_baselines: Array[Dictionary] = []
+var _profile_samples_ms: Array[float] = []
+var _profile_active := false
+var _profile_elapsed := 0.0
+var _profile_duration := 4.0
+var _next_baseline_reason := "fresh_start"
+var _retry_baseline_generation := 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -69,13 +79,14 @@ func _ready() -> void:
 	world.attack_runtime.hit_resolved.connect(_on_player_hit_resolved)
 	warden.dash_phase_changed.connect(_on_dash_changed)
 	if OS.has_feature("editor"):
-		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_draft", &"validation_prepare_result_failure", &"validation_prepare_result_victory", &"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_reset_density"]:
+		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_draft", &"validation_prepare_result_failure", &"validation_prepare_result_victory", &"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_reset_density", &"validation_prepare_final_profile", &"validation_advance_final_profile", &"validation_reset_final_profile"]:
 			if not InputMap.has_action(action):
 				InputMap.add_action(action)
 	_enter_title()
 
 func _process(delta: float) -> void:
 	_advance_terminal_handoff()
+	_advance_profile_sample(delta)
 	if run_state in ["active","boss"] and not get_tree().paused:
 		run_elapsed += delta
 	_snapshot_clock -= delta
@@ -84,6 +95,18 @@ func _process(delta: float) -> void:
 		_emit_snapshot()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if OS.has_feature("editor") and event.is_action_pressed(&"validation_prepare_final_profile"):
+		_prepare_final_profile()
+		get_viewport().set_input_as_handled()
+		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"validation_advance_final_profile"):
+		_advance_final_profile()
+		get_viewport().set_input_as_handled()
+		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"validation_reset_final_profile"):
+		_reset_final_profile()
+		get_viewport().set_input_as_handled()
+		return
 	if OS.has_feature("editor") and event.is_action_pressed(&"validation_prepare_density_3"):
 		_prepare_validation_density_checkpoint(3)
 		get_viewport().set_input_as_handled()
@@ -136,6 +159,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func start_run() -> void:
+	_next_baseline_reason = "fresh_start"
 	_teardown_run("fresh_start", "defensive_start_cleanup")
 	_begin_run()
 
@@ -158,10 +182,12 @@ func _begin_run() -> void:
 	draft_controller.reset()
 	audio_director.reset_for_run()
 	world.reset_session()
+	_health_accounting_suspended = true
 	health.maximum_health = 100.0
 	health.reset_warden_health()
 	warden.cooldown_duration = 0.72
 	_last_health = health.current_health
+	_health_accounting_suspended = false
 	inventory.reset_starting_build()
 	world.set_session_active(true)
 	title_menu.hide()
@@ -169,9 +195,12 @@ func _begin_run() -> void:
 	spawner.reset_encounter()
 	wave_director.begin()
 	_transition("active")
+	_record_retry_baseline(_next_baseline_reason)
+	_next_baseline_reason = "ordinary_run"
 	_emit_snapshot()
 
 func retry_run() -> void:
+	_next_baseline_reason = "retry"
 	_teardown_run("retry", "player_retry")
 	_transition("retrying")
 	_begin_run()
@@ -266,6 +295,9 @@ func _present_result(_event: Dictionary) -> void:
 	_emit_snapshot()
 
 func _on_health_changed(current: float, _maximum: float) -> void:
+	if _health_accounting_suspended:
+		_last_health = current
+		return
 	if current < _last_health:
 		damage_taken += int(round(_last_health - current))
 	_last_health = current
@@ -493,6 +525,170 @@ func _transition(next_state: String) -> void:
 	state_history.append(next_state)
 	state_changed.emit(previous, next_state)
 
+func _prepare_final_profile() -> void:
+	if not OS.has_feature("editor") or run_state not in ["active", "boss"]:
+		return
+	_profile_active = false
+	_profile_samples_ms.clear()
+	_profile_elapsed = 0.0
+	get_tree().paused = false
+	health.maximum_health = 5000.0
+	health.reset_warden_health()
+	_last_health = health.current_health
+	experience = 0
+	experience_threshold = 9999
+	var build_receipt := inventory.prepare_legal_build("representative")
+	wave_director.prepare_test_wave(3)
+	var attack_count_before := world.attack_runtime.authorized_count
+	var preparation := spawner.prepare_validation_density(32)
+	if not is_instance_valid(boss):
+		_spawn_bellkeeper()
+	if is_instance_valid(boss):
+		boss_snapshot = boss.get_snapshot().duplicate(true)
+	_transition("boss")
+	_validation_setup_generation += 1
+	var encounter := spawner.get_snapshot()
+	get_tree().paused = true
+	validation_profile_receipt = {
+		"accepted":bool(preparation.get("accepted",false)) and is_instance_valid(boss),
+		"branch_id":"final_wave_bellkeeper_profile",
+		"run_serial":run_serial,
+		"setup_generation":_validation_setup_generation,
+		"requested_density":32,
+		"resolved_density":int(encounter.get("live",0)),
+		"enemy_roles":(encounter.get("roles",{}) as Dictionary).duplicate(true),
+		"boss_state":boss_snapshot.get("state","absent"),
+		"boss_phase":boss_snapshot.get("phase",0),
+		"weapon_ranks":_profile_weapon_ranks(),
+		"build_receipt":build_receipt.duplicate(true),
+		"counts":_profile_counts(),
+		"telegraph_admission":(encounter.get("telegraph_admission",{}) as Dictionary).duplicate(true),
+		"neighbor_registry":(encounter.get("neighbor_registry",{}) as Dictionary).duplicate(true),
+		"ordinary_light_budget":(encounter.get("ordinary_light_budget",{}) as Dictionary).duplicate(true),
+		"pool_counts":{"active":encounter.get("live",0),"pooled":encounter.get("pooled",0)},
+		"requested_profile":"representative_final_wave_and_bellkeeper",
+		"resolved_profile":"prepared_paused",
+		"preparation_paused":get_tree().paused,
+		"attacks_advanced_by_preparation":world.attack_runtime.authorized_count != attack_count_before,
+		"terminal_state_advanced":result_committed,
+		"advance_action_required":true,
+		"reset_isolation_pending":true,
+	}
+	validation_density_receipt = validation_profile_receipt.duplicate(true)
+	_emit_snapshot()
+
+func _advance_final_profile() -> void:
+	if not OS.has_feature("editor") or not bool(validation_profile_receipt.get("accepted",false)) or _profile_active:
+		return
+	_profile_samples_ms.clear()
+	_profile_elapsed = 0.0
+	_profile_active = true
+	validation_profile_sample = {
+		"status":"sampling", "branch_id":validation_profile_receipt.get("branch_id",""),
+		"run_serial":run_serial, "setup_generation":validation_profile_receipt.get("setup_generation",0),
+		"window_seconds":_profile_duration,
+	}
+	get_tree().paused = false
+
+func _advance_profile_sample(delta: float) -> void:
+	if not _profile_active or get_tree().paused:
+		return
+	var frame_ms := maxf(0.0,delta*1000.0)
+	_profile_samples_ms.append(frame_ms)
+	_profile_elapsed += delta
+	if _profile_elapsed < _profile_duration:
+		return
+	_profile_active = false
+	var sorted := _profile_samples_ms.duplicate()
+	sorted.sort()
+	validation_profile_sample = {
+		"status":"complete", "branch_id":validation_profile_receipt.get("branch_id",""),
+		"run_serial":run_serial, "setup_generation":validation_profile_receipt.get("setup_generation",0),
+		"sample_count":sorted.size(), "window_seconds":_profile_elapsed,
+		"frame_ms":{"p50":_percentile(sorted,0.50),"p95":_percentile(sorted,0.95),"p99":_percentile(sorted,0.99),"worst":sorted.back() if not sorted.is_empty() else 0.0},
+		"counts":_profile_counts(),
+	}
+	get_tree().paused = true
+	_emit_snapshot()
+
+func _reset_final_profile() -> void:
+	if not OS.has_feature("editor"):
+		return
+	_profile_active = false
+	_profile_samples_ms.clear()
+	_profile_elapsed = 0.0
+	get_tree().paused = false
+	spawner.reset_encounter()
+	_retire_run_group("friendly_attack")
+	audio_director.reset_for_run()
+	if is_instance_valid(boss):
+		boss.retire_run_actor("validation_profile_reset",_validation_setup_generation+1)
+		boss.queue_free()
+	boss = null
+	boss_snapshot.clear()
+	_validation_setup_generation += 1
+	var counts := _profile_counts()
+	validation_profile_receipt = {
+		"accepted":true, "reset":true, "branch_id":"final_wave_bellkeeper_profile",
+		"run_serial":run_serial, "setup_generation":_validation_setup_generation,
+		"requested_density":0, "resolved_density":counts.get("enemies",-1),
+		"requested_profile":"reset", "resolved_profile":"ordinary_run_ready",
+		"counts":counts,
+		"reset_isolation":int(counts.get("enemies",-1)) == 0 and int(counts.get("projectiles",-1)) == 0 and not is_instance_valid(boss),
+	}
+	validation_density_receipt = validation_profile_receipt.duplicate(true)
+	_transition("active")
+	_emit_snapshot()
+
+func _percentile(sorted: Array[float], fraction: float) -> float:
+	if sorted.is_empty():
+		return 0.0
+	return sorted[clampi(int(ceil((sorted.size()-1)*fraction)),0,sorted.size()-1)]
+
+func _profile_weapon_ranks() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for weapon in inventory.get_snapshot().get("weapons",[]):
+		if bool(weapon.get("equipped",false)):
+			result.append({"weapon_id":weapon.get("weapon_id",""),"rank":weapon.get("rank",0)})
+	return result
+
+func _profile_counts() -> Dictionary:
+	var encounter := spawner.get_snapshot()
+	var lights := 0
+	for node in world.find_children("*","Light3D",true,false):
+		if node is Light3D and node.is_visible_in_tree():
+			lights += 1
+	var audio_voices := 0
+	for voice in audio_director.voices:
+		if voice.playing:
+			audio_voices += 1
+	return {
+		"enemies":int(encounter.get("live",0)),
+		"pooled_enemies":int(encounter.get("pooled",0)),
+		"bosses":1 if is_instance_valid(boss) else 0,
+		"projectiles":get_tree().get_nodes_in_group("friendly_attack").size(),
+		"pickups":get_tree().get_nodes_in_group("reward_pickup").size(),
+		"effects":get_tree().get_nodes_in_group("impact_effect").size(),
+		"lights":lights, "audio_voices":audio_voices,
+		"telegraph_active":int((encounter.get("telegraph_admission",{}) as Dictionary).get("active",0)),
+		"neighbor_candidate_visits":int((encounter.get("neighbor_registry",{}) as Dictionary).get("candidate_visits",0)),
+		"active_attack_ledgers":world.attack_runtime._hit_ledgers.size(),
+	}
+
+func _record_retry_baseline(reason: String) -> void:
+	_retry_baseline_generation += 1
+	var receipt := {
+		"run_serial":run_serial, "baseline_generation":_retry_baseline_generation,
+		"source":reason,
+		"tree_paused":get_tree().paused, "run_state":run_state,
+		"counts":_profile_counts(),
+		"world_active":world.session_active,
+		"teardown_generation":teardown_receipt.get("completion_generation",0),
+	}
+	validation_retry_baselines.append(receipt)
+	if validation_retry_baselines.size() > 3:
+		validation_retry_baselines.pop_front()
+
 func _prepare_validation_wave(index: int) -> void:
 	if not OS.has_feature("editor") or run_state not in ["active", "boss"]:
 		return
@@ -606,6 +802,9 @@ func _mcp_state() -> Dictionary:
 		"terminal_handoff":terminal_handoff_receipt,
 		"terminal_handoff_active":_terminal_handoff_active,
 		"validation_density":validation_density_receipt,
+		"validation_profile":validation_profile_receipt,
+		"validation_profile_sample":validation_profile_sample,
+		"validation_retry_baselines":validation_retry_baselines,
 		"shell_focus": String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none",
 	}
 

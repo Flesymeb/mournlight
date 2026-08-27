@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/gameplay/run_controller.gd" id="1_controller"]
 [ext_resource type="PackedScene" path="res://scenes/gameplay/survival_foundation.tscn" id="2_world"]
@@ -11,10 +11,15 @@
 [ext_resource type="PackedScene" path="res://scenes/audio/mournlight_audio.tscn" id="9_audio"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/bellkeeper.tscn" id="10_boss"]
 [ext_resource type="PackedScene" path="res://ui/menus/maaack/scenes/menus/main_menu/main_menu.tscn" id="11_maaack_main"]
+[ext_resource type="Script" path="res://scripts/input/input_context_router.gd" id="12_input_router"]
 
 [node name="Mournlight" type="Node" groups=["mcp_watch"]]
 process_mode = 3
 script = ExtResource("1_controller")
+
+[node name="InputContextRouter" type="Node" parent="." groups=["mcp_watch"]]
+process_mode = 3
+script = ExtResource("12_input_router")
 
 [node name="World" parent="." instance=ExtResource("2_world")]
 process_mode = 1

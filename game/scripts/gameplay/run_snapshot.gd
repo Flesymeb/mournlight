@@ -49,5 +49,7 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 		},
 		"terminal_handoff":controller.terminal_handoff_receipt.duplicate(true),
 		"validation_density":controller.validation_density_receipt.duplicate(true),
+		"validation_profile":controller.validation_profile_receipt.duplicate(true),
+		"validation_profile_sample":controller.validation_profile_sample.duplicate(true),
 		"world_active": world.session_active if world else false,
 	}
