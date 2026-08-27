@@ -466,7 +466,6 @@ func _teardown_run(route: String, reason: String) -> Dictionary:
 		wave_director.terminate(reason)
 	else:
 		wave_director.reset()
-	spawner.stop_encounter()
 	var boss_retirement := {"active":false, "state":"absent", "reason":reason, "completion_generation":_teardown_generation}
 	if not is_instance_valid(boss) and int(teardown_receipt.get("run_serial", -1)) == run_serial:
 		var previous_boss_retirement: Dictionary = teardown_receipt.get("boss_retirement", {})
@@ -483,10 +482,8 @@ func _teardown_run(route: String, reason: String) -> Dictionary:
 			boss.phase_shifted.disconnect(_on_boss_phase_shifted)
 		boss.queue_free()
 	boss = null
-	world.set_session_active(false)
+	var transient_retirement := _retire_transient_ownership(route, reason, _teardown_generation)
 	world.reset_session()
-	var retired_attack_presentations := _retire_run_group("friendly_attack")
-	var audio_retirement := audio_director.retire_run_ownership(route, _teardown_generation)
 	var encounter := spawner.get_snapshot()
 	teardown_receipt = {
 		"run_serial":run_serial, "route":route, "reason":reason,
@@ -495,13 +492,31 @@ func _teardown_run(route: String, reason: String) -> Dictionary:
 		"spawner_live":encounter.get("live", -1), "spawner_pooled":encounter.get("pooled", -1),
 		"spawner_registered":(encounter.get("neighbor_registry", {}) as Dictionary).get("registered_count", -1),
 		"world_active":world.session_active, "tree_paused":get_tree().paused,
-		"retired_attack_presentations":retired_attack_presentations,
+		"runtime_retirement":transient_retirement.get("runtime_retirement",{}),
+		"retired_attack_presentations":transient_retirement.get("retired_attack_presentations",0),
 		"remaining_attack_presentations":get_tree().get_nodes_in_group("friendly_attack").size(),
-		"audio_retirement":audio_retirement, "terminal_snapshot_preserved":not terminal_snapshot.is_empty(),
+		"audio_retirement":transient_retirement.get("audio_retirement",{}), "terminal_snapshot_preserved":not terminal_snapshot.is_empty(),
 		"completion_generation":_teardown_generation, "complete":true,
 	}
 	_teardown_active = false
 	return teardown_receipt.duplicate(true)
+
+func _retire_transient_ownership(route: String, reason: String, generation: int) -> Dictionary:
+	# Both ordinary lifecycle routes and the dense diagnostic reset enter this
+	# exact ordering: stop update owners, synchronously invalidate weapon/combat
+	# references, retire encounters, then retire generic presentation and audio.
+	var runtime_retirement := world.retire_run_ownership(reason, generation)
+	spawner.stop_encounter()
+	var retired_attack_presentations := _retire_run_group("friendly_attack")
+	var audio_retirement := audio_director.retire_run_ownership(route, generation)
+	return {
+		"route": route, "reason": reason, "generation": generation,
+		"runtime_retirement": runtime_retirement,
+		"retired_attack_presentations": retired_attack_presentations,
+		"remaining_attack_presentations": get_tree().get_nodes_in_group("friendly_attack").size(),
+		"audio_retirement": audio_retirement,
+		"complete": bool(runtime_retirement.get("complete", false)) and get_tree().get_nodes_in_group("friendly_attack").is_empty(),
+	}
 
 func _retire_run_group(group_name: StringName) -> int:
 	var retired := 0
@@ -618,14 +633,19 @@ func _reset_final_profile() -> void:
 	_profile_samples_ms.clear()
 	_profile_elapsed = 0.0
 	get_tree().paused = false
+	_teardown_generation += 1
+	var requested_counts := _profile_counts()
+	var retirement := _retire_transient_ownership("validation_profile_reset", "validation_profile_reset", _teardown_generation)
 	spawner.reset_encounter()
-	_retire_run_group("friendly_attack")
-	audio_director.reset_for_run()
 	if is_instance_valid(boss):
-		boss.retire_run_actor("validation_profile_reset",_validation_setup_generation+1)
+		boss.retire_run_actor("validation_profile_reset", _teardown_generation)
 		boss.queue_free()
 	boss = null
 	boss_snapshot.clear()
+	world.reset_session()
+	inventory.reset_starting_build()
+	world.set_session_active(true)
+	audio_director.reset_for_run()
 	_validation_setup_generation += 1
 	var counts := _profile_counts()
 	validation_profile_receipt = {
@@ -633,12 +653,38 @@ func _reset_final_profile() -> void:
 		"run_serial":run_serial, "setup_generation":_validation_setup_generation,
 		"requested_density":0, "resolved_density":counts.get("enemies",-1),
 		"requested_profile":"reset", "resolved_profile":"ordinary_run_ready",
-		"counts":counts,
-		"reset_isolation":int(counts.get("enemies",-1)) == 0 and int(counts.get("projectiles",-1)) == 0 and not is_instance_valid(boss),
+		"requested_counts": requested_counts, "resolved_retirement": retirement,
+		"post_reset_counts":counts, "counts":counts,
+		"reset_isolation":_counts_are_isolated(counts),
+		"next_frame_isolation_pending": true,
 	}
 	validation_density_receipt = validation_profile_receipt.duplicate(true)
 	_transition("active")
 	_emit_snapshot()
+	call_deferred("_capture_profile_next_frame_isolation", _validation_setup_generation, run_serial)
+
+func _capture_profile_next_frame_isolation(setup_generation: int, expected_run_serial: int) -> void:
+	await get_tree().process_frame
+	if setup_generation != _validation_setup_generation or expected_run_serial != run_serial:
+		return
+	var next_counts := _profile_counts()
+	validation_profile_receipt.next_frame_counts = next_counts
+	validation_profile_receipt.next_frame_isolation = _counts_are_isolated(next_counts)
+	validation_profile_receipt.next_frame_isolation_pending = false
+	validation_density_receipt = validation_profile_receipt.duplicate(true)
+	_emit_snapshot()
+
+func _counts_are_isolated(counts: Dictionary) -> bool:
+	return (
+		int(counts.get("enemies", -1)) == 0
+		and int(counts.get("bosses", -1)) == 0
+		and int(counts.get("projectiles", -1)) == 0
+		and int(counts.get("wisp_handles", -1)) == 0
+		and int(counts.get("wisp_interval_targets", -1)) == 0
+		and int(counts.get("active_attack_ledgers", -1)) == 0
+		and int(counts.get("registered_neighbors", -1)) == 0
+		and int(counts.get("audio_voices", -1)) == 0
+	)
 
 func _percentile(sorted: Array[float], fraction: float) -> float:
 	if sorted.is_empty():
@@ -654,6 +700,7 @@ func _profile_weapon_ranks() -> Array[Dictionary]:
 
 func _profile_counts() -> Dictionary:
 	var encounter := spawner.get_snapshot()
+	var wisps: WanderingWispsRuntime = $World/Warden/Weapons/WanderingWispsRuntime
 	var lights := 0
 	for node in world.find_children("*","Light3D",true,false):
 		if node is Light3D and node.is_visible_in_tree():
@@ -668,10 +715,14 @@ func _profile_counts() -> Dictionary:
 		"bosses":1 if is_instance_valid(boss) else 0,
 		"projectiles":get_tree().get_nodes_in_group("friendly_attack").size(),
 		"pickups":get_tree().get_nodes_in_group("reward_pickup").size(),
+		"pickup_production_ready":spawner.reward_dropped.is_connected(_on_reward_dropped),
 		"effects":get_tree().get_nodes_in_group("impact_effect").size(),
 		"lights":lights, "audio_voices":audio_voices,
 		"telegraph_active":int((encounter.get("telegraph_admission",{}) as Dictionary).get("active",0)),
 		"neighbor_candidate_visits":int((encounter.get("neighbor_registry",{}) as Dictionary).get("candidate_visits",0)),
+		"registered_neighbors":int((encounter.get("neighbor_registry",{}) as Dictionary).get("registered_count",0)),
+		"wisp_handles":wisps.active_wisp_count,
+		"wisp_interval_targets":wisps._target_next_hit_time.size(),
 		"active_attack_ledgers":world.attack_runtime._hit_ledgers.size(),
 	}
 

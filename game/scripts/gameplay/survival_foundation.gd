@@ -8,6 +8,8 @@ extends Node3D
 @onready var inventory: WeaponInventory = $Warden/Weapons/WeaponInventory
 @onready var attack_runtime: AttackRuntime = $Warden/Weapons/AttackRuntime
 @onready var lantern_runtime: WardenLanternRuntime = $Warden/Weapons/WardenLanternRuntime
+@onready var gravespade_runtime: GravespadeRuntime = $Warden/Weapons/GravespadeRuntime
+@onready var wisps_runtime: WanderingWispsRuntime = $Warden/Weapons/WanderingWispsRuntime
 @onready var spawner: EncounterSpawner = $EncounterSpawner
 
 var last_attack_event: Dictionary = {}
@@ -65,6 +67,25 @@ func reset_session() -> void:
 	last_drop_event = {}
 	validation_build_profile = "starting"
 
+func retire_run_ownership(reason: String, generation: int) -> Dictionary:
+	# Disable every update owner before invalidating its handles. This boundary
+	# is intentionally repeat-safe and precedes generic friendly-attack cleanup.
+	set_session_active(false)
+	var weapon_receipts: Array[Dictionary] = []
+	for runtime in [lantern_runtime, gravespade_runtime, wisps_runtime]:
+		if runtime.has_method("retire_runtime"):
+			weapon_receipts.append(runtime.retire_runtime(reason, generation))
+	var combat_receipt := attack_runtime.retire_runtime(reason, generation)
+	return {
+		"reason": reason, "generation": generation,
+		"weapon_receipts": weapon_receipts,
+		"combat_receipt": combat_receipt,
+		"wisp_handles": wisps_runtime.active_wisp_count,
+		"wisp_intervals": wisps_runtime._target_next_hit_time.size(),
+		"active_attack_ledgers": attack_runtime._hit_ledgers.size(),
+		"complete": wisps_runtime.active_wisp_count == 0 and attack_runtime._hit_ledgers.is_empty(),
+	}
+
 func prepare_weapon_validation(profile: String = "representative") -> Dictionary:
 	validation_build_profile = profile
 	return inventory.prepare_legal_build(profile)
@@ -85,6 +106,9 @@ func _on_enemy_lifecycle(event: Dictionary) -> void:
 
 func _on_drop_committed(event: Dictionary) -> void:
 	last_drop_event = event.duplicate(true)
+	# Health/death/drop signals are synchronous. AttackRuntime holds this final
+	# link until apply_damage returns, preserving damage -> death -> drop order.
+	attack_runtime.record_reward(event)
 
 func _mcp_state() -> Dictionary:
 	return {

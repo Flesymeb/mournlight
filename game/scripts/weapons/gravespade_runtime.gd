@@ -42,6 +42,7 @@ func _emit_sweep(primary_target: Node3D, stats: Dictionary) -> void:
 	if generation != _runtime_generation:
 		return
 	if not is_instance_valid(primary_target) or not primary_target.is_legal_target():
+		attack_runtime.reject_attack(weapon_id, "target_invalid_during_anticipation", {"target_id": last_target_id})
 		attack_phase = "rejected"
 		_emitting = false
 		cooldown_remaining = 0.12
@@ -51,6 +52,7 @@ func _emit_sweep(primary_target: Node3D, stats: Dictionary) -> void:
 		_emitting = false
 		return
 	sweep_count += 1
+	attack_runtime.record_phase(String(event.attack_id), "onset", {"presentation": "gravespade_sweep"})
 	presentation_variant = posmod(sweep_count - 1, 3)
 	attack_phase = "active"
 	if sweep_scene:
@@ -67,16 +69,26 @@ func _emit_sweep(primary_target: Node3D, stats: Dictionary) -> void:
 		if direction.normalized().dot(to_target) >= -0.15:
 			attack_runtime.resolve_hit(event, target)
 	attack_phase = "impact"
+	attack_runtime.record_phase(String(event.attack_id), "impact", {"target_count": targets.size()})
 	await get_tree().create_timer(0.16).timeout
 	if generation != _runtime_generation:
 		return
 	attack_phase = "recovery"
-	attack_runtime.finish_attack(String(event.attack_id))
+	attack_runtime.finish_attack(String(event.attack_id), "recovery")
 	cooldown_remaining = float(stats.cooldown)
 	_emitting = false
 
-func reset_runtime() -> void:
+func retire_runtime(reason: String, generation: int) -> Dictionary:
+	set_physics_process(false)
+	var before := {"attack_phase": attack_phase, "emitting": _emitting, "target_id": last_target_id}
 	_runtime_generation += 1
+	attack_phase = "retired"
+	last_target_id = ""
+	_emitting = false
+	return {"weapon_id": String(weapon_id), "reason": reason, "generation": generation, "before": before, "active": false, "complete": true}
+
+func reset_runtime() -> void:
+	retire_runtime("reset", _runtime_generation + 1)
 	cooldown_remaining = 0.35
 	attack_phase = "unequipped" if not inventory.is_equipped(weapon_id) else "cooldown"
 	sweep_count = 0

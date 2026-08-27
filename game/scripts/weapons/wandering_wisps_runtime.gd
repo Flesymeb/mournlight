@@ -13,8 +13,12 @@ var active_wisp_count := 0
 var _wisps: Array[Node3D] = []
 var _target_next_hit_time: Dictionary = {}
 var _gameplay_time := 0.0
+var _retired := false
+var _retirement_generation := 0
 
 func _physics_process(delta: float) -> void:
+	if _retired:
+		return
 	if not inventory.is_equipped(weapon_id):
 		_clear_wisps()
 		return
@@ -53,8 +57,9 @@ func _resolve_contacts(stats: Dictionary) -> void:
 			continue
 		var event := attack_runtime.authorize(weapon_id, target, stats, "per_target_interval")
 		if event.get("accepted", false):
+			attack_runtime.record_phase(String(event.attack_id), "onset", {"wisp_contact": true})
 			attack_runtime.resolve_hit(event, target)
-			attack_runtime.finish_attack(String(event.attack_id))
+			attack_runtime.finish_attack(String(event.attack_id), "recovery")
 			contact_hit_count += 1
 			_target_next_hit_time[target_id] = _gameplay_time + float(stats.hit_interval)
 
@@ -66,20 +71,42 @@ func _clear_wisps() -> void:
 	active_wisp_count = 0
 
 func _exit_tree() -> void:
-	_clear_wisps()
+	retire_runtime("exit_tree", _retirement_generation + 1)
 
-func reset_runtime() -> void:
+func retire_runtime(reason: String, generation: int) -> Dictionary:
+	# Ownership is invalidated synchronously before the presentation nodes are
+	# queued. Generic group retirement can therefore never leave a live handle
+	# for the next physics tick to dereference.
+	set_physics_process(false)
+	_retired = true
+	_retirement_generation = maxi(_retirement_generation, generation)
+	var before := {
+		"wisp_handles": _wisps.size(),
+		"per_target_intervals": _target_next_hit_time.size(),
+		"orbit_phase": orbit_phase,
+	}
 	_clear_wisps()
 	_target_next_hit_time.clear()
 	_gameplay_time = 0.0
 	orbit_phase = 0.0
+	return {
+		"weapon_id": String(weapon_id), "reason": reason,
+		"generation": _retirement_generation, "before": before,
+		"after": {"wisp_handles": _wisps.size(), "per_target_intervals": _target_next_hit_time.size(), "orbit_phase": orbit_phase},
+		"complete": true,
+	}
+
+func reset_runtime() -> void:
+	retire_runtime("reset", _retirement_generation + 1)
 	contact_hit_count = 0
+	_retired = false
 
 func _mcp_state() -> Dictionary:
 	return {
 		"weapon_id": String(weapon_id), "equipped": inventory.is_equipped(weapon_id), "rank": inventory.get_rank(weapon_id),
 		"active_wisp_count": active_wisp_count, "contact_hit_count": contact_hit_count,
 		"per_target_interval_count": _target_next_hit_time.size(), "orbit_phase": orbit_phase,
-		"gameplay_clock": _gameplay_time,
+		"gameplay_clock": _gameplay_time, "retired": _retired,
+		"retirement_generation": _retirement_generation,
 		"stats": inventory.get_stats(weapon_id),
 	}

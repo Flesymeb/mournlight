@@ -48,7 +48,7 @@ func _emit_attack(target: Node3D, stats: Dictionary) -> void:
 	if generation != _runtime_generation:
 		return
 	if not is_instance_valid(target) or not target.is_inside_tree() or not target.is_legal_target():
-		attack_runtime.reject_attack(weapon_id, "target_invalid_during_anticipation")
+		attack_runtime.reject_attack(weapon_id, "target_invalid_during_anticipation", {"target_id": selected_target_id})
 		attack_phase = "rejected"
 		_emitting = false
 		cooldown_remaining = 0.12
@@ -60,6 +60,7 @@ func _emit_attack(target: Node3D, stats: Dictionary) -> void:
 		return
 	emitted_count += 1
 	last_attack_id = String(event.attack_id)
+	attack_runtime.record_phase(last_attack_id, "onset", {"presentation": "lantern_bolt"})
 	presentation_variant = posmod(emitted_count - 1, 4)
 	attack_phase = "onset"
 	if bolt_scene:
@@ -70,6 +71,7 @@ func _emit_attack(target: Node3D, stats: Dictionary) -> void:
 	if generation != _runtime_generation:
 		return
 	attack_phase = "impact"
+	attack_runtime.record_phase(last_attack_id, "impact", {"target_id": selected_target_id})
 	var result := attack_runtime.resolve_hit(event, target)
 	if result.get("accepted", false):
 		resolved_hit_count += 1
@@ -77,12 +79,22 @@ func _emit_attack(target: Node3D, stats: Dictionary) -> void:
 	if generation != _runtime_generation:
 		return
 	attack_phase = "recovery"
-	attack_runtime.finish_attack(String(event.attack_id))
+	attack_runtime.finish_attack(String(event.attack_id), "recovery")
 	cooldown_remaining = float(stats.cooldown)
 	_emitting = false
 
-func reset_runtime() -> void:
+func retire_runtime(reason: String, generation: int) -> Dictionary:
+	set_physics_process(false)
+	var before := {"attack_phase": attack_phase, "emitting": _emitting, "attack_id": last_attack_id}
 	_runtime_generation += 1
+	attack_phase = "retired"
+	selected_target_id = ""
+	last_attack_id = ""
+	_emitting = false
+	return {"weapon_id": String(weapon_id), "reason": reason, "generation": generation, "before": before, "active": false, "complete": true}
+
+func reset_runtime() -> void:
+	retire_runtime("reset", _runtime_generation + 1)
 	cooldown_remaining = 0.18
 	attack_phase = "cooldown"
 	selected_target_id = ""
