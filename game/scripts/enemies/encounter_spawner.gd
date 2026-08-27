@@ -14,6 +14,9 @@ signal reward_dropped(event: Dictionary)
 @export var minimum_player_safe_radius := 7.0
 @export var playable_half_extents := Vector2(10.7, 9.2)
 @export var protected_camera_half_extents := Vector2(5.8, 4.2)
+@export_range(1, 12, 1) var telegraph_cue_cap := 4
+@export_range(0, 16, 1) var role_light_cap := 8
+@export_range(0, 8, 1) var hurt_light_cap := 3
 
 var active := false
 var encounter_id := 0
@@ -35,6 +38,17 @@ var _reconciliation_serial := 0
 var retired_total := 0
 var last_reconciliation_receipt: Dictionary = {}
 var neighbor_registry: EnemyNeighborRegistry
+var _telegraph_waiting: Dictionary = {}
+var _telegraph_owners: Dictionary = {}
+var _cue_requested_total := 0
+var _cue_admitted_total := 0
+var _cue_released_total := 0
+var _cue_peak_admitted := 0
+var _last_cue_release: Dictionary = {}
+var _role_light_owners: Dictionary = {}
+var _hurt_light_owners: Dictionary = {}
+var _light_peak_active := 0
+var _light_peak_requested := 0
 
 const LANES := [
 	Vector3(-10.2, 0.05, -7.8), Vector3(-4.2, 0.05, -8.8),
@@ -88,6 +102,10 @@ func stop_encounter() -> void:
 		if actor.state != "pooled":
 			actor.remove_from_group("active_enemies")
 			actor.return_to_pool()
+	_telegraph_waiting.clear()
+	_telegraph_owners.clear()
+	_role_light_owners.clear()
+	_hurt_light_owners.clear()
 	neighbor_registry.clear()
 	_emit_snapshot()
 
@@ -105,6 +123,17 @@ func reset_encounter() -> void:
 	_wave_spawned = 0
 	retired_total = 0
 	last_reconciliation_receipt = {}
+	_telegraph_waiting.clear()
+	_telegraph_owners.clear()
+	_cue_requested_total = 0
+	_cue_admitted_total = 0
+	_cue_released_total = 0
+	_cue_peak_admitted = 0
+	_last_cue_release = {}
+	_role_light_owners.clear()
+	_hurt_light_owners.clear()
+	_light_peak_active = 0
+	_light_peak_requested = 0
 	for actor in _pool:
 		actor.remove_from_group("active_enemies")
 		actor.return_to_pool()
@@ -113,6 +142,8 @@ func reset_encounter() -> void:
 func _process(delta: float) -> void:
 	if not active:
 		return
+	_resolve_telegraph_admissions()
+	_update_light_budget()
 	_spawn_cooldown = maxf(0.0, _spawn_cooldown - delta)
 	if _spawn_cooldown <= 0.0 and _active_count() < live_cap and _wave_spawned < _spawn_budget:
 		_spawn_one(_spawn_cursor)
@@ -134,7 +165,7 @@ func _spawn_one(role_offset: int) -> bool:
 		_generation_by_id[actor.stable_id] = generation
 		var selected_profile := _select_profile(_wave_spawned + role_offset)
 		actor.add_to_group("active_enemies")
-		actor.activate(selected_profile, player, position, generation, neighbor_registry)
+		actor.activate(selected_profile, player, position, generation, neighbor_registry, self)
 		spawned_total += 1
 		_wave_spawned += 1
 		_spawn_cursor = (lane_index + 1) % LANES.size()
@@ -152,10 +183,18 @@ func prepare_validation_density(target_live: int) -> Dictionary:
 	if not OS.has_feature("editor") or not active:
 		return {"accepted": false, "reason": "release_guard_or_inactive"}
 	var bounded_target := clampi(target_live, 1, live_cap)
+	if _active_count() > bounded_target:
+		_reconcile_to_cap(bounded_target, "validation_density_checkpoint")
 	var attempts := 0
 	while _active_count() < bounded_target and _wave_spawned < _spawn_budget and attempts < pool_size * 3:
 		_spawn_one(_wave_spawned)
 		attempts += 1
+	# A validation checkpoint is inspectable, not a request to resume wave
+	# growth immediately after preparation. The next wave/checkpoint setup
+	# restores its authored cap through configure_pressure().
+	live_cap = bounded_target
+	_resolve_telegraph_admissions()
+	_update_light_budget()
 	return {"accepted": _active_count() >= bounded_target, "target": bounded_target,
 		"live": _active_count(), "attempts": attempts, "cap": live_cap}
 
@@ -243,6 +282,105 @@ func _active_count() -> int:
 			count += 1
 	return count
 
+func request_telegraph_admission(actor: EnemyActor) -> bool:
+	if not active or not is_instance_valid(actor) or actor.state in ["pooled", "death"]:
+		return false
+	var key := _actor_key(actor)
+	if _telegraph_owners.has(key):
+		return true
+	if not _telegraph_waiting.has(key):
+		_telegraph_waiting[key] = actor
+		_cue_requested_total += 1
+	return false
+
+func has_telegraph_admission(actor: EnemyActor) -> bool:
+	return is_instance_valid(actor) and _telegraph_owners.get(_actor_key(actor)) == actor
+
+func release_telegraph_admission(actor: EnemyActor, reason: String) -> void:
+	if not is_instance_valid(actor):
+		return
+	var key := _actor_key(actor)
+	var released_owner := _telegraph_owners.erase(key)
+	var released_waiter := _telegraph_waiting.erase(key)
+	if released_owner or released_waiter:
+		_cue_released_total += 1
+		_last_cue_release = {"stable_id":String(actor.stable_id), "generation":actor.spawn_generation, "reason":reason}
+
+func _resolve_telegraph_admissions() -> void:
+	_prune_actor_map(_telegraph_owners)
+	_prune_actor_map(_telegraph_waiting)
+	var keys: Array = _telegraph_waiting.keys()
+	keys.sort_custom(func(a: Variant, b: Variant) -> bool: return String(a) < String(b))
+	for key in keys:
+		if _telegraph_owners.size() >= telegraph_cue_cap:
+			break
+		var actor: EnemyActor = _telegraph_waiting.get(key)
+		if not is_instance_valid(actor):
+			continue
+		_telegraph_waiting.erase(key)
+		_telegraph_owners[key] = actor
+		_cue_admitted_total += 1
+	_cue_peak_admitted = maxi(_cue_peak_admitted, _telegraph_owners.size())
+
+func _update_light_budget() -> void:
+	var active_actors: Array[EnemyActor] = []
+	var hurt_requested := 0
+	for actor in _pool:
+		if actor.state in ["pooled", "death"]:
+			continue
+		active_actors.append(actor)
+		if actor.has_hurt_light_request():
+			hurt_requested += 1
+	_role_light_owners = _select_light_owners(active_actors, role_light_cap, _role_light_owners, false)
+	_hurt_light_owners = _select_light_owners(active_actors, hurt_light_cap, _hurt_light_owners, true)
+	for actor in _pool:
+		var key := _actor_key(actor)
+		actor.set_light_budget(_role_light_owners.has(key), _hurt_light_owners.has(key))
+	var requested := active_actors.size() + hurt_requested
+	var active_lights := _role_light_owners.size() + _hurt_light_owners.size()
+	_light_peak_requested = maxi(_light_peak_requested, requested)
+	_light_peak_active = maxi(_light_peak_active, active_lights)
+
+func _select_light_owners(candidates: Array[EnemyActor], cap: int, previous: Dictionary, hurt_only: bool) -> Dictionary:
+	if cap <= 0:
+		return {}
+	var eligible: Array[EnemyActor] = []
+	for actor in candidates:
+		if not hurt_only or actor.has_hurt_light_request():
+			eligible.append(actor)
+	eligible.sort_custom(func(a: EnemyActor, b: EnemyActor) -> bool:
+		var a_priority := _light_priority(a, previous.has(_actor_key(a)), hurt_only)
+		var b_priority := _light_priority(b, previous.has(_actor_key(b)), hurt_only)
+		if a_priority != b_priority:
+			return a_priority < b_priority
+		return _actor_key(a) < _actor_key(b)
+	)
+	var selected: Dictionary = {}
+	for index in range(mini(cap, eligible.size())):
+		var actor := eligible[index]
+		selected[_actor_key(actor)] = actor
+	return selected
+
+func _light_priority(actor: EnemyActor, was_selected: bool, hurt_only: bool) -> int:
+	var state_priority := 0
+	if not hurt_only:
+		match actor.state:
+			"telegraph": state_priority = -100
+			"waiting_admission": state_priority = -70
+			"damage": state_priority = -45
+			_: state_priority = 0
+	var distance_bucket := int(actor.global_position.distance_to(player.global_position) * 2.0) if is_instance_valid(player) else 100
+	return state_priority + distance_bucket - (18 if was_selected else 0)
+
+func _prune_actor_map(actor_map: Dictionary) -> void:
+	for key in actor_map.keys():
+		var actor: EnemyActor = actor_map.get(key)
+		if not is_instance_valid(actor) or actor.state in ["pooled", "death"] or _actor_key(actor) != String(key):
+			actor_map.erase(key)
+
+func _actor_key(actor: EnemyActor) -> String:
+	return "%s.g%08d" % [String(actor.stable_id), actor.spawn_generation]
+
 func _on_enemy_defeated(actor: EnemyActor, event: Dictionary) -> void:
 	defeated_total += 1
 	var report := event.duplicate(true)
@@ -273,11 +411,27 @@ func _emit_snapshot() -> void:
 
 func get_snapshot() -> Dictionary:
 	var roles: Dictionary = {}
+	var hurt_requested := 0
+	var role_active := 0
+	var hurt_active := 0
+	var role_owner_keys: Array[String] = []
+	var hurt_owner_keys: Array[String] = []
 	for actor in _pool:
 		if actor.state == "pooled" or not actor.profile:
 			continue
 		var role := String(actor.profile.role_id)
 		roles[role] = int(roles.get(role, 0)) + 1
+		if actor.has_hurt_light_request():
+			hurt_requested += 1
+		if actor.is_role_light_active():
+			role_active += 1
+			role_owner_keys.append(_actor_key(actor))
+		if actor.is_hurt_light_active():
+			hurt_active += 1
+			hurt_owner_keys.append(_actor_key(actor))
+	var role_requested := _active_count()
+	var light_requested := role_requested + hurt_requested
+	var light_active := role_active + hurt_active
 	return {
 		"encounter_id": encounter_id, "active": active, "live": _active_count(),
 		"cap": live_cap, "spawned": spawned_total, "defeated": defeated_total,
@@ -288,7 +442,31 @@ func get_snapshot() -> Dictionary:
 		"composition_weights": _composition_weights, "elite_every": _elite_every,
 		"retired": retired_total, "last_reconciliation": last_reconciliation_receipt,
 		"neighbor_registry": neighbor_registry.get_snapshot() if is_instance_valid(neighbor_registry) else {},
+		"telegraph_admission": {
+			"cap":telegraph_cue_cap, "requested_total":_cue_requested_total,
+			"admitted_total":_cue_admitted_total, "waiting":_telegraph_waiting.size(),
+			"active":_telegraph_owners.size(), "released_total":_cue_released_total,
+			"peak_active":_cue_peak_admitted, "owners":_telegraph_owners.keys(),
+			"waiting_keys":_telegraph_waiting.keys(), "last_release":_last_cue_release,
+		},
+		"ordinary_light_budget": {
+			"role_cap":role_light_cap, "hurt_cap":hurt_light_cap,
+			"requested":light_requested, "active":light_active,
+			"suppressed":maxi(0, light_requested - light_active),
+			"peak_requested":_light_peak_requested, "peak_active":_light_peak_active,
+			"role":{"requested":role_requested, "active":role_active, "suppressed":maxi(0, role_requested - role_active), "owners":role_owner_keys},
+			"hurt":{"requested":hurt_requested, "active":hurt_active, "suppressed":maxi(0, hurt_requested - hurt_active), "owners":hurt_owner_keys},
+		},
 	}
 
 func _mcp_state() -> Dictionary:
-	return get_snapshot()
+	var snapshot := get_snapshot()
+	return {
+		"active":snapshot.get("active", false), "live":snapshot.get("live", 0),
+		"pooled":snapshot.get("pooled", 0), "cap":snapshot.get("cap", 0),
+		"roles":snapshot.get("roles", {}),
+		"telegraph_admission":snapshot.get("telegraph_admission", {}),
+		"ordinary_light_budget":snapshot.get("ordinary_light_budget", {}),
+		"neighbor_registry":snapshot.get("neighbor_registry", {}),
+		"last_lifecycle_event":snapshot.get("last_lifecycle_event", {}),
+	}

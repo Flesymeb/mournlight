@@ -31,6 +31,7 @@ fog_height = 0.0
 fog_height_density = 0.045
 
 [node name="SurvivalFoundation" type="Node3D" groups=["mcp_watch"]]
+process_mode = 1
 script = ExtResource("1_foundation")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]

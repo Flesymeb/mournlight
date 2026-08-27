@@ -17,11 +17,13 @@ process_mode = 3
 script = ExtResource("1_controller")
 
 [node name="World" parent="." instance=ExtResource("2_world")]
+process_mode = 1
 
 [node name="BossAnchor" type="Node3D" parent="World"]
 position = Vector3(-5.0,0.05,2.0)
 
 [node name="WaveDirector" type="Node" parent="." groups=["mcp_watch"]]
+process_mode = 1
 script = ExtResource("6_wave")
 
 [node name="UpgradeDraftController" type="Node" parent="." groups=["mcp_watch"]]

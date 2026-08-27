@@ -40,5 +40,14 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 		"selected_upgrades": controller.selected_upgrades.duplicate(true),
 		"upgrade_draft": controller.draft_controller.get_snapshot(),
 		"teardown_receipt": controller.teardown_receipt.duplicate(true),
+		"pause_ownership": {
+			"tree_paused":controller.get_tree().paused,
+			"controller_process_mode":controller.process_mode,
+			"shell_process_mode":controller.shell.process_mode,
+			"world_process_mode":world.process_mode if world else Node.PROCESS_MODE_DISABLED,
+			"wave_process_mode":controller.wave_director.process_mode,
+		},
+		"terminal_handoff":controller.terminal_handoff_receipt.duplicate(true),
+		"validation_density":controller.validation_density_receipt.duplicate(true),
 		"world_active": world.session_active if world else false,
 	}

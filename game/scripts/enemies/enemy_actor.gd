@@ -30,6 +30,11 @@ var _flank_sign := 1.0
 var _pool_return_pending := false
 var retirement_count := 0
 var neighbor_registry: EnemyNeighborRegistry
+var encounter_owner: EncounterSpawner
+var telegraph_admitted := false
+var _hurt_light_remaining := 0.0
+var _role_light_active := false
+var _hurt_light_active := false
 
 func _ready() -> void:
 	add_to_group("combat_targets")
@@ -41,13 +46,17 @@ func _ready() -> void:
 	visible = false
 	collider.disabled = true
 
-func activate(next_profile: EnemyProfile, next_target: WardenController, at_position: Vector3, generation: int, registry: EnemyNeighborRegistry = null) -> void:
+func activate(next_profile: EnemyProfile, next_target: WardenController, at_position: Vector3, generation: int, registry: EnemyNeighborRegistry = null, owner: EncounterSpawner = null) -> void:
 	if is_instance_valid(neighbor_registry):
 		neighbor_registry.unregister_actor(stable_id, spawn_generation)
 	profile = next_profile
 	target = next_target
 	spawn_generation = generation
 	neighbor_registry = registry
+	encounter_owner = owner
+	telegraph_admitted = false
+	_hurt_light_remaining = 0.0
+	_set_light_budget(false, false)
 	_lifetime = 0.0
 	attack_serial = 0
 	hurt_count = 0
@@ -75,6 +84,7 @@ func activate(next_profile: EnemyProfile, next_target: WardenController, at_posi
 	lifecycle_event.emit(_event("spawn", {"position": global_position, "role_id": String(profile.role_id)}))
 
 func return_to_pool() -> void:
+	_release_telegraph_admission("pool_return")
 	if is_instance_valid(neighbor_registry):
 		neighbor_registry.unregister_actor(stable_id, spawn_generation)
 	set_physics_process(false)
@@ -87,9 +97,12 @@ func return_to_pool() -> void:
 	collider.set_deferred("disabled", true)
 	telegraph_ring.visible = false
 	lane_cue.visible = false
+	_hurt_light_remaining = 0.0
+	_set_light_budget(false, false)
 	_pool_return_pending = false
 	lifecycle_event.emit(_event("pool_return"))
 	neighbor_registry = null
+	encounter_owner = null
 
 func retire_from_pressure(reason: String, reconciliation_id: int) -> Dictionary:
 	if state == "pooled":
@@ -108,7 +121,9 @@ func retire_from_pressure(reason: String, reconciliation_id: int) -> Dictionary:
 
 func _physics_process(delta: float) -> void:
 	_lifetime += delta
-	hurt_light.light_energy = move_toward(hurt_light.light_energy, 0.0, delta * 14.0)
+	_hurt_light_remaining = maxf(0.0, _hurt_light_remaining - delta)
+	if _hurt_light_remaining <= 0.0 and _hurt_light_active:
+		_set_light_budget(_role_light_active, false)
 	if not is_instance_valid(target) or state in ["pooled", "death"]:
 		return
 	state_remaining = maxf(0.0, state_remaining - delta)
@@ -120,10 +135,17 @@ func _physics_process(delta: float) -> void:
 		"approach":
 			_steer_approach(delta)
 			if global_position.distance_to(target.global_position) <= profile.attack_range:
+				_request_telegraph_admission()
+		"waiting_admission":
+			velocity = velocity.move_toward(Vector3.ZERO, 12.0 * delta)
+			if global_position.distance_to(target.global_position) > profile.attack_range + 0.9:
+				_release_telegraph_admission("escape")
+				_set_state("approach")
+			elif is_instance_valid(encounter_owner) and encounter_owner.has_telegraph_admission(self):
 				_begin_telegraph()
 		"telegraph":
 			velocity = velocity.move_toward(Vector3.ZERO, 12.0 * delta)
-			telegraph_ring.scale = Vector3.ONE * (1.0 + (1.0 - state_remaining / profile.telegraph_duration) * 0.55)
+			telegraph_ring.scale = Vector3.ONE * (1.0 + (1.0 - state_remaining / profile.telegraph_duration) * 0.24)
 			if state_remaining <= 0.0:
 				_damage_frame()
 		"damage":
@@ -157,7 +179,16 @@ func _steer_approach(delta: float) -> void:
 	var target_velocity := (desired + separation * 0.72).normalized() * profile.movement_speed
 	velocity = velocity.move_toward(target_velocity, 9.0 * delta)
 
+func _request_telegraph_admission() -> void:
+	if not is_instance_valid(encounter_owner):
+		telegraph_admitted = true
+		_begin_telegraph()
+		return
+	encounter_owner.request_telegraph_admission(self)
+	_set_state("waiting_admission")
+
 func _begin_telegraph() -> void:
+	telegraph_admitted = true
 	_set_state("telegraph", profile.telegraph_duration)
 	telegraph_ring.visible = true
 	lane_cue.visible = profile.attack_kind == "ranged"
@@ -169,6 +200,7 @@ func _begin_telegraph() -> void:
 	lifecycle_event.emit(_event("telegraph", {"attack_kind": profile.attack_kind}))
 
 func _damage_frame() -> void:
+	_release_telegraph_admission("damage")
 	_set_state("damage", 0.13)
 	telegraph_ring.visible = false
 	lane_cue.visible = false
@@ -192,13 +224,16 @@ func _damage_frame() -> void:
 
 func _on_hurt(event: Dictionary) -> void:
 	hurt_count += 1
-	hurt_light.light_energy = 4.0
+	_hurt_light_remaining = 0.24
 	lifecycle_event.emit(_event("hurt", {"health_after": event.get("health_after", health.current_health)}))
 
 func _on_died(event: Dictionary) -> void:
 	if state == "death":
 		return
 	death_count += 1
+	_release_telegraph_admission("death")
+	_hurt_light_remaining = 0.0
+	_set_light_budget(false, false)
 	_pool_return_pending = true
 	_set_state("death")
 	velocity = Vector3.ZERO
@@ -230,12 +265,37 @@ func _state_duration(for_state: String) -> float:
 func _apply_accent(color: Color) -> void:
 	for mesh in [telegraph_ring, lane_cue]:
 		var material := mesh.get_active_material(0).duplicate() as StandardMaterial3D
-		material.albedo_color = Color(color, 0.55)
+		material.albedo_color = Color(color, 0.32)
 		material.emission = color
-		material.emission_energy_multiplier = 2.8
+		material.emission_energy_multiplier = 1.35
 		mesh.material_override = material
 	hurt_light.light_color = color
 	role_glow.light_color = color
+
+func _release_telegraph_admission(reason: String) -> void:
+	if is_instance_valid(encounter_owner):
+		encounter_owner.release_telegraph_admission(self, reason)
+	telegraph_admitted = false
+
+func has_hurt_light_request() -> bool:
+	return state not in ["pooled", "death"] and _hurt_light_remaining > 0.0
+
+func is_role_light_active() -> bool:
+	return _role_light_active
+
+func is_hurt_light_active() -> bool:
+	return _hurt_light_active
+
+func set_light_budget(role_active: bool, hurt_active: bool) -> void:
+	_set_light_budget(role_active, hurt_active)
+
+func _set_light_budget(role_active: bool, hurt_active: bool) -> void:
+	_role_light_active = role_active and state not in ["pooled", "death"]
+	_hurt_light_active = hurt_active and has_hurt_light_request()
+	if is_instance_valid(role_glow):
+		role_glow.light_energy = 0.52 if _role_light_active else 0.0
+	if is_instance_valid(hurt_light):
+		hurt_light.light_energy = 3.2 * clampf(_hurt_light_remaining / 0.24, 0.0, 1.0) if _hurt_light_active else 0.0
 
 func _event(phase: String, extra: Dictionary = {}) -> Dictionary:
 	var event := {
@@ -261,6 +321,12 @@ func _mcp_state() -> Dictionary:
 		"hurt_count": hurt_count, "death_count": death_count, "target_valid": is_instance_valid(target),
 		"velocity": velocity, "pool_return_pending": _pool_return_pending,
 		"retirement_count": retirement_count,
+		"telegraph_admitted": telegraph_admitted,
+		"telegraph_waiting": state == "waiting_admission",
+		"role_light_requested": state not in ["pooled", "death"],
+		"role_light_active": _role_light_active,
+		"hurt_light_requested": has_hurt_light_request(),
+		"hurt_light_active": _hurt_light_active,
 		"presentation_descriptor": model_pivot.presentation_descriptor() if is_instance_valid(model_pivot) else "none",
 		"presentation_variant_id": model_pivot.variant_id if is_instance_valid(model_pivot) else "none",
 		"semantic_state": model_pivot.semantic_state if is_instance_valid(model_pivot) else state,

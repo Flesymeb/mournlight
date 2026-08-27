@@ -16,15 +16,15 @@ var last_drop_event: Dictionary = {}
 var validation_build_profile := "starting"
 
 func _ready() -> void:
-	process_mode = Node.PROCESS_MODE_ALWAYS
 	# Runtime-only Tester controls: registered without physical bindings and
 	# intentionally absent from project.godot/release controls.
-	if not InputMap.has_action(&"validation_prepare_build"):
-		InputMap.add_action(&"validation_prepare_build")
-	if not InputMap.has_action(&"validation_reset_build"):
-		InputMap.add_action(&"validation_reset_build")
-	if not InputMap.has_action(&"validation_prepare_wisps"):
-		InputMap.add_action(&"validation_prepare_wisps")
+	if OS.has_feature("editor"):
+		if not InputMap.has_action(&"validation_prepare_build"):
+			InputMap.add_action(&"validation_prepare_build")
+		if not InputMap.has_action(&"validation_reset_build"):
+			InputMap.add_action(&"validation_reset_build")
+		if not InputMap.has_action(&"validation_prepare_wisps"):
+			InputMap.add_action(&"validation_prepare_wisps")
 	attack_runtime.attack_authorized.connect(_on_attack_authorized)
 	attack_runtime.hit_resolved.connect(_on_hit_resolved)
 	spawner.enemy_lifecycle.connect(_on_enemy_lifecycle)
@@ -32,6 +32,8 @@ func _ready() -> void:
 	set_session_active(false)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not OS.has_feature("editor"):
+		return
 	if event.is_action_pressed(&"validation_prepare_build"):
 		prepare_weapon_validation("representative")
 		get_viewport().set_input_as_handled()

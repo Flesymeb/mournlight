@@ -42,6 +42,12 @@ var _last_health := 100.0
 var teardown_receipt: Dictionary = {}
 var _teardown_generation := 0
 var _teardown_active := false
+var _terminal_handoff_generation := 0
+var _terminal_handoff_active := false
+var _terminal_handoff_release_frames := 0
+var terminal_handoff_receipt: Dictionary = {}
+var _validation_setup_generation := 0
+var validation_density_receipt: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -63,12 +69,13 @@ func _ready() -> void:
 	world.attack_runtime.hit_resolved.connect(_on_player_hit_resolved)
 	warden.dash_phase_changed.connect(_on_dash_changed)
 	if OS.has_feature("editor"):
-		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_draft", &"validation_prepare_result_failure", &"validation_prepare_result_victory"]:
+		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_draft", &"validation_prepare_result_failure", &"validation_prepare_result_victory", &"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_reset_density"]:
 			if not InputMap.has_action(action):
 				InputMap.add_action(action)
 	_enter_title()
 
 func _process(delta: float) -> void:
+	_advance_terminal_handoff()
 	if run_state in ["active","boss"] and not get_tree().paused:
 		run_elapsed += delta
 	_snapshot_clock -= delta
@@ -77,6 +84,30 @@ func _process(delta: float) -> void:
 		_emit_snapshot()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if OS.has_feature("editor") and event.is_action_pressed(&"validation_prepare_density_3"):
+		_prepare_validation_density_checkpoint(3)
+		get_viewport().set_input_as_handled()
+		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"validation_prepare_density_5"):
+		_prepare_validation_density_checkpoint(5)
+		get_viewport().set_input_as_handled()
+		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"validation_prepare_density_10"):
+		_prepare_validation_density_checkpoint(10)
+		get_viewport().set_input_as_handled()
+		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"validation_prepare_density_18"):
+		_prepare_validation_density_checkpoint(18)
+		get_viewport().set_input_as_handled()
+		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"validation_prepare_density_32"):
+		_prepare_validation_density_checkpoint(32)
+		get_viewport().set_input_as_handled()
+		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"validation_reset_density"):
+		_reset_validation_density()
+		get_viewport().set_input_as_handled()
+		return
 	if OS.has_feature("editor") and event.is_action_pressed(&"validation_prepare_wave4"):
 		_prepare_validation_wave(3)
 		get_viewport().set_input_as_handled()
@@ -146,6 +177,7 @@ func retry_run() -> void:
 	_begin_run()
 
 func _enter_title() -> void:
+	_terminal_handoff_active = false
 	_teardown_run("title", "return_to_title")
 	boss_snapshot.clear()
 	hud.clear_snapshot()
@@ -153,6 +185,50 @@ func _enter_title() -> void:
 	shell.set_mode("hidden")
 	title_menu.show()
 	title_menu.new_game_button.grab_focus.call_deferred()
+	_emit_snapshot()
+
+func _begin_terminal_title_handoff() -> void:
+	if _terminal_handoff_active:
+		return
+	_terminal_handoff_generation += 1
+	_terminal_handoff_active = true
+	_terminal_handoff_release_frames = 0
+	terminal_handoff_receipt = {
+		"generation":_terminal_handoff_generation,
+		"source":"result", "action":"title",
+		"shell_action_generation":shell.action_generation,
+		"stage":"consuming_initiating_confirm",
+		"release_observed":false, "title_exposed":false,
+		"teardown_complete":false,
+	}
+	_teardown_run("title", "return_to_title")
+	boss_snapshot.clear()
+	hud.clear_snapshot()
+	_transition("title")
+	shell.set_mode("hidden")
+	title_menu.hide()
+	terminal_handoff_receipt.teardown_complete = bool(teardown_receipt.get("complete", false))
+	terminal_handoff_receipt.teardown_generation = int(teardown_receipt.get("completion_generation", 0))
+	_emit_snapshot()
+
+func _advance_terminal_handoff() -> void:
+	if not _terminal_handoff_active:
+		return
+	if Input.is_action_pressed(&"ui_accept"):
+		_terminal_handoff_release_frames = 0
+		return
+	_terminal_handoff_release_frames += 1
+	terminal_handoff_receipt.release_observed = true
+	terminal_handoff_receipt.release_frames = _terminal_handoff_release_frames
+	if _terminal_handoff_release_frames < 2:
+		return
+	_terminal_handoff_active = false
+	title_menu.show()
+	title_menu.new_game_button.grab_focus.call_deferred()
+	terminal_handoff_receipt.stage = "complete"
+	terminal_handoff_receipt.title_exposed = true
+	terminal_handoff_receipt.focus_target = "Play"
+	terminal_handoff_receipt.quit_requested = quit_requested
 	_emit_snapshot()
 
 func _pause_run() -> void:
@@ -222,7 +298,11 @@ func _on_shell_action(action: StringName) -> void:
 		&"play": start_run()
 		&"resume": _resume_run()
 		&"retry": retry_run()
-		&"title": _enter_title()
+		&"title":
+			if run_state == "result":
+				_begin_terminal_title_handoff()
+			else:
+				_enter_title()
 		&"settings": _open_settings_page()
 		&"credits": _open_credits_page()
 		&"back": _return_from_shell_page()
@@ -424,7 +504,58 @@ func _prepare_validation_wave(index: int) -> void:
 		experience_threshold = 9999
 	wave_director.prepare_test_wave(index)
 	if index == 3:
-		spawner.prepare_validation_density(32)
+		_record_validation_density(32)
+
+func _prepare_validation_density_checkpoint(target_live: int) -> void:
+	if not OS.has_feature("editor") or run_state not in ["active", "boss"]:
+		return
+	health.maximum_health = 5000.0
+	health.reset_warden_health()
+	_last_health = health.current_health
+	experience = 0
+	experience_threshold = 9999
+	wave_director.prepare_test_wave(3)
+	_record_validation_density(target_live)
+
+func _record_validation_density(target_live: int) -> void:
+	var before := spawner.get_snapshot()
+	var preparation := spawner.prepare_validation_density(target_live)
+	_validation_setup_generation += 1
+	var after := spawner.get_snapshot()
+	validation_density_receipt = {
+		"accepted":bool(preparation.get("accepted", false)),
+		"requested_density":target_live,
+		"resolved_density":int(after.get("live", 0)),
+		"run_serial":run_serial,
+		"setup_generation":_validation_setup_generation,
+		"active":int(after.get("live", 0)), "pooled":int(after.get("pooled", 0)),
+		"before_active":int(before.get("live", 0)),
+		"light_budget":(after.get("ordinary_light_budget", {}) as Dictionary).duplicate(true),
+		"neighbor_registry":(after.get("neighbor_registry", {}) as Dictionary).duplicate(true),
+		"telegraph_admission":(after.get("telegraph_admission", {}) as Dictionary).duplicate(true),
+		"preparation":preparation.duplicate(true),
+		"attacks_advanced_by_preparation":false,
+		"terminal_state_advanced":false,
+	}
+	_emit_snapshot()
+
+func _reset_validation_density() -> void:
+	if not OS.has_feature("editor") or run_state not in ["active", "boss"]:
+		return
+	spawner.reset_encounter()
+	_validation_setup_generation += 1
+	var after := spawner.get_snapshot()
+	validation_density_receipt = {
+		"accepted":true, "reset":true, "requested_density":0,
+		"resolved_density":int(after.get("live", 0)), "run_serial":run_serial,
+		"setup_generation":_validation_setup_generation,
+		"active":int(after.get("live", 0)), "pooled":int(after.get("pooled", 0)),
+		"light_budget":(after.get("ordinary_light_budget", {}) as Dictionary).duplicate(true),
+		"neighbor_registry":(after.get("neighbor_registry", {}) as Dictionary).duplicate(true),
+		"telegraph_admission":(after.get("telegraph_admission", {}) as Dictionary).duplicate(true),
+		"reset_isolated":int(after.get("live", -1)) == 0 and int((after.get("neighbor_registry", {}) as Dictionary).get("registered_count", -1)) == 0 and int((after.get("ordinary_light_budget", {}) as Dictionary).get("active", -1)) == 0,
+	}
+	_emit_snapshot()
 
 func _prepare_validation_result(validation_outcome: String) -> void:
 	if not OS.has_feature("editor") or run_state not in ["active","boss"]:
@@ -467,6 +598,14 @@ func _mcp_state() -> Dictionary:
 		"upgrade_draft":draft_controller.get_snapshot(), "teardown_receipt":teardown_receipt,
 		"tree_paused": get_tree().paused, "shell_mode": shell.mode,
 		"shell_return_mode": shell.return_mode, "shell_action_latched": shell.action_latched,
+		"process_ownership":{
+			"controller":process_mode, "shell":shell.process_mode,
+			"world":world.process_mode, "wave_director":wave_director.process_mode,
+			"upgrade_draft":draft_controller.process_mode,
+		},
+		"terminal_handoff":terminal_handoff_receipt,
+		"terminal_handoff_active":_terminal_handoff_active,
+		"validation_density":validation_density_receipt,
 		"shell_focus": String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none",
 	}
 

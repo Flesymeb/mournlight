@@ -12,21 +12,21 @@ height = 1.45
 [sub_resource type="StandardMaterial3D" id="CueMat"]
 transparency = 1
 shading_mode = 0
-albedo_color = Color(0.78, 0.18, 0.66, 0.5)
+albedo_color = Color(0.78, 0.18, 0.66, 0.32)
 emission_enabled = true
 emission = Color(0.78, 0.1, 0.56, 1)
-emission_energy_multiplier = 2.8
+emission_energy_multiplier = 1.35
 
 [sub_resource type="TorusMesh" id="TelegraphMesh"]
 material = SubResource("CueMat")
-inner_radius = 0.78
+inner_radius = 0.82
 outer_radius = 0.9
 rings = 24
 ring_segments = 5
 
 [sub_resource type="BoxMesh" id="LaneMesh"]
 material = SubResource("CueMat")
-size = Vector3(0.18, 0.04, 5.0)
+size = Vector3(0.12, 0.025, 5.0)
 
 [node name="EnemyActor" type="CharacterBody3D"]
 script = ExtResource("1_actor")
@@ -44,13 +44,13 @@ scale = Vector3(0.55, 0.55, 0.55)
 script = ExtResource("4_presenter")
 
 [node name="TelegraphRing" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.07, 0)
+position = Vector3(0, 0.045, 0)
 mesh = SubResource("TelegraphMesh")
 cast_shadow = 0
 visible = false
 
 [node name="LaneCue" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.08, -2.5)
+position = Vector3(0, 0.055, -2.5)
 mesh = SubResource("LaneMesh")
 cast_shadow = 0
 visible = false
@@ -64,7 +64,7 @@ omni_range = 3.2
 [node name="RoleGlow" type="OmniLight3D" parent="."]
 position = Vector3(0, 0.72, 0)
 light_color = Color(0.4, 0.95, 0.7, 1)
-light_energy = 0.7
+light_energy = 0.0
 light_specular = 0.0
 omni_range = 1.85
 

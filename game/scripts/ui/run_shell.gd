@@ -20,6 +20,8 @@ var mode := "title"
 var return_mode := "title"
 var summary: Dictionary = {}
 var action_latched := false
+var action_generation := 0
+var last_action_receipt: Dictionary = {}
 var buttons: Array[Button] = []
 var actions: Array[StringName] = []
 var title_label: Label
@@ -224,9 +226,13 @@ func _on_button(index: int) -> void:
 		_refresh_settings_page()
 		return
 	if action in [&"settings",&"credits",&"back"]:
+		action_generation += 1
+		last_action_receipt = {"generation":action_generation, "action":String(action), "mode":mode, "latched":false}
 		action_requested.emit(action)
 		return
 	action_latched = true
+	action_generation += 1
+	last_action_receipt = {"generation":action_generation, "action":String(action), "mode":mode, "latched":true}
 	action_requested.emit(action)
 
 func _draw() -> void:
@@ -259,7 +265,7 @@ func _onoff(value: Variant) -> String:
 	return "ON" if bool(value) else "OFF"
 
 func _mcp_state() -> Dictionary:
-	return {"mode":mode,"return_mode":return_mode,"visible":visible,"action_latched":action_latched,"displayed_result_fields":_displayed_result_fields(),"focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none","actions":actions,"settings":setting_values,"last_setting_mutation":last_setting_mutation}
+	return {"mode":mode,"return_mode":return_mode,"visible":visible,"action_latched":action_latched,"action_generation":action_generation,"last_action_receipt":last_action_receipt,"displayed_result_fields":_displayed_result_fields(),"focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none","actions":actions,"settings":setting_values,"last_setting_mutation":last_setting_mutation}
 
 func _displayed_result_fields() -> Dictionary:
 	if mode != "result": return {}
