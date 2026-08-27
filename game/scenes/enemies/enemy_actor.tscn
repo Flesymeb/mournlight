@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://scripts/enemies/enemy_actor.gd" id="1_actor"]
 [ext_resource type="Script" path="res://scripts/combat/health_component.gd" id="2_health"]
 [ext_resource type="Script" path="res://scripts/combat/drop_transaction.gd" id="3_drop"]
-[ext_resource type="PackedScene" path="res://assets/authored/hostile_lantern.glb" id="4_model"]
+[ext_resource type="Script" path="res://scripts/enemies/enemy_semantic_presenter.gd" id="4_presenter"]
 
 [sub_resource type="CapsuleShape3D" id="Shape"]
 radius = 0.55
@@ -40,12 +40,8 @@ shape = SubResource("Shape")
 [node name="PresentationRoot" type="Node3D" parent="."]
 
 [node name="ModelPivot" type="Node3D" parent="PresentationRoot"]
-scale = Vector3(0.0085, 0.0085, 0.0085)
-
-[node name="AssetTransform" type="Node3D" parent="PresentationRoot/ModelPivot"]
-position = Vector3(-1.71, 5.08, -9.94)
-
-[node name="AuthoredHostilePackage" parent="PresentationRoot/ModelPivot/AssetTransform" instance=ExtResource("4_model")]
+scale = Vector3(0.55, 0.55, 0.55)
+script = ExtResource("4_presenter")
 
 [node name="TelegraphRing" type="MeshInstance3D" parent="."]
 position = Vector3(0, 0.07, 0)

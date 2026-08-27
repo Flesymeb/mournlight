@@ -35,6 +35,14 @@ func apply() -> void:
 	_set_bus("Effects", float(values.effects_volume))
 	var mode := int(values.window_mode)
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if mode == 1 else DisplayServer.WINDOW_MODE_WINDOWED)
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree:
+		tree.root.content_scale_factor = clampf(float(values.ui_scale), 0.9, 1.25)
+		tree.root.set_meta("mournlight_screen_shake", bool(values.screen_shake))
+		tree.root.set_meta("mournlight_hit_flash", bool(values.hit_flash))
+		tree.root.set_meta("mournlight_damage_numbers", bool(values.damage_numbers))
+		tree.root.set_meta("mournlight_danger_contrast", bool(values.danger_contrast))
+	TargetSelector.configure_bias(int(values.target_bias))
 
 func _set_bus(bus_name: String, linear: float) -> void:
 	var index := AudioServer.get_bus_index(bus_name)

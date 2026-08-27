@@ -27,11 +27,12 @@ var subtitle_label: Label
 var body_label: Label
 var settings := MournlightSettingsStore.new()
 var setting_values: Dictionary
+var last_setting_mutation: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	buttons = [$PrimaryButton, $SecondaryButton]
-	for index in range(4):
+	for index in range(10):
 		var button := Button.new()
 		button.name = "ActionButton%d" % (index + 3)
 		button.process_mode = Node.PROCESS_MODE_ALWAYS
@@ -74,24 +75,32 @@ func _notification(what: int) -> void:
 
 func _layout() -> void:
 	var center := size * 0.5
-	title_label.position = center + Vector2(-360,-84)
+	var page_top := maxf(78.0, center.y - 266.0)
+	title_label.position = Vector2(center.x - 360,page_top)
 	title_label.size = Vector2(720,58)
-	subtitle_label.position = center + Vector2(-340,-28)
+	subtitle_label.position = Vector2(center.x - 340,page_top + 54)
 	subtitle_label.size = Vector2(680,30)
-	body_label.position = center + Vector2(-370,2)
-	body_label.size = Vector2(740,76)
+	body_label.position = Vector2(center.x - 400,page_top + 86)
+	body_label.size = Vector2(800,190 if mode == "credits" else 150 if mode == "result" else 56)
 	var visible_count := 0
 	for button in buttons:
 		if button.visible:
 			visible_count += 1
-	var compact := visible_count >= 6
-	var start_y := center.y + (84 if compact else 82)
-	var spacing := 42 if compact else 54
-	var button_height := 38 if compact else 44
+	if mode == "settings":
+		var start_y := page_top + 154
+		for index in buttons.size():
+			var button := buttons[index]
+			button.position = Vector2(center.x - 360 + (index % 2) * 370, start_y + (index / 2) * 54)
+			button.size = Vector2(350,42)
+		return
+	var compact := visible_count >= 5
+	var start_y := page_top + (315 if mode == "credits" else 255 if mode == "result" else 184)
+	var spacing := 48 if compact else 56
+	var button_height := 42 if compact else 46
 	for index in buttons.size():
 		var button := buttons[index]
-		button.position = Vector2(center.x - 170, start_y + index * spacing)
-		button.size = Vector2(340,button_height)
+		button.position = Vector2(center.x - 180, start_y + index * spacing)
+		button.size = Vector2(360,button_height)
 
 func set_mode(next_mode: String, next_summary: Dictionary = {}) -> void:
 	if next_mode == "settings" or next_mode == "credits":
@@ -111,13 +120,13 @@ func set_mode(next_mode: String, next_summary: Dictionary = {}) -> void:
 			_refresh_settings_page()
 		"credits":
 			_configure("CREDITS & NOTICES","MOURNLIGHT — RELEASE CANDIDATE",
-				"Authored cemetery, Warden and lantern sources are preserved with receipts.\nMontserrat typography: upstream font license retained.\nBellkeeper: Stylized Possessed Lantern, CC-BY-4.0.\nMenus: Maaack template mechanism, MIT. Audio: credited source library; see THIRD_PARTY_NOTICES.",
+				"MOURNLIGHT — DESIGN, CODE & CEMETERY GARDEN\nAuthored production assembled for this release candidate.\n\nMontserrat typography — SIL Open Font License.\nBellkeeper / possessed lantern — CC BY 4.0.\nMaaack menu navigation mechanism — MIT.\nAudio sources — credited library; see THIRD_PARTY_NOTICES.\n\nThank you for keeping the last lantern lit.",
 				[["back","BACK"]])
 		"result":
 			var won := String(summary.get("outcome","failure")) == "victory"
 			var time := float(summary.get("elapsed",0.0))
 			_configure("DAWN ANSWERS" if won else "FLAME EXTINGUISHED","VICTORY" if won else "THE WATCH ENDS",
-				"%02d:%02d   WAVE %d / 5   LEVEL %d   BANISHED %d\nDAMAGE DEALT %d   TAKEN %d\n%s" % [int(time)/60,int(time)%60,int(summary.get("wave",1)),int(summary.get("level",1)),int(summary.get("defeated",0)),int(summary.get("damage_dealt",0)),int(summary.get("damage_taken",0)),_upgrade_summary(summary)],
+				"TIME  %02d:%02d     WAVE  %d / %d     LEVEL  %d     BANISHED  %d\nDAMAGE DEALT  %d     DAMAGE TAKEN  %d\n\nARSENAL  %s\nVIGILS  %s" % [int(time)/60,int(time)%60,int(summary.get("wave",1)),int(summary.get("wave_count",5)),int(summary.get("level",1)),int(summary.get("defeated",0)),int(summary.get("damage_dealt",0)),int(summary.get("damage_taken",0)),_weapon_summary(summary),_upgrade_summary(summary)],
 				[["retry","RETRY"],["title","RETURN TO TITLE"]])
 		"draft":
 			_configure("CHOOSE A VIGIL","THE NIGHT HOLDS ITS BREATH","Select one upgrade. The choice applies before combat resumes.",[])
@@ -141,20 +150,34 @@ func _configure(title: String, subtitle: String, body: String, entries: Array) -
 			var action := StringName(entry[0])
 			actions.append(action)
 			button.text = String(entry[1])
-			button.icon = ICONS.get(String(action))
+			button.icon = ICONS.get(String(action), ICONS.settings)
 			button.visible = true
 			button.disabled = false
 		else:
 			button.visible = false
+	for index in actions.size():
+		var button := buttons[index]
+		var previous := buttons[(index - 1 + actions.size()) % actions.size()]
+		var next := buttons[(index + 1) % actions.size()]
+		button.focus_neighbor_top = button.get_path_to(previous)
+		button.focus_neighbor_bottom = button.get_path_to(next)
+		if mode == "settings":
+			button.focus_neighbor_left = button.get_path_to(buttons[index - 1] if index % 2 == 1 else button)
+			button.focus_neighbor_right = button.get_path_to(buttons[index + 1] if index % 2 == 0 and index + 1 < actions.size() else button)
 
 func _refresh_settings_page() -> void:
 	var display := "FULLSCREEN" if int(setting_values.window_mode) == 1 else "WINDOWED"
-	var access := "SHAKE %s  FLASH %s  NUMBERS %s  CONTRAST %s  BIAS %d" % [_onoff(setting_values.screen_shake),_onoff(setting_values.hit_flash),_onoff(setting_values.damage_numbers),_onoff(setting_values.danger_contrast),int(setting_values.target_bias)]
-	_configure("SETTINGS","PERSISTED BETWEEN WATCHES","%s   UI %.0f%%\n%s" % [display,float(setting_values.ui_scale)*100.0,access],
+	_configure("SETTINGS","ONE CONTROL · ONE PERSISTED CHOICE","Audio, display, feedback and targeting update independently.",
 		[["master","MASTER VOLUME  %d%%" % int(float(setting_values.master_volume)*100.0)],
 		["music","MUSIC VOLUME  %d%%" % int(float(setting_values.music_volume)*100.0)],
 		["effects","EFFECTS VOLUME  %d%%" % int(float(setting_values.effects_volume)*100.0)],
-		["display","DISPLAY & UI SCALE"],["accessibility","ACCESSIBILITY & TARGETING"],["back","BACK"]])
+		["window_mode","WINDOW  %s" % display],["ui_scale","UI SCALE  %.0f%%" % (float(setting_values.ui_scale)*100.0)],
+		["screen_shake","SCREEN SHAKE  %s" % _onoff(setting_values.screen_shake)],
+		["hit_flash","HIT FLASH  %s" % _onoff(setting_values.hit_flash)],
+		["damage_numbers","DAMAGE NUMBERS  %s" % _onoff(setting_values.damage_numbers)],
+		["danger_contrast","DANGER CONTRAST  %s" % _onoff(setting_values.danger_contrast)],
+		["target_bias","TARGETING  %s" % ("DIRECTIONAL" if int(setting_values.target_bias) == 1 else "AUTOMATIC")],
+		["back","BACK"]])
 
 func _on_button(index: int) -> void:
 	if action_latched or index >= actions.size():
@@ -162,31 +185,46 @@ func _on_button(index: int) -> void:
 	var action := actions[index]
 	if action in [&"master",&"music",&"effects"]:
 		var key := String(action) + "_volume"
+		var before: Variant = setting_values[key]
 		var next := fmod(float(setting_values[key]) + 0.2, 1.01)
 		setting_values[key] = next
 		settings.set_value(key,next)
+		last_setting_mutation = {"key":key,"before":before,"after":next}
 		_refresh_settings_page()
 		return
-	if action == &"display":
-		setting_values.window_mode = 1 - int(setting_values.window_mode)
-		setting_values.ui_scale = 1.25 if float(setting_values.ui_scale) < 1.1 else 0.9 if float(setting_values.ui_scale) > 1.1 else 1.0
+	if action == &"window_mode":
+		var before := int(setting_values.window_mode)
+		setting_values.window_mode = 1 - before
 		settings.set_value("window_mode",setting_values.window_mode)
+		last_setting_mutation = {"key":"window_mode","before":before,"after":setting_values.window_mode}
+		_refresh_settings_page()
+		return
+	if action == &"ui_scale":
+		var before := float(setting_values.ui_scale)
+		var choices := [0.9,1.0,1.25]
+		var choice_index := choices.find(before)
+		setting_values.ui_scale = choices[(choice_index+1)%choices.size()]
 		settings.set_value("ui_scale",setting_values.ui_scale)
+		last_setting_mutation = {"key":"ui_scale","before":before,"after":setting_values.ui_scale}
 		_refresh_settings_page()
 		return
-	if action == &"accessibility":
-		for key in ["screen_shake","hit_flash","damage_numbers","danger_contrast"]:
-			setting_values[key] = not bool(setting_values[key])
-			settings.set_value(key,setting_values[key])
-		setting_values.target_bias = (int(setting_values.target_bias)+1)%3
+	if action in [&"screen_shake",&"hit_flash",&"damage_numbers",&"danger_contrast"]:
+		var key := String(action)
+		var before := bool(setting_values[key])
+		setting_values[key] = not before
+		settings.set_value(key,setting_values[key])
+		last_setting_mutation = {"key":key,"before":before,"after":setting_values[key]}
+		_refresh_settings_page()
+		return
+	if action == &"target_bias":
+		var before := int(setting_values.target_bias)
+		setting_values.target_bias = 1-before
 		settings.set_value("target_bias",setting_values.target_bias)
+		last_setting_mutation = {"key":"target_bias","before":before,"after":setting_values.target_bias}
 		_refresh_settings_page()
 		return
-	if action == &"back":
-		if return_mode == "title":
-			action_requested.emit(&"title")
-		else:
-			set_mode(return_mode,summary)
+	if action in [&"settings",&"credits",&"back"]:
+		action_requested.emit(action)
 		return
 	action_latched = true
 	action_requested.emit(action)
@@ -196,18 +234,37 @@ func _draw() -> void:
 		return
 	draw_rect(Rect2(Vector2.ZERO,size),SHADE,true)
 	var center := size*0.5
-	draw_circle(center+Vector2(0,-174),48,Color(0.03,0.045,0.11,0.96))
-	draw_arc(center+Vector2(0,-174),48,0,TAU,48,BRASS,3,true)
-	draw_circle(center+Vector2(-4,-176),27,Color("d4def6"))
-	draw_circle(center+Vector2(9,-184),24,Color("101733"))
-	draw_line(center+Vector2(-230,-105),center+Vector2(230,-105),BRASS,2,true)
+	var page_top := maxf(78.0,center.y-266.0)
+	var seal := Vector2(maxf(74.0,center.x-470.0),page_top+30.0)
+	draw_circle(seal,38,Color(0.03,0.045,0.11,0.96))
+	draw_arc(seal,38,0,TAU,40,BRASS,3,true)
+	draw_circle(seal+Vector2(-3,-2),21,Color("d4def6"))
+	draw_circle(seal+Vector2(8,-8),19,Color("101733"))
+	draw_line(Vector2(center.x-230,page_top+132),Vector2(center.x+230,page_top+132),BRASS,2,true)
 
 func _upgrade_summary(data: Dictionary) -> String:
 	var upgrades: Array = data.get("selected_upgrades",[])
-	return "NO UPGRADES" if upgrades.is_empty() else "VIGILS: " + ", ".join(upgrades.map(func(item: Dictionary) -> String:return String(item.get("title",""))))
+	return "NONE SELECTED" if upgrades.is_empty() else ", ".join(upgrades.map(func(item: Dictionary) -> String:return "%s %s" % [String(item.get("title",item.get("upgrade_id","VIGIL"))),String(item.get("rank_label",item.get("concrete_change","")))]))
+
+func _weapon_summary(data: Dictionary) -> String:
+	var build: Dictionary = data.get("weapons",{})
+	var rows: Array[String] = []
+	for weapon in build.get("weapons",[]):
+		if bool(weapon.get("equipped",false)):
+			var stats: Dictionary = weapon.get("stats",{})
+			rows.append("%s R%d" % [String(stats.get("display_name",weapon.get("weapon_id","WEAPON"))).to_upper(),int(weapon.get("rank",1))])
+	return "WARDEN LANTERN R1" if rows.is_empty() else "  ·  ".join(rows)
 
 func _onoff(value: Variant) -> String:
 	return "ON" if bool(value) else "OFF"
 
 func _mcp_state() -> Dictionary:
-	return {"mode":mode,"visible":visible,"focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none","actions":actions,"settings":setting_values,"summary":summary}
+	return {"mode":mode,"return_mode":return_mode,"visible":visible,"action_latched":action_latched,"displayed_result_fields":_displayed_result_fields(),"focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none","actions":actions,"settings":setting_values,"last_setting_mutation":last_setting_mutation}
+
+func _displayed_result_fields() -> Dictionary:
+	if mode != "result": return {}
+	var weapon_ranks: Array[Dictionary] = []
+	for weapon in (summary.get("weapons",{}) as Dictionary).get("weapons",[]):
+		if bool(weapon.get("equipped",false)):
+			weapon_ranks.append({"weapon_id":weapon.get("weapon_id",""),"rank":weapon.get("rank",0)})
+	return {"outcome":summary.get("outcome","failure"),"elapsed":summary.get("elapsed",0.0),"wave":summary.get("wave",1),"level":summary.get("level",1),"defeated":summary.get("defeated",0),"damage_dealt":summary.get("damage_dealt",0),"damage_taken":summary.get("damage_taken",0),"weapon_ranks":weapon_ranks,"selected_upgrades":summary.get("selected_upgrades",[])}

@@ -173,4 +173,16 @@ func _draw_text(value: String, position: Vector2, font_size: int, color: Color, 
 	draw_string(font, position, value, alignment, width, font_size, color)
 
 func _mcp_state() -> Dictionary:
-	return {"snapshot_serial": snapshot_serial, "visible": visible, "bound_snapshot": snapshot}
+	return {"displayed_fields":{"health":snapshot.get("health",0.0),"health_maximum":snapshot.get("health_maximum",0.0),
+		"experience":snapshot.get("experience",0),"experience_threshold":snapshot.get("experience_threshold",0),
+		"level":snapshot.get("level",1),"wave":snapshot.get("wave",1),"wave_count":snapshot.get("wave_count",5),
+		"elapsed":snapshot.get("elapsed",0.0),"weapon_ranks":_weapon_rank_digest(),"dash_phase":snapshot.get("dash_phase","ready"),
+		"boss_active":snapshot.get("boss_active",false),"boss_health":snapshot.get("boss_health",0.0),"boss_health_maximum":snapshot.get("boss_health_maximum",0.0)},
+		"snapshot_serial": snapshot_serial, "visible": visible}
+
+func _weapon_rank_digest() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for weapon in (snapshot.get("weapons",{}) as Dictionary).get("weapons",[]):
+		if bool(weapon.get("equipped",false)):
+			result.append({"weapon_id":weapon.get("weapon_id",""),"rank":weapon.get("rank",0)})
+	return result

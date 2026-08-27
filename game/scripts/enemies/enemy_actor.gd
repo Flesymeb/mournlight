@@ -11,7 +11,7 @@ signal drop_committed(event: Dictionary)
 @onready var health: HealthComponent = $HealthComponent
 @onready var drops: DropTransaction = $DropTransaction
 @onready var presentation_root: Node3D = $PresentationRoot
-@onready var model_pivot: Node3D = $PresentationRoot/ModelPivot
+@onready var model_pivot: EnemySemanticPresenter = $PresentationRoot/ModelPivot
 @onready var telegraph_ring: MeshInstance3D = $TelegraphRing
 @onready var lane_cue: MeshInstance3D = $LaneCue
 @onready var hurt_light: OmniLight3D = $HurtLight
@@ -58,6 +58,9 @@ func activate(next_profile: EnemyProfile, next_target: WardenController, at_posi
 	global_position = at_position
 	velocity = Vector3.ZERO
 	presentation_root.scale = Vector3.ONE * profile.presentation_scale
+	presentation_root.rotation = Vector3.ZERO
+	presentation_root.position = Vector3.ZERO
+	model_pivot.configure(String(profile.role_id), profile.accent_color, stable_id, generation)
 	_apply_accent(profile.accent_color)
 	visible = true
 	collider.disabled = false
@@ -71,6 +74,7 @@ func return_to_pool() -> void:
 	target = null
 	state_remaining = 0.0
 	state = "pooled"
+	model_pivot.reset_presenter()
 	visible = false
 	collider.set_deferred("disabled", true)
 	telegraph_ring.visible = false
@@ -102,7 +106,6 @@ func _physics_process(delta: float) -> void:
 	match state:
 		"spawn":
 			velocity = Vector3.ZERO
-			model_pivot.position.y = sin(_lifetime * 12.0) * 0.08
 			if state_remaining <= 0.0:
 				_set_state("approach")
 		"approach":
@@ -124,7 +127,9 @@ func _physics_process(delta: float) -> void:
 				_set_state("approach")
 	move_and_slide()
 	global_position.y = 0.05
-	model_pivot.rotation.y += delta * (0.35 if profile.attack_kind == "slam" else 0.18)
+	model_pivot.advance(delta, velocity, state_remaining, _state_duration(state))
+	if velocity.length_squared() > 0.04 and state == "approach":
+		presentation_root.look_at(global_position + velocity, Vector3.UP)
 
 func _steer_approach(delta: float) -> void:
 	var to_target := target.global_position - global_position
@@ -195,9 +200,6 @@ func _on_died(event: Dictionary) -> void:
 	drops.commit_from_death(event)
 	lifecycle_event.emit(_event("death", {"death_id": event.get("death_id", "")}))
 	defeated.emit(self, event)
-	var tween := create_tween()
-	tween.tween_property(presentation_root, "scale", Vector3(0.3, 1.25, 0.3) * profile.presentation_scale, 0.18)
-	tween.tween_property(presentation_root, "scale", Vector3.ZERO, 0.28)
 
 func _on_drop(event: Dictionary) -> void:
 	drop_committed.emit(event)
@@ -206,6 +208,16 @@ func _on_drop(event: Dictionary) -> void:
 func _set_state(next_state: String, duration: float = 0.0) -> void:
 	state = next_state
 	state_remaining = duration
+	if is_instance_valid(model_pivot):
+		model_pivot.set_semantic(next_state)
+
+func _state_duration(for_state: String) -> float:
+	match for_state:
+		"spawn": return 0.55
+		"telegraph": return profile.telegraph_duration if profile else 0.0
+		"damage": return 0.13
+		"recovery": return profile.recovery_duration if profile else 0.0
+		_: return 0.0
 
 func _apply_accent(color: Color) -> void:
 	for mesh in [telegraph_ring, lane_cue]:
@@ -241,4 +253,9 @@ func _mcp_state() -> Dictionary:
 		"hurt_count": hurt_count, "death_count": death_count, "target_valid": is_instance_valid(target),
 		"velocity": velocity, "pool_return_pending": _pool_return_pending,
 		"retirement_count": retirement_count,
+		"presentation_descriptor": model_pivot.presentation_descriptor() if is_instance_valid(model_pivot) else "none",
+		"presentation_variant_id": model_pivot.variant_id if is_instance_valid(model_pivot) else "none",
+		"semantic_state": model_pivot.semantic_state if is_instance_valid(model_pivot) else state,
+		"active_motion_id": model_pivot.active_motion_id if is_instance_valid(model_pivot) else "none",
+		"semantic_bindings": model_pivot.semantic_bindings() if is_instance_valid(model_pivot) else {},
 	}

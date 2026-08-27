@@ -1,6 +1,14 @@
 class_name TargetSelector
 extends RefCounted
 
+static var _target_bias_mode := 0
+
+static func configure_bias(mode: int) -> void:
+	_target_bias_mode = clampi(mode, 0, 1)
+
+static func target_bias_mode() -> int:
+	return _target_bias_mode
+
 static func nearest_legal(owner: Node3D, maximum_range: float) -> Node3D:
 	if not is_instance_valid(owner) or not owner.is_inside_tree():
 		return null
@@ -34,4 +42,3 @@ static func _stable_id(candidate: Node) -> String:
 	if candidate.has_method("get_stable_id"):
 		return String(candidate.get_stable_id())
 	return String(candidate.get_path())
-

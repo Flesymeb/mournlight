@@ -34,6 +34,7 @@ var boss_snapshot: Dictionary = {}
 var quit_requested := false
 var _resume_state := "active"
 var result_committed := false
+var terminal_snapshot: Dictionary = {}
 var state_history: Array[String] = []
 var last_snapshot: Dictionary = {}
 var _snapshot_clock := 0.0
@@ -59,7 +60,7 @@ func _ready() -> void:
 	world.attack_runtime.hit_resolved.connect(_on_player_hit_resolved)
 	warden.dash_phase_changed.connect(_on_dash_changed)
 	if OS.has_feature("editor"):
-		for action in [&"validation_prepare_wave4", &"validation_prepare_boss"]:
+		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_result_failure", &"validation_prepare_result_victory"]:
 			if not InputMap.has_action(action):
 				InputMap.add_action(action)
 	_enter_title()
@@ -79,6 +80,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if OS.has_feature("editor") and event.is_action_pressed(&"validation_prepare_boss"):
 		_prepare_validation_wave(4)
+		get_viewport().set_input_as_handled()
+		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"validation_prepare_result_failure"):
+		_prepare_validation_result("failure")
+		get_viewport().set_input_as_handled()
+		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"validation_prepare_result_victory"):
+		_prepare_validation_result("victory")
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("pause") and not event.is_echo():
@@ -105,6 +114,7 @@ func start_run() -> void:
 	if is_instance_valid(boss): boss.queue_free()
 	boss = null
 	result_committed = false
+	terminal_snapshot.clear()
 	draft_controller.reset()
 	audio_director.reset_for_run()
 	world.reset_session()
@@ -168,12 +178,13 @@ func _on_warden_failed(event: Dictionary) -> void:
 	if result_committed or run_state not in ["active", "boss", "paused", "draft"]:
 		return
 	result_committed = true
+	outcome = "failure"
+	_commit_terminal_snapshot("failure")
 	spawner.stop_encounter()
 	wave_director.terminate("failure")
 	world.set_session_active(false)
 	if is_instance_valid(boss):
 		boss.terminate("failure")
-	outcome = "failure"
 	if warden.animation_binding: warden.animation_binding.trigger("death",999.0)
 	get_tree().paused = true
 	_transition("failure")
@@ -182,7 +193,8 @@ func _on_warden_failed(event: Dictionary) -> void:
 
 func _present_result(_event: Dictionary) -> void:
 	_transition("result")
-	shell.set_mode("result", last_snapshot)
+	hud.visible = false
+	shell.set_mode("result", terminal_snapshot)
 	_emit_snapshot()
 
 func _on_health_changed(current: float, _maximum: float) -> void:
@@ -219,6 +231,9 @@ func _on_shell_action(action: StringName) -> void:
 		&"resume": _resume_run()
 		&"retry": retry_run()
 		&"title": _enter_title()
+		&"settings": _open_settings_page()
+		&"credits": _open_credits_page()
+		&"back": _return_from_shell_page()
 		&"quit":
 			quit_requested = true
 			if not OS.has_feature("editor"):
@@ -227,6 +242,31 @@ func _on_shell_action(action: StringName) -> void:
 func _on_title_page_requested(page: String) -> void:
 	title_menu.hide()
 	shell.set_mode(page)
+
+func _open_settings_page() -> void:
+	if run_state == "paused":
+		_transition("settings")
+		get_tree().paused = true
+		shell.set_mode("settings", last_snapshot)
+	elif run_state == "title":
+		title_menu.hide()
+		shell.set_mode("settings")
+	_emit_snapshot()
+
+func _open_credits_page() -> void:
+	if run_state == "title":
+		title_menu.hide()
+		shell.set_mode("credits")
+	_emit_snapshot()
+
+func _return_from_shell_page() -> void:
+	if shell.return_mode == "pause" and run_state == "settings":
+		get_tree().paused = true
+		_transition("paused")
+		shell.set_mode("pause",last_snapshot)
+		_emit_snapshot()
+	else:
+		_enter_title()
 
 func _on_title_exit_requested() -> void:
 	quit_requested = true
@@ -286,6 +326,7 @@ func _on_boss_defeated(_event: Dictionary) -> void:
 		return
 	result_committed = true
 	outcome = "victory"
+	_commit_terminal_snapshot("victory")
 	spawner.stop_encounter()
 	wave_director.terminate("victory")
 	world.set_session_active(false)
@@ -297,6 +338,16 @@ func _on_boss_defeated(_event: Dictionary) -> void:
 
 func _on_player_hit_resolved(event: Dictionary) -> void:
 	damage_dealt += int(round(float(event.get("damage",0.0))))
+
+func _commit_terminal_snapshot(terminal_outcome: String) -> void:
+	if not terminal_snapshot.is_empty():
+		return
+	terminal_snapshot = RunSnapshot.make(self,world,warden,health,spawner,inventory)
+	terminal_snapshot.outcome = terminal_outcome
+	terminal_snapshot.state = "result"
+	terminal_snapshot["committed"] = true
+	terminal_snapshot["commit_run_serial"] = run_serial
+	terminal_snapshot = terminal_snapshot.duplicate(true)
 
 func _transition(next_state: String) -> void:
 	if run_state == next_state:
@@ -319,6 +370,23 @@ func _prepare_validation_wave(index: int) -> void:
 	if index == 3:
 		spawner.prepare_validation_density(32)
 
+func _prepare_validation_result(validation_outcome: String) -> void:
+	if not OS.has_feature("editor") or run_state not in ["active","boss"]:
+		return
+	inventory.prepare_legal_build("representative")
+	selected_upgrades = [
+		{"id":"lantern_focus","title":"Focused Flame","rank_label":"R2","concrete_change":"+25% DAMAGE"},
+		{"id":"dash_cooldown","title":"Moonstep","rank_label":"R1","concrete_change":"15% FASTER DASH"},
+	]
+	defeated_enemies = maxi(defeated_enemies,18)
+	damage_dealt = maxi(damage_dealt,742)
+	damage_taken = maxi(damage_taken,37)
+	if validation_outcome == "victory":
+		_on_boss_defeated({"validation":true})
+	else:
+		health.current_health = 0.0
+		_on_warden_failed({"validation":true})
+
 func _emit_snapshot() -> void:
 	if not is_node_ready():
 		return
@@ -328,12 +396,30 @@ func _emit_snapshot() -> void:
 		hud.bind_snapshot(last_snapshot)
 
 func _mcp_state() -> Dictionary:
+	var wave_state := wave_director.get_snapshot()
 	return {
 		"run_state": run_state, "run_serial": run_serial, "run_elapsed": run_elapsed,
 		"experience": experience, "experience_threshold": experience_threshold, "level": level,
 		"defeated_enemies": defeated_enemies, "damage_taken": damage_taken,
-		"damage_dealt":damage_dealt,"outcome":outcome,"selected_upgrades":selected_upgrades,
-		"wave":wave_director.get_snapshot(),"boss":boss_snapshot,"quit_requested":quit_requested,
-		"result_committed": result_committed, "state_history": state_history,
-		"tree_paused": get_tree().paused, "snapshot": last_snapshot,
+		"damage_dealt":damage_dealt,"outcome":outcome,"selected_upgrade_count":selected_upgrades.size(),
+		"wave":{"wave":wave_state.get("wave",0),"wave_count":wave_state.get("wave_count",5),"phase":wave_state.get("phase","idle"),"title":wave_state.get("title","")},
+		"boss":{"active":boss_snapshot.get("active",false),"health":boss_snapshot.get("health",0.0),"health_maximum":boss_snapshot.get("health_maximum",0.0),"phase":boss_snapshot.get("phase",0)},"quit_requested":quit_requested,
+		"result_committed": result_committed, "terminal_snapshot_digest": _terminal_snapshot_digest(), "state_history": state_history,
+		"tree_paused": get_tree().paused, "shell_mode": shell.mode,
+		"shell_return_mode": shell.return_mode, "shell_action_latched": shell.action_latched,
+		"shell_focus": String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none",
 	}
+
+func _terminal_snapshot_digest() -> Dictionary:
+	if terminal_snapshot.is_empty(): return {}
+	return {"committed":terminal_snapshot.get("committed",false),"commit_run_serial":terminal_snapshot.get("commit_run_serial",0),
+		"outcome":terminal_snapshot.get("outcome",""),"elapsed":terminal_snapshot.get("elapsed",0.0),"wave":terminal_snapshot.get("wave",0),
+		"level":terminal_snapshot.get("level",0),"defeated":terminal_snapshot.get("defeated",0),"damage_dealt":terminal_snapshot.get("damage_dealt",0),
+		"damage_taken":terminal_snapshot.get("damage_taken",0),"weapon_ranks":_terminal_weapon_ranks(),"selected_upgrades":terminal_snapshot.get("selected_upgrades",[])}
+
+func _terminal_weapon_ranks() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for weapon in (terminal_snapshot.get("weapons",{}) as Dictionary).get("weapons",[]):
+		if bool(weapon.get("equipped",false)):
+			result.append({"weapon_id":weapon.get("weapon_id",""),"rank":weapon.get("rank",0)})
+	return result
