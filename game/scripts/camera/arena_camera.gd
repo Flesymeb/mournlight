@@ -9,6 +9,13 @@ extends Camera3D
 @export var lead_damping := 5.0
 @export var arena_limit := Vector2(10.5, 8.5)
 @export var normal_fov := 48.0
+@export var safe_frame_fraction := Vector2(0.18, 0.24)
+@export var safe_frame_activation_buffer := 0.04
+@export var safe_frame_correction_damping := 11.0
+@export var safe_frame_max_correction := 1.25
+@export var safe_frame_actor_half_width := 0.72
+@export var safe_frame_actor_half_depth := 0.48
+@export var safe_frame_actor_height := 2.05
 @export var visibility_activation_seconds := 0.04
 @export var visibility_release_seconds := 0.22
 @export var visibility_probe_overscan := 1.25
@@ -21,7 +28,12 @@ const VISIBILITY_LAYER := 20
 var movement_velocity := Vector3.ZERO
 var framing_target := Vector3.ZERO
 var occlusion_guard_active := false
+var safe_frame_ok := true
+var safe_frame_correction_active := false
+var projected_margins := {"left":0.0, "right":0.0, "top":0.0, "bottom":0.0, "minimum":0.0}
 var _lead := Vector3.ZERO
+var _safe_frame_offset := Vector3.ZERO
+var _safe_frame_screen_shift := Vector2.ZERO
 var _blocked_seconds := 0.0
 var _clear_seconds := 0.0
 var _visibility_samples_blocked := 0
@@ -58,17 +70,114 @@ func _process(delta: float) -> void:
 	if movement_velocity.length_squared() > 0.04:
 		desired_lead = movement_velocity.normalized() * lead_distance
 	_lead = _lead.lerp(desired_lead, 1.0 - exp(-lead_damping * delta))
-	framing_target = target.global_position + _lead
-	framing_target.x = clampf(framing_target.x, -arena_limit.x, arena_limit.x)
-	framing_target.z = clampf(framing_target.z, -arena_limit.y, arena_limit.y)
-	# Framing remains stable. Visibility isolation is driven by the live
-	# camera-to-Warden sightline and never by player coordinates or map edits.
-	_update_visibility_isolation(delta)
+	var requested_target := target.global_position + _lead
+	var arena_target := requested_target
+	arena_target.x = clampf(arena_target.x, -arena_limit.x, arena_limit.x)
+	arena_target.z = clampf(arena_target.z, -arena_limit.y, arena_limit.y)
+	var before := _measure_projected_safe_frame()
+	var activation_fraction := Vector2(
+		safe_frame_fraction.x + safe_frame_activation_buffer,
+		safe_frame_fraction.y + safe_frame_activation_buffer
+	)
+	var approaching_edge := not _margins_inside_fraction(before, activation_fraction)
+	var inside_release_band := _margins_inside_fraction(before, Vector2(activation_fraction.x + safe_frame_activation_buffer, activation_fraction.y + safe_frame_activation_buffer))
+	var desired_offset := Vector3.ZERO
+	_safe_frame_screen_shift = Vector2.ZERO
+	if approaching_edge:
+		_safe_frame_screen_shift = _screen_shift_into_fraction(before, activation_fraction)
+		desired_offset = _safe_frame_offset + _screen_shift_to_ground_correction(before, _safe_frame_screen_shift)
+		desired_offset.y = 0.0
+		desired_offset = desired_offset.limit_length(safe_frame_max_correction)
+	elif safe_frame_correction_active and not inside_release_band:
+		desired_offset = _safe_frame_offset
+	_safe_frame_offset = _safe_frame_offset.lerp(desired_offset, 1.0 - exp(-safe_frame_correction_damping * delta))
+	framing_target = arena_target + _safe_frame_offset
 	fov = normal_fov
 	var desired_position := framing_target + Vector3(0.0, follow_height, follow_distance)
 	global_position = global_position.lerp(desired_position, 1.0 - exp(-follow_damping * delta))
 	look_at(framing_target + Vector3(0.0, 0.65, 0.0), Vector3.UP)
+	var after := _measure_projected_safe_frame()
+	projected_margins = (after.get("margins", {}) as Dictionary).duplicate(true)
+	safe_frame_ok = bool(after.get("inside_fraction", false))
+	safe_frame_correction_active = _safe_frame_offset.length_squared() > 0.0025 or not safe_frame_ok
+	# Projected containment owns framing. Sightline isolation remains a secondary
+	# response to cemetery geometry that genuinely crosses the camera-to-Warden ray.
+	_update_visibility_isolation(delta)
 	_sync_visibility_camera()
+
+func _measure_projected_safe_frame() -> Dictionary:
+	var viewport_size := get_viewport().get_visible_rect().size
+	if viewport_size.x <= 1.0 or viewport_size.y <= 1.0 or not is_instance_valid(target):
+		return {"inside_fraction":false, "margins":projected_margins.duplicate(true), "center":Vector2.ZERO, "rect":Rect2()}
+	var min_screen := Vector2(INF, INF)
+	var max_screen := Vector2(-INF, -INF)
+	var center_world := target.global_position + Vector3.UP * safe_frame_actor_height * 0.5
+	for x_offset in [-safe_frame_actor_half_width, safe_frame_actor_half_width]:
+		for y_offset in [0.05, safe_frame_actor_height]:
+			for z_offset in [-safe_frame_actor_half_depth, safe_frame_actor_half_depth]:
+				var world_point := target.global_position + Vector3(x_offset, y_offset, z_offset)
+				if is_position_behind(world_point):
+					return {"inside_fraction":false, "margins":{"left":-INF,"right":-INF,"top":-INF,"bottom":-INF,"minimum":-INF}, "center":Vector2.ZERO, "rect":Rect2()}
+				var screen := unproject_position(world_point)
+				min_screen.x = minf(min_screen.x, screen.x)
+				min_screen.y = minf(min_screen.y, screen.y)
+				max_screen.x = maxf(max_screen.x, screen.x)
+				max_screen.y = maxf(max_screen.y, screen.y)
+	var margins := {
+		"left":min_screen.x, "right":viewport_size.x - max_screen.x,
+		"top":min_screen.y, "bottom":viewport_size.y - max_screen.y,
+	}
+	margins["minimum"] = minf(minf(float(margins.left), float(margins.right)), minf(float(margins.top), float(margins.bottom)))
+	var receipt := {
+		"viewport":viewport_size,
+		"center":unproject_position(center_world),
+		"rect":Rect2(min_screen, max_screen - min_screen),
+		"margins":margins,
+	}
+	receipt["inside_fraction"] = _margins_inside_fraction(receipt, safe_frame_fraction)
+	return receipt
+
+func _margins_inside_fraction(receipt: Dictionary, fraction: Vector2) -> bool:
+	var viewport_size: Vector2 = receipt.get("viewport", get_viewport().get_visible_rect().size)
+	var margins: Dictionary = receipt.get("margins", {})
+	return (
+		float(margins.get("left", -INF)) >= viewport_size.x * fraction.x
+		and float(margins.get("right", -INF)) >= viewport_size.x * fraction.x
+		and float(margins.get("top", -INF)) >= viewport_size.y * fraction.y
+		and float(margins.get("bottom", -INF)) >= viewport_size.y * fraction.y
+	)
+
+func _screen_shift_into_fraction(receipt: Dictionary, fraction: Vector2) -> Vector2:
+	var viewport_size: Vector2 = receipt.get("viewport", get_viewport().get_visible_rect().size)
+	var rect: Rect2 = receipt.get("rect", Rect2())
+	var safe_min := Vector2(viewport_size.x * fraction.x, viewport_size.y * fraction.y)
+	var safe_max := Vector2(viewport_size.x * (1.0 - fraction.x), viewport_size.y * (1.0 - fraction.y))
+	var shift := Vector2.ZERO
+	if rect.position.x < safe_min.x:
+		shift.x = safe_min.x - rect.position.x
+	elif rect.end.x > safe_max.x:
+		shift.x = safe_max.x - rect.end.x
+	if rect.position.y < safe_min.y:
+		shift.y = safe_min.y - rect.position.y
+	elif rect.end.y > safe_max.y:
+		shift.y = safe_max.y - rect.end.y
+	return shift
+
+func _screen_shift_to_ground_correction(receipt: Dictionary, shift: Vector2) -> Vector3:
+	if shift.length_squared() < 0.01:
+		return Vector3.ZERO
+	var center: Vector2 = receipt.get("center", Vector2.ZERO)
+	var current_ground := _screen_to_target_plane(center)
+	var desired_ground := _screen_to_target_plane(center + shift)
+	return current_ground - desired_ground
+
+func _screen_to_target_plane(screen: Vector2) -> Vector3:
+	var origin := project_ray_origin(screen)
+	var direction := project_ray_normal(screen)
+	if absf(direction.y) < 0.0001:
+		return target.global_position
+	var distance := (target.global_position.y - origin.y) / direction.y
+	return origin + direction * maxf(0.0, distance)
 
 func _bind_visibility_presentation() -> void:
 	# The compositor owns the complete concrete Warden contract. Every authored
@@ -239,6 +348,7 @@ func _apply_visibility_overlay(active: bool) -> void:
 
 func _snap_to_target() -> void:
 	framing_target = target.global_position
+	_safe_frame_offset = Vector3.ZERO
 	global_position = framing_target + Vector3(0.0, follow_height, follow_distance)
 	look_at(framing_target + Vector3(0.0, 0.65, 0.0), Vector3.UP)
 
@@ -262,6 +372,12 @@ func _mcp_state() -> Dictionary:
 		"compositor_updates": _visibility_viewport.render_target_update_mode == SubViewport.UPDATE_ALWAYS if is_instance_valid(_visibility_viewport) else false,
 		"effect_visual_count": _effect_visuals.size(),
 		"framing_target": framing_target,
+		"safe_frame_ok":safe_frame_ok,
+		"safe_frame_correction_active":safe_frame_correction_active,
+		"safe_frame_offset":_safe_frame_offset,
+		"safe_frame_screen_shift":_safe_frame_screen_shift,
+		"projected_margins":projected_margins.duplicate(true),
+		"safe_frame_fraction":safe_frame_fraction,
 		"isolated_visual_count": _presentation_visuals.size(),
 		"movement_velocity": movement_velocity,
 		"follow_height": follow_height,
@@ -272,7 +388,7 @@ func _mcp_state() -> Dictionary:
 		"original_presentation_restored": _original_presentation_restored(),
 		"primary_camera_visibility_layer": get_cull_mask_value(VISIBILITY_LAYER),
 		"source_visual_count": _source_visuals.size(),
-		"visibility_strategy": "complete_private_layer_compositor",
+		"visibility_strategy": "projected_safe_frame_with_secondary_private_layer_compositor",
 		"visibility_isolation": {
 			"active": occlusion_guard_active, "blocked_samples": _visibility_samples_blocked,
 			"sample_count": 3, "blocked_seconds": _blocked_seconds,

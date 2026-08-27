@@ -11,6 +11,8 @@ var offered: Array[Dictionary] = []
 var selected: Array[Dictionary] = []
 var draft_serial := 0
 var active := false
+var offer_strategy := "three_weapon_lanes"
+var offer_slots: Array[Dictionary] = []
 
 func _ready() -> void:
 	CATALOG.validate_catalog()
@@ -21,6 +23,7 @@ func reset() -> void:
 	selected.clear()
 	draft_serial = 0
 	active = false
+	offer_slots.clear()
 
 func open_draft(inventory: WeaponInventory, health: WardenHealth, warden: WardenController) -> Array[Dictionary]:
 	if active:
@@ -35,9 +38,31 @@ func open_draft(inventory: WeaponInventory, health: WardenHealth, warden: Warden
 	active = true
 	draft_serial += 1
 	offered.clear()
-	var start := (draft_serial * 3 - 3) % eligible.size()
-	for offset in 3:
-		var definition := eligible[(start + offset) % eligible.size()]
+	offer_slots.clear()
+	var chosen: Array[MournlightUpgradeDefinition] = []
+	# One truthful next step from each weapon lane keeps all three identities
+	# naturally reachable. Exhausted lanes deterministically yield to utility.
+	for weapon_id in [&"warden_lantern", &"gravespade", &"wandering_wisps"]:
+		for definition in eligible:
+			if definition.action == "weapon_rank" and definition.weapon_id == weapon_id:
+				chosen.append(definition)
+				offer_slots.append({"slot":chosen.size() - 1, "lane":String(weapon_id), "upgrade_id":String(definition.upgrade_id)})
+				break
+	var utility: Array[MournlightUpgradeDefinition] = []
+	for definition in eligible:
+		if not chosen.has(definition):
+			utility.append(definition)
+	var utility_start := (draft_serial - 1) % maxi(1, utility.size())
+	for offset in utility.size():
+		if chosen.size() >= 3:
+			break
+		var definition := utility[(utility_start + offset) % utility.size()]
+		chosen.append(definition)
+		offer_slots.append({"slot":chosen.size() - 1, "lane":"utility", "upgrade_id":String(definition.upgrade_id)})
+	if chosen.size() < 3:
+		active = false
+		return []
+	for definition in chosen:
 		offered.append(definition.project(int(ranks.get(definition.upgrade_id, 0)), inventory, health, warden))
 	draft_opened.emit(offered)
 	return offered
@@ -61,13 +86,13 @@ func choose(index: int, inventory: WeaponInventory, health: WardenHealth, warden
 	return choice
 
 func get_snapshot() -> Dictionary:
-	return {"active":active, "serial":draft_serial, "offered":offered.duplicate(true), "selected":selected.duplicate(true), "ranks":ranks.duplicate(true), "catalog_size":CATALOG.upgrades.size()}
+	return {"active":active, "serial":draft_serial, "offered":offered.duplicate(true), "selected":selected.duplicate(true), "ranks":ranks.duplicate(true), "catalog_size":CATALOG.upgrades.size(), "offer_strategy":offer_strategy, "offer_slots":offer_slots.duplicate(true)}
 
 func _mcp_state() -> Dictionary:
 	var offer_digest: Array[Dictionary] = []
 	for card in offered:
 		offer_digest.append({"id":card.id, "title":card.title, "rank":card.rank, "icon_path":card.icon_path, "current":card.current, "result":card.result, "effect_lines":card.effect_lines})
-	return {"authoritative_offer":offer_digest, "authoritative_selection":_selection_digest(), "active":active, "serial":draft_serial, "catalog_size":CATALOG.upgrades.size(), "ranks":ranks}
+	return {"authoritative_offer":offer_digest, "authoritative_selection":_selection_digest(), "active":active, "serial":draft_serial, "catalog_size":CATALOG.upgrades.size(), "ranks":ranks, "offer_strategy":offer_strategy, "offer_slots":offer_slots.duplicate(true)}
 
 func _selection_digest() -> Dictionary:
 	if selected.is_empty():
