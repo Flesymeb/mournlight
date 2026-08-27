@@ -463,6 +463,10 @@ func get_snapshot() -> Dictionary:
 	var hurt_active := 0
 	var role_owner_keys: Array[String] = []
 	var hurt_owner_keys: Array[String] = []
+	var presentation_updates := 0
+	var presentation_skips := 0
+	var presentation_priority_updates := 0
+	var manual_animation_players := 0
 	for actor in _pool:
 		if actor.state == "pooled" or not actor.profile:
 			continue
@@ -480,6 +484,12 @@ func get_snapshot() -> Dictionary:
 		if actor.is_hurt_light_active():
 			hurt_active += 1
 			hurt_owner_keys.append(_actor_key(actor))
+		var presentation_budget := actor.model_pivot.presentation_budget_snapshot()
+		presentation_updates += int(presentation_budget.get("updates", 0))
+		presentation_skips += int(presentation_budget.get("skips", 0))
+		presentation_priority_updates += int(presentation_budget.get("priority_updates", 0))
+		if bool(presentation_budget.get("manual_animation", false)):
+			manual_animation_players += 1
 	var role_requested := _active_count()
 	var light_requested := role_requested + hurt_requested
 	var light_active := role_active + hurt_active
@@ -514,6 +524,15 @@ func get_snapshot() -> Dictionary:
 			"role":{"requested":role_requested, "active":role_active, "suppressed":maxi(0, role_requested - role_active), "owners":role_owner_keys},
 			"hurt":{"requested":hurt_requested, "active":hurt_active, "suppressed":maxi(0, hurt_requested - hurt_active), "owners":hurt_owner_keys},
 		},
+		"dense_presentation_budget": {
+			"family":"staggered_authored_animation",
+			"approach_bucket_count":EnemySemanticPresenter.DENSE_APPROACH_ANIMATION_BUCKETS,
+			"manual_animation_players":manual_animation_players,
+			"updates":presentation_updates,
+			"skips":presentation_skips,
+			"priority_updates":presentation_priority_updates,
+			"danger_states_unstaggered":true,
+		},
 	}
 
 func _variant_balance_receipt(role_variants: Dictionary) -> Dictionary:
@@ -541,6 +560,7 @@ func _mcp_state() -> Dictionary:
 		"variant_balance":snapshot.get("variant_balance", {}),
 		"telegraph_admission":snapshot.get("telegraph_admission", {}),
 		"ordinary_light_budget":snapshot.get("ordinary_light_budget", {}),
+		"dense_presentation_budget":snapshot.get("dense_presentation_budget", {}),
 		"neighbor_registry":snapshot.get("neighbor_registry", {}),
 		"last_lifecycle_event":snapshot.get("last_lifecycle_event", {}),
 	}

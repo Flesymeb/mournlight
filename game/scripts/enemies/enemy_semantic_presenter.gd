@@ -14,6 +14,7 @@ const ROLE_SCENES := {
 	"grave_brute": preload("res://scenes/enemies/presentation/grave_brute_presenter.tscn"),
 }
 const SEMANTICS := ["spawn", "approach", "telegraph", "damage", "recovery", "hurt", "death"]
+const DENSE_APPROACH_ANIMATION_BUCKETS := 3
 
 var role_id := "none"
 var variant_id := "none"
@@ -28,9 +29,20 @@ var _authored_clip := &""
 var _base_position := Vector3.ZERO
 var _base_rotation := Vector3.ZERO
 var _base_scale := Vector3.ONE
+var _animation_bucket := 0
+var _pending_animation_delta := 0.0
+var _presentation_updates := 0
+var _presentation_skips := 0
+var _priority_updates := 0
+var _manual_animation_enabled := false
 
 func configure(next_role_id: String, _accent: Color, stable_id: StringName, generation: int, allocated_variant_index: int = -1) -> void:
 	role_id = next_role_id
+	_animation_bucket = posmod(String(stable_id).hash() + generation, DENSE_APPROACH_ANIMATION_BUCKETS)
+	_pending_animation_delta = 0.0
+	_presentation_updates = 0
+	_presentation_skips = 0
+	_priority_updates = 0
 	var variant_index := clampi(allocated_variant_index, 0, 1) if allocated_variant_index >= 0 else posmod(String(stable_id).hash() + generation * 17, 2)
 	variant_id = "%s.variant_%s" % [ROLE_DESCRIPTORS.get(role_id, "unknown"), ["a", "b"][variant_index]]
 	_build_role(variant_index)
@@ -42,6 +54,7 @@ func reset_presenter() -> void:
 	_time = 0.0
 	_state_time = 0.0
 	_animation_player = null
+	_manual_animation_enabled = false
 	_active_variant = null
 	_presentation = null
 	for child in get_children():
@@ -57,8 +70,20 @@ func set_semantic(next_state: String) -> void:
 func advance(delta: float, planar_velocity: Vector3, remaining: float = 0.0, duration: float = 0.0) -> void:
 	_time += delta
 	_state_time += delta
+	_pending_animation_delta += delta
 	if not is_instance_valid(_active_variant):
 		return
+	var priority_state := semantic_state != "approach"
+	var presentation_due := priority_state or posmod(Engine.get_physics_frames(), DENSE_APPROACH_ANIMATION_BUCKETS) == _animation_bucket
+	if not presentation_due:
+		_presentation_skips += 1
+		return
+	_presentation_updates += 1
+	if priority_state:
+		_priority_updates += 1
+	if _manual_animation_enabled and _animation_player.is_playing():
+		_animation_player.advance(_pending_animation_delta)
+	_pending_animation_delta = 0.0
 	_restore_pose()
 	var speed := Vector2(planar_velocity.x, planar_velocity.z).length()
 	match semantic_state:
@@ -124,6 +149,9 @@ func _build_role(variant_index: int) -> void:
 	_apply_role_material_treatment(_active_variant, variant_index)
 	_animation_player = _find_animation_player(_active_variant)
 	_authored_clip = _select_authored_clip(_animation_player)
+	if _animation_player:
+		_animation_player.set_process_callback(AnimationPlayer.ANIMATION_PROCESS_MANUAL)
+		_manual_animation_enabled = true
 
 func _select_authored_clip(candidate: AnimationPlayer) -> StringName:
 	if candidate == null:
@@ -139,8 +167,22 @@ func _play_authored_motion() -> void:
 		return
 	if semantic_state in ["spawn", "approach", "telegraph", "damage", "recovery"]:
 		_animation_player.play(_authored_clip, 0.1)
+		if _manual_animation_enabled:
+			_animation_player.advance(0.0)
 	else:
 		_animation_player.stop()
+
+func presentation_budget_snapshot() -> Dictionary:
+	var attempts := _presentation_updates + _presentation_skips
+	return {
+		"bucket_count":DENSE_APPROACH_ANIMATION_BUCKETS,
+		"bucket":_animation_bucket,
+		"manual_animation":_manual_animation_enabled,
+		"updates":_presentation_updates,
+		"skips":_presentation_skips,
+		"priority_updates":_priority_updates,
+		"update_ratio":float(_presentation_updates) / float(attempts) if attempts > 0 else 0.0,
+	}
 
 func _restore_pose() -> void:
 	if not is_instance_valid(_active_variant):

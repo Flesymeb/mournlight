@@ -66,6 +66,7 @@ var validation_profile_sample: Dictionary = {}
 var validation_retry_baselines: Array[Dictionary] = []
 var validation_profile_cycles: Array[Dictionary] = []
 var ordinary_victory_receipt: Dictionary = {}
+var ordinary_victory_transactions: Array[Dictionary] = []
 var pickup_spawned_total := 0
 var pickup_collected_total := 0
 var _profile_samples_ms: Array[float] = []
@@ -230,10 +231,13 @@ func _begin_run() -> void:
 	_emit_snapshot()
 
 func retry_run() -> void:
+	var victory_transaction := ordinary_victory_receipt.duplicate(true)
 	_next_baseline_reason = "retry"
 	_teardown_run("retry", "player_retry")
 	_transition("retrying")
 	_begin_run()
+	if not victory_transaction.is_empty():
+		_finalize_victory_retry(victory_transaction)
 
 func _enter_title() -> void:
 	_context_handoff_active = false
@@ -390,6 +394,46 @@ func _present_result(_event: Dictionary) -> void:
 	_transition("result")
 	hud.visible = false
 	shell.set_mode("result", terminal_snapshot)
+	if outcome == "victory" and int(ordinary_victory_receipt.get("source_run_serial", -1)) == run_serial:
+		var result_animation := warden.animation_binding.get_snapshot() if warden.animation_binding else {}
+		var result_handoff := {
+			"run_state":run_state, "shell_mode":shell.mode,
+			"terminal_owner":"victory", "animation":result_animation,
+		}
+		ordinary_victory_receipt["status"] = "result_presented"
+		ordinary_victory_receipt["result_handoff"] = result_handoff
+		(ordinary_victory_receipt["stages"] as Array).append({"stage":"result_presented","run_state":run_state,"shell_mode":shell.mode,"animation":result_animation})
+	_emit_snapshot()
+
+func _finalize_victory_retry(transaction: Dictionary) -> void:
+	transaction["status"] = "retry_idle_restored"
+	var retry_state := {
+		"prior_run_serial":transaction.get("source_run_serial", -1),
+		"new_run_serial":run_serial,
+		"run_state":run_state,
+		"route_kind":run_route_kind,
+		"terminal_owner_cleared":not result_committed and terminal_snapshot.is_empty(),
+		"terminal_commit_count_reset":terminal_commit_count == 0,
+		"animation":warden.animation_binding.get_snapshot() if warden.animation_binding else {},
+		"counts":_profile_counts(),
+		"teardown":teardown_receipt.duplicate(true),
+	}
+	transaction["retry"] = retry_state
+	var retry_animation: Dictionary = retry_state.get("animation", {})
+	transaction["retry_clean"] = (
+		bool(retry_state.get("terminal_owner_cleared", false))
+		and bool(retry_state.get("terminal_commit_count_reset", false))
+		and String(retry_animation.get("semantic_state", "")) == "idle"
+		and String(retry_animation.get("resolved_clip", "")) == "Idle"
+		and _counts_are_isolated(retry_state.get("counts", {}))
+	)
+	var stages: Array = transaction.get("stages", [])
+	stages.append({"stage":"retry_idle_restored","prior_run_serial":transaction.get("source_run_serial",-1),"new_run_serial":run_serial,"retry_clean":transaction["retry_clean"],"animation":retry_animation})
+	transaction["stages"] = stages
+	ordinary_victory_receipt = transaction.duplicate(true)
+	ordinary_victory_transactions.append(transaction.duplicate(true))
+	while ordinary_victory_transactions.size() > 2:
+		ordinary_victory_transactions.pop_front()
 	_emit_snapshot()
 
 func _on_health_changed(current: float, _maximum: float) -> void:
@@ -602,18 +646,31 @@ func _on_boss_defeated(_event: Dictionary) -> void:
 		warden.animation_binding.trigger("victory",999.0)
 	var wave_state := wave_director.get_snapshot()
 	ordinary_victory_receipt = {
+		"transaction_id":"victory.r%04d" % run_serial,
+		"source_run_serial":run_serial,
+		"status":"victory_acquired",
 		"route_kind":run_route_kind, "elapsed":run_elapsed,
 		"wave_id":String((wave_state.get("definition", {}) as Dictionary).get("id", "")),
 		"wave_ids":(wave_state.get("ordinary_route_wave_ids", []) as Array).duplicate(),
 		"ordinary_route_complete":bool(wave_state.get("ordinary_route_complete", false)),
 		"diagnostic_jump_count":int(wave_state.get("diagnostic_jump_count", 0)),
 		"animation":warden.animation_binding.get_snapshot() if warden.animation_binding else {},
+		"terminal_owner":"victory",
+		"stages":[
+			{"stage":"bellkeeper_defeated","run_state":run_state,"elapsed":run_elapsed,"boss_defeat_committed":true},
+			{"stage":"victory_animation_acquired","animation":warden.animation_binding.get_snapshot() if warden.animation_binding else {}},
+		],
 		"result_commit_count_before":terminal_commit_count,
 	}
 	_commit_terminal_snapshot("victory")
 	ordinary_victory_receipt["result_commit_count_after"] = terminal_commit_count
 	ordinary_victory_receipt["result_committed"] = result_committed
-	_teardown_run("result", "victory")
+	ordinary_victory_receipt["exactly_one_result_commit"] = terminal_commit_count == 1
+	(ordinary_victory_receipt["stages"] as Array).append({"stage":"terminal_snapshot_committed","commit_count":terminal_commit_count,"terminal_snapshot":_terminal_snapshot_digest()})
+	var victory_teardown := _teardown_run("result", "victory")
+	ordinary_victory_receipt["teardown"] = victory_teardown
+	ordinary_victory_receipt["handoff_animation"] = warden.animation_binding.get_snapshot() if warden.animation_binding else {}
+	(ordinary_victory_receipt["stages"] as Array).append({"stage":"victory_teardown_complete","teardown_complete":victory_teardown.get("complete",false),"animation":ordinary_victory_receipt["handoff_animation"]})
 	get_tree().paused = true
 	_transition("victory")
 	_emit_snapshot()
@@ -1071,6 +1128,7 @@ func _dense_work_caps(encounter: Dictionary) -> Dictionary:
 		"hurt_lights":spawner.hurt_light_cap,
 		"audio_effect_voices":int(audio_state.get("voice_limit", 0)),
 		"completed_attack_history":int(attack_state.get("history_limit", 0)),
+		"dense_presentation":(encounter.get("dense_presentation_budget", {}) as Dictionary).duplicate(true),
 	}
 
 func _route_qualification(wave_state: Dictionary) -> Dictionary:
@@ -1238,6 +1296,7 @@ func _mcp_state() -> Dictionary:
 		"validation_profile_cycle_comparison":_profile_cycle_comparison(),
 		"validation_retry_baselines":validation_retry_baselines,
 		"ordinary_victory_receipt":ordinary_victory_receipt,
+		"ordinary_victory_transactions":ordinary_victory_transactions,
 		"reward_pickups":{"spawned_total":pickup_spawned_total,"collected_total":pickup_collected_total,"live":get_tree().get_nodes_in_group("reward_pickup").size()},
 		"shell_focus": String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none",
 	}

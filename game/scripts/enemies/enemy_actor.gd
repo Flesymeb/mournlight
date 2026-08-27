@@ -336,4 +336,5 @@ func _mcp_state() -> Dictionary:
 		"semantic_state": model_pivot.semantic_state if is_instance_valid(model_pivot) else state,
 		"active_motion_id": model_pivot.active_motion_id if is_instance_valid(model_pivot) else "none",
 		"semantic_bindings": model_pivot.semantic_bindings() if is_instance_valid(model_pivot) else {},
+		"presentation_budget": model_pivot.presentation_budget_snapshot() if is_instance_valid(model_pivot) else {},
 	}
