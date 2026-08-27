@@ -181,7 +181,7 @@ func _layout() -> void:
 		_layout_result(center, page_top)
 		return
 	var compact := visible_count >= 5
-	var start_y := page_top + (315 if mode == "credits" else 255 if mode == "result" else 184)
+	var start_y := page_top + (360 if mode == "credits" else 255 if mode == "result" else 184)
 	var spacing := 48 if compact else 56
 	var button_height := 42 if compact else 46
 	for index in buttons.size():
@@ -235,13 +235,13 @@ func _layout_result(center: Vector2, page_top: float) -> void:
 		var value_label := card.get_node("WeaponValue") as Label
 		value_label.position = Vector2(82,68); value_label.size = Vector2(124,28)
 	result_upgrade_panel.position = Vector2(center.x-338,page_top+278)
-	result_upgrade_panel.size = Vector2(676,70)
+	result_upgrade_panel.size = Vector2(676,92)
 	result_upgrade_icon.position = Vector2(18,13); result_upgrade_icon.size = Vector2(46,44)
-	result_upgrade_label.position = Vector2(78,10); result_upgrade_label.size = Vector2(578,50)
+	result_upgrade_label.position = Vector2(78,8); result_upgrade_label.size = Vector2(578,76)
 	for index in buttons.size():
 		var button := buttons[index]
 		if button.visible:
-			button.position = Vector2(center.x-180,page_top+370+index*52)
+			button.position = Vector2(center.x-180,page_top+392+index*52)
 			button.size = Vector2(360,42)
 
 func set_mode(next_mode: String, next_summary: Dictionary = {}) -> void:
@@ -263,7 +263,7 @@ func set_mode(next_mode: String, next_summary: Dictionary = {}) -> void:
 			_refresh_settings_page()
 		"credits":
 			_configure("CREDITS & NOTICES","MOURNLIGHT — RELEASE CANDIDATE",
-				"MOURNLIGHT — DESIGN, CODE & CEMETERY GARDEN\nAuthored production assembled for this release candidate.\n\nMontserrat typography — SIL Open Font License.\nBellkeeper / possessed lantern — CC BY 4.0.\nMaaack menu navigation mechanism — MIT.\nAudio sources — credited library; see THIRD_PARTY_NOTICES.\n\nThank you for keeping the last lantern lit.",
+				"MOURNLIGHT — DESIGN, CODE & CEMETERY GARDEN\nAuthored production assembled for this release candidate.\n\nMontserrat typography — SIL Open Font License.\nBellkeeper / possessed lantern — CC BY 4.0.\nMaaack menu navigation mechanism — MIT.\nAudio sources — credited library.\n\nComplete release manifest: ASSET_PROVENANCE.json\nHuman-readable notices: THIRD_PARTY_NOTICES.md\n\nThank you for keeping the last lantern lit.",
 				[["back","BACK"]])
 		"result":
 			var won := String(summary.get("outcome","failure")) == "victory"
@@ -462,7 +462,13 @@ func _draw() -> void:
 
 func _upgrade_summary(data: Dictionary) -> String:
 	var upgrades: Array = data.get("selected_upgrades",[])
-	return "NONE SELECTED" if upgrades.is_empty() else ", ".join(upgrades.map(func(item: Dictionary) -> String:return "%s %s" % [String(item.get("title",item.get("upgrade_id","VIGIL"))),String(item.get("rank_label",item.get("concrete_change","")))]))
+	if upgrades.is_empty():
+		return "NONE SELECTED"
+	var rows: Array[String] = []
+	for item in upgrades:
+		var detail := String(item.get("rank_label", item.get("concrete_change", "")))
+		rows.append("%s %s" % [String(item.get("title", item.get("upgrade_id", "VIGIL"))), detail])
+	return "%d CHOICES · %s" % [upgrades.size(), "  ·  ".join(rows)]
 
 func _weapon_summary(data: Dictionary) -> String:
 	var build: Dictionary = data.get("weapons",{})

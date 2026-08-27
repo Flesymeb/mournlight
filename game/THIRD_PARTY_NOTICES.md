@@ -1,5 +1,7 @@
 # Mournlight third-party notices
 
+The machine-inspectable aggregate release inventory is `ASSET_PROVENANCE.json`. All paths below and in that manifest are repository-relative; the shipped candidate has no private-pool or machine-path dependency.
+
 - Montserrat type family: OFL-1.1; exact staged font receipts are in `assets/fonts/`.
 - Maaack Godot Menus Template interaction reference: MIT; retained under `ui/menus/maaack/` with its complete receipt and attribution.
 - Stylized Possessed Lantern by its Sketchfab author: CC-BY-4.0; exact source receipt is `assets/authored/bellkeeper.glb.receipt.json`.

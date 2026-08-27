@@ -29,6 +29,10 @@ var _pool: Array[EnemyActor] = []
 var _spawn_cursor := 0
 var _spawn_cooldown := 0.0
 var _generation_by_id: Dictionary = {}
+var _role_variant_cursor: Dictionary = {}
+var _role_variant_allocations: Dictionary = {}
+var _variant_assignment_by_actor: Dictionary = {}
+var _validation_role_sequence: Array[String] = []
 var _wave_id := "unconfigured"
 var _wave_spawned := 0
 var _spawn_budget := 0
@@ -49,6 +53,7 @@ var _role_light_owners: Dictionary = {}
 var _hurt_light_owners: Dictionary = {}
 var _light_peak_active := 0
 var _light_peak_requested := 0
+var _baseline_live_cap := 10
 
 const LANES := [
 	Vector3(-10.2, 0.05, -7.8), Vector3(-4.2, 0.05, -8.8),
@@ -58,6 +63,7 @@ const LANES := [
 ]
 
 func _ready() -> void:
+	_baseline_live_cap = live_cap
 	neighbor_registry = EnemyNeighborRegistry.new()
 	add_child(neighbor_registry)
 	for index in range(pool_size):
@@ -71,7 +77,7 @@ func _ready() -> void:
 	set_process(false)
 
 func begin_encounter() -> void:
-	reset_encounter()
+	reset_encounter(true)
 	active = true
 	encounter_id += 1
 	set_process(true)
@@ -109,7 +115,7 @@ func stop_encounter() -> void:
 	neighbor_registry.clear()
 	_emit_snapshot()
 
-func reset_encounter() -> void:
+func reset_encounter(preserve_pressure: bool = false) -> void:
 	active = false
 	set_process(false)
 	spawned_total = 0
@@ -120,7 +126,17 @@ func reset_encounter() -> void:
 	_spawn_cursor = 0
 	_spawn_cooldown = 0.0
 	_generation_by_id.clear()
+	_role_variant_cursor.clear()
+	_role_variant_allocations.clear()
+	_variant_assignment_by_actor.clear()
 	_wave_spawned = 0
+	if not preserve_pressure:
+		live_cap = _baseline_live_cap
+		_wave_id = "unconfigured"
+		_spawn_budget = 0
+		_composition_weights.clear()
+		_elite_every = 0
+		set_meta("spawn_cadence", 1.45)
 	retired_total = 0
 	last_reconciliation_receipt = {}
 	_telegraph_waiting.clear()
@@ -164,20 +180,36 @@ func _spawn_one(role_offset: int) -> bool:
 		var generation := int(_generation_by_id.get(actor.stable_id, 0)) + 1
 		_generation_by_id[actor.stable_id] = generation
 		var selected_profile := _select_profile(_wave_spawned + role_offset)
+		var variant_index := _allocate_role_variant(String(selected_profile.role_id), actor.stable_id, generation)
 		actor.add_to_group("active_enemies")
-		actor.activate(selected_profile, player, position, generation, neighbor_registry, self)
+		actor.activate(selected_profile, player, position, generation, neighbor_registry, self, variant_index)
 		spawned_total += 1
 		_wave_spawned += 1
 		_spawn_cursor = (lane_index + 1) % LANES.size()
 		last_spawn_receipt = {
 			"stable_id": String(actor.stable_id), "generation": generation,
 			"role_id": String(selected_profile.role_id), "lane_index": lane_index,
+			"variant_index":variant_index, "variant_id":actor.model_pivot.variant_id,
 			"position": position, "validation": validation,
 		}
 		_emit_snapshot()
 		return true
 	_spawn_cursor = (_spawn_cursor + 1) % LANES.size()
 	return false
+
+func _allocate_role_variant(role_id: String, stable_id: StringName, generation: int) -> int:
+	var ordinal := int(_role_variant_cursor.get(role_id, 0))
+	var variant_index := ordinal % 2
+	_role_variant_cursor[role_id] = ordinal + 1
+	var counts: Dictionary = _role_variant_allocations.get(role_id, {"variant_a":0, "variant_b":0})
+	var key := "variant_a" if variant_index == 0 else "variant_b"
+	counts[key] = int(counts.get(key, 0)) + 1
+	_role_variant_allocations[role_id] = counts
+	_variant_assignment_by_actor["%s.g%08d" % [String(stable_id), generation]] = {
+		"role_id":role_id, "ordinal":ordinal, "variant_index":variant_index,
+		"variant":"a" if variant_index == 0 else "b",
+	}
+	return variant_index
 
 func prepare_validation_density(target_live: int) -> Dictionary:
 	if not OS.has_feature("editor") or not active:
@@ -201,6 +233,11 @@ func prepare_validation_density(target_live: int) -> Dictionary:
 func _select_profile(sequence_index: int) -> EnemyProfile:
 	if profiles.is_empty():
 		return null
+	if OS.has_feature("editor") and not _validation_role_sequence.is_empty():
+		var requested_role := _validation_role_sequence[_wave_spawned % _validation_role_sequence.size()]
+		for candidate in profiles:
+			if String(candidate.role_id) == requested_role:
+				return candidate
 	if _elite_every > 0 and _wave_spawned > 0 and _wave_spawned % _elite_every == 0:
 		for candidate in profiles:
 			if String(candidate.role_id) == "grave_brute":
@@ -217,6 +254,15 @@ func _select_profile(sequence_index: int) -> EnemyProfile:
 			return candidate
 		cursor -= weight
 	return profiles[0]
+
+func configure_validation_roster(role_sequence: Array) -> void:
+	if OS.has_feature("editor"):
+		_validation_role_sequence.clear()
+		for role in role_sequence:
+			_validation_role_sequence.append(String(role))
+
+func clear_validation_roster() -> void:
+	_validation_role_sequence.clear()
 
 func _reconcile_to_cap(target_cap: int, reason: String) -> void:
 	_reconciliation_serial += 1
@@ -411,6 +457,7 @@ func _emit_snapshot() -> void:
 
 func get_snapshot() -> Dictionary:
 	var roles: Dictionary = {}
+	var role_variants: Dictionary = {}
 	var hurt_requested := 0
 	var role_active := 0
 	var hurt_active := 0
@@ -421,6 +468,10 @@ func get_snapshot() -> Dictionary:
 			continue
 		var role := String(actor.profile.role_id)
 		roles[role] = int(roles.get(role, 0)) + 1
+		var variant_counts: Dictionary = role_variants.get(role, {"variant_a":0, "variant_b":0})
+		var variant_key := "variant_b" if String(actor.model_pivot.variant_id).ends_with("variant_b") else "variant_a"
+		variant_counts[variant_key] = int(variant_counts.get(variant_key, 0)) + 1
+		role_variants[role] = variant_counts
 		if actor.has_hurt_light_request():
 			hurt_requested += 1
 		if actor.is_role_light_active():
@@ -436,6 +487,12 @@ func get_snapshot() -> Dictionary:
 		"encounter_id": encounter_id, "active": active, "live": _active_count(),
 		"cap": live_cap, "spawned": spawned_total, "defeated": defeated_total,
 		"pooled": pool_size - _active_count(), "roles": roles,
+		"role_variants":role_variants,
+		"role_variant_allocations":_role_variant_allocations.duplicate(true),
+		"variant_assignment_by_actor":_variant_assignment_by_actor.duplicate(true),
+		"variant_balance":_variant_balance_receipt(role_variants),
+		"validation_roster_active":not _validation_role_sequence.is_empty(),
+		"validation_roster_size":_validation_role_sequence.size(),
 		"rejected_spawns": rejected_spawn_count, "last_spawn_receipt": last_spawn_receipt,
 		"last_lifecycle_event": last_lifecycle_event,
 		"wave_id": _wave_id, "wave_spawned": _wave_spawned, "spawn_budget": _spawn_budget,
@@ -459,12 +516,29 @@ func get_snapshot() -> Dictionary:
 		},
 	}
 
+func _variant_balance_receipt(role_variants: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	for role in role_variants:
+		var counts: Dictionary = role_variants[role]
+		var a := int(counts.get("variant_a", 0))
+		var b := int(counts.get("variant_b", 0))
+		var total := a + b
+		result[role] = {
+			"variant_a":a, "variant_b":b, "total":total,
+			"difference":absi(a-b),
+			"maximum_single_variant_share":(float(maxi(a,b)) / float(total)) if total > 0 else 0.0,
+			"within_release_ceiling":total >= 2 and float(maxi(a,b)) / float(total) <= 0.75,
+		}
+	return result
+
 func _mcp_state() -> Dictionary:
 	var snapshot := get_snapshot()
 	return {
 		"active":snapshot.get("active", false), "live":snapshot.get("live", 0),
 		"pooled":snapshot.get("pooled", 0), "cap":snapshot.get("cap", 0),
 		"roles":snapshot.get("roles", {}),
+		"role_variants":snapshot.get("role_variants", {}),
+		"variant_balance":snapshot.get("variant_balance", {}),
 		"telegraph_admission":snapshot.get("telegraph_admission", {}),
 		"ordinary_light_budget":snapshot.get("ordinary_light_budget", {}),
 		"neighbor_registry":snapshot.get("neighbor_registry", {}),

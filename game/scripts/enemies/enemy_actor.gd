@@ -46,7 +46,7 @@ func _ready() -> void:
 	visible = false
 	collider.disabled = true
 
-func activate(next_profile: EnemyProfile, next_target: WardenController, at_position: Vector3, generation: int, registry: EnemyNeighborRegistry = null, owner: EncounterSpawner = null) -> void:
+func activate(next_profile: EnemyProfile, next_target: WardenController, at_position: Vector3, generation: int, registry: EnemyNeighborRegistry = null, owner: EncounterSpawner = null, presentation_variant_index: int = -1) -> void:
 	if is_instance_valid(neighbor_registry):
 		neighbor_registry.unregister_actor(stable_id, spawn_generation)
 	profile = next_profile
@@ -73,7 +73,7 @@ func activate(next_profile: EnemyProfile, next_target: WardenController, at_posi
 	presentation_root.scale = Vector3.ONE * profile.presentation_scale
 	presentation_root.rotation = Vector3.ZERO
 	presentation_root.position = Vector3.ZERO
-	model_pivot.configure(String(profile.role_id), profile.accent_color, stable_id, generation)
+	model_pivot.configure(String(profile.role_id), profile.accent_color, stable_id, generation, presentation_variant_index)
 	_apply_accent(profile.accent_color)
 	visible = true
 	collider.disabled = false

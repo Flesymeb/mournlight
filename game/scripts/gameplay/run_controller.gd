@@ -16,6 +16,7 @@ signal snapshot_changed(snapshot: Dictionary)
 @onready var draft_controller: UpgradeDraftController = $UpgradeDraftController
 @onready var draft_view: UpgradeDraftView = $Interface/UpgradeDraft
 @onready var audio_director: MournlightAudioDirector = $MournlightAudio
+@onready var input_router: InputContextRouter = $InputContextRouter
 const BELLKEEPER_SCENE := preload("res://scenes/enemies/bellkeeper.tscn")
 
 var run_state := "title"
@@ -34,6 +35,8 @@ var boss_snapshot: Dictionary = {}
 var quit_requested := false
 var _resume_state := "active"
 var result_committed := false
+var terminal_commit_count := 0
+var run_route_kind := "ordinary"
 var terminal_snapshot: Dictionary = {}
 var state_history: Array[String] = []
 var last_snapshot: Dictionary = {}
@@ -47,6 +50,12 @@ var _terminal_handoff_generation := 0
 var _terminal_handoff_active := false
 var _terminal_handoff_release_frames := 0
 var terminal_handoff_receipt: Dictionary = {}
+var context_handoff_receipt: Dictionary = {}
+var _context_handoff_active := false
+var _context_handoff_destination := ""
+var _context_handoff_physical := ""
+var _context_handoff_activation_generation := -1
+var _context_handoff_generation := 0
 var _validation_setup_generation := 0
 var validation_density_receipt: Dictionary = {}
 var validation_profile_receipt: Dictionary = {}
@@ -85,7 +94,7 @@ func _ready() -> void:
 	_enter_title()
 
 func _process(delta: float) -> void:
-	_advance_terminal_handoff()
+	_advance_context_handoff()
 	_advance_profile_sample(delta)
 	if run_state in ["active","boss"] and not get_tree().paused:
 		run_elapsed += delta
@@ -178,6 +187,8 @@ func _begin_run() -> void:
 	selected_upgrades.clear()
 	boss_snapshot.clear()
 	result_committed = false
+	terminal_commit_count = 0
+	run_route_kind = "ordinary"
 	terminal_snapshot.clear()
 	draft_controller.reset()
 	audio_director.reset_for_run()
@@ -190,8 +201,9 @@ func _begin_run() -> void:
 	_health_accounting_suspended = false
 	inventory.reset_starting_build()
 	world.set_session_active(true)
-	title_menu.hide()
+	_set_title_surface(false)
 	shell.set_mode("hidden")
+	spawner.clear_validation_roster()
 	spawner.reset_encounter()
 	wave_director.begin()
 	_transition("active")
@@ -206,13 +218,14 @@ func retry_run() -> void:
 	_begin_run()
 
 func _enter_title() -> void:
+	_context_handoff_active = false
 	_terminal_handoff_active = false
 	_teardown_run("title", "return_to_title")
 	boss_snapshot.clear()
 	hud.clear_snapshot()
 	_transition("title")
 	shell.set_mode("hidden")
-	title_menu.show()
+	_set_title_surface(true)
 	title_menu.new_game_button.grab_focus.call_deferred()
 	_emit_snapshot()
 
@@ -220,44 +233,111 @@ func _begin_terminal_title_handoff() -> void:
 	if _terminal_handoff_active:
 		return
 	_terminal_handoff_generation += 1
-	_terminal_handoff_active = true
-	_terminal_handoff_release_frames = 0
-	terminal_handoff_receipt = {
-		"generation":_terminal_handoff_generation,
-		"source":"result", "action":"title",
-		"shell_action_generation":shell.action_generation,
-		"stage":"consuming_initiating_confirm",
-		"release_observed":false, "title_exposed":false,
-		"teardown_complete":false,
-	}
+	_begin_shell_title_handoff("result", "confirm")
+	terminal_handoff_receipt = context_handoff_receipt.duplicate(true)
+
+func _begin_shell_title_handoff(source: String, physical: String) -> void:
 	_teardown_run("title", "return_to_title")
 	boss_snapshot.clear()
 	hud.clear_snapshot()
 	_transition("title")
 	shell.set_mode("hidden")
-	title_menu.hide()
-	terminal_handoff_receipt.teardown_complete = bool(teardown_receipt.get("complete", false))
-	terminal_handoff_receipt.teardown_generation = int(teardown_receipt.get("completion_generation", 0))
+	_set_title_surface(false)
+	_begin_context_handoff(source, "title", physical)
 	_emit_snapshot()
 
-func _advance_terminal_handoff() -> void:
-	if not _terminal_handoff_active:
+func _begin_context_handoff(source: String, destination: String, physical: String) -> void:
+	var transaction: Dictionary = input_router.active_transactions.get(physical, {})
+	if transaction.is_empty():
+		# Focused buttons may commit ui_accept on the same logical-release frame,
+		# after the router has archived the physical transaction. Bind that exact
+		# release; older receipts remain ineligible so mouse/programmatic actions
+		# cannot inherit stale keyboard or gamepad ownership.
+		var archived: Dictionary = input_router.last_release_receipt
+		var release_frame := int(archived.get("release_observation_frame", -1000))
+		var same_release := (
+			String(archived.get("physical", "")) == physical
+			and String(archived.get("originating_context", "")) == source
+			and bool(archived.get("physical_release_observed", false))
+			and Engine.get_process_frames() - release_frame <= 1
+		)
+		_context_handoff_generation += 1
+		context_handoff_receipt = {
+			"generation":_context_handoff_generation,
+			"source":source, "destination":destination,
+			"physical":physical if same_release else "mouse_or_programmatic",
+			"originating_context":archived.get("originating_context", source) if same_release else source,
+			"originating_context_generation":archived.get("originating_context_generation", -1) if same_release else -1,
+			"activation_generation":archived.get("activation_generation", -1) if same_release else -1,
+			"shell_action_generation":shell.action_generation,
+			"stage":"complete", "release_observed":same_release,
+			"release_context":archived.get("release_context", source) if same_release else source,
+			"logical_release_dispatched":archived.get("logical_release_dispatched", false) if same_release else false,
+			"destination_exposed":true, "downstream_action_count":1,
+			"teardown_complete":bool(teardown_receipt.get("complete", false)),
+			"teardown_generation":int(teardown_receipt.get("completion_generation", 0)),
+			"focus_target":"Play" if destination == "title" else "Resume",
+			"quit_requested":quit_requested,
+		}
+		_complete_context_handoff(destination, true)
 		return
-	if Input.is_action_pressed(&"ui_accept"):
-		_terminal_handoff_release_frames = 0
+	_context_handoff_active = true
+	_context_handoff_generation += 1
+	_context_handoff_destination = destination
+	_context_handoff_physical = physical
+	_context_handoff_activation_generation = int(transaction.get("activation_generation", -1))
+	input_router.bind_destination(physical, destination, 1)
+	context_handoff_receipt = {
+		"generation":_context_handoff_generation,
+		"source":source, "destination":destination,
+		"physical":physical,
+		"originating_context":transaction.get("originating_context", source),
+		"originating_context_generation":transaction.get("originating_context_generation", -1),
+		"activation_generation":_context_handoff_activation_generation,
+		"shell_action_generation":shell.action_generation,
+		"stage":"awaiting_physical_release",
+		"release_observed":false, "destination_exposed":false,
+		"downstream_action_count":1,
+		"teardown_complete":bool(teardown_receipt.get("complete", false)),
+		"teardown_generation":int(teardown_receipt.get("completion_generation", 0)),
+	}
+	if source == "result":
+		_terminal_handoff_active = true
+		terminal_handoff_receipt = context_handoff_receipt.duplicate(true)
+
+func _advance_context_handoff() -> void:
+	if not _context_handoff_active:
 		return
-	_terminal_handoff_release_frames += 1
-	terminal_handoff_receipt.release_observed = true
-	terminal_handoff_receipt.release_frames = _terminal_handoff_release_frames
-	if _terminal_handoff_release_frames < 2:
+	if not input_router.transaction_released(_context_handoff_physical, _context_handoff_activation_generation):
 		return
-	_terminal_handoff_active = false
-	title_menu.show()
-	title_menu.new_game_button.grab_focus.call_deferred()
-	terminal_handoff_receipt.stage = "complete"
-	terminal_handoff_receipt.title_exposed = true
-	terminal_handoff_receipt.focus_target = "Play"
-	terminal_handoff_receipt.quit_requested = quit_requested
+	var transaction := input_router.transaction_receipt(_context_handoff_physical, _context_handoff_activation_generation)
+	context_handoff_receipt["release_observed"] = bool(transaction.get("physical_release_observed", false))
+	context_handoff_receipt["release_context"] = transaction.get("release_context", "")
+	context_handoff_receipt["logical_release_dispatched"] = transaction.get("logical_release_dispatched", false)
+	context_handoff_receipt["downstream_action_count"] = transaction.get("downstream_action_count", 0)
+	_complete_context_handoff(_context_handoff_destination, false)
+
+func _complete_context_handoff(destination: String, immediate: bool) -> void:
+	_context_handoff_active = false
+	_context_handoff_destination = ""
+	_context_handoff_physical = ""
+	_context_handoff_activation_generation = -1
+	if destination == "title":
+		shell.set_mode("hidden")
+		_set_title_surface(true)
+		title_menu.new_game_button.grab_focus.call_deferred()
+	elif destination == "pause":
+		_set_title_surface(false)
+		get_tree().paused = true
+		shell.set_mode("pause", last_snapshot)
+	if not immediate:
+		context_handoff_receipt["stage"] = "complete"
+		context_handoff_receipt["destination_exposed"] = true
+		context_handoff_receipt["focus_target"] = "Play" if destination == "title" else "Resume"
+		context_handoff_receipt["quit_requested"] = quit_requested
+	if _terminal_handoff_active:
+		_terminal_handoff_active = false
+		terminal_handoff_receipt = context_handoff_receipt.duplicate(true)
 	_emit_snapshot()
 
 func _pause_run() -> void:
@@ -334,7 +414,7 @@ func _on_shell_action(action: StringName) -> void:
 			if run_state == "result":
 				_begin_terminal_title_handoff()
 			else:
-				_enter_title()
+				_begin_shell_title_handoff(shell.mode, "confirm")
 		&"settings": _open_settings_page()
 		&"credits": _open_credits_page()
 		&"back": _return_from_shell_page()
@@ -344,7 +424,7 @@ func _on_shell_action(action: StringName) -> void:
 				get_tree().quit()
 
 func _on_title_page_requested(page: String) -> void:
-	title_menu.hide()
+	_set_title_surface(false)
 	shell.set_mode(page)
 
 func _open_settings_page() -> void:
@@ -353,13 +433,13 @@ func _open_settings_page() -> void:
 		get_tree().paused = true
 		shell.set_mode("settings", last_snapshot)
 	elif run_state == "title":
-		title_menu.hide()
+		_set_title_surface(false)
 		shell.set_mode("settings")
 	_emit_snapshot()
 
 func _open_credits_page() -> void:
 	if run_state == "title":
-		title_menu.hide()
+		_set_title_surface(false)
 		shell.set_mode("credits")
 	_emit_snapshot()
 
@@ -367,15 +447,32 @@ func _return_from_shell_page() -> void:
 	if shell.return_mode == "pause" and run_state == "settings":
 		get_tree().paused = true
 		_transition("paused")
-		shell.set_mode("pause",last_snapshot)
+		shell.set_mode("hidden")
+		_begin_context_handoff("settings", "pause", "back")
 		_emit_snapshot()
 	else:
-		_enter_title()
+		var source := shell.mode
+		_teardown_run("title", "return_from_%s" % source)
+		boss_snapshot.clear()
+		hud.clear_snapshot()
+		_transition("title")
+		shell.set_mode("hidden")
+		_set_title_surface(false)
+		_begin_context_handoff(source, "title", "back")
+		_emit_snapshot()
 
 func _on_title_exit_requested() -> void:
 	quit_requested = true
 	if not OS.has_feature("editor"):
 		get_tree().quit()
+
+func _set_title_surface(exposed: bool) -> void:
+	if exposed:
+		title_menu.process_mode = Node.PROCESS_MODE_ALWAYS
+		title_menu.show()
+	else:
+		title_menu.hide()
+		title_menu.process_mode = Node.PROCESS_MODE_DISABLED
 
 func _open_upgrade_draft() -> void:
 	if run_state != "active" or draft_controller.active:
@@ -447,11 +544,15 @@ func _on_player_hit_resolved(event: Dictionary) -> void:
 func _commit_terminal_snapshot(terminal_outcome: String) -> void:
 	if not terminal_snapshot.is_empty():
 		return
+	terminal_commit_count += 1
 	terminal_snapshot = RunSnapshot.make(self,world,warden,health,spawner,inventory)
 	terminal_snapshot.outcome = terminal_outcome
 	terminal_snapshot.state = "result"
 	terminal_snapshot["committed"] = true
 	terminal_snapshot["commit_run_serial"] = run_serial
+	terminal_snapshot["commit_count"] = terminal_commit_count
+	terminal_snapshot["route_kind"] = run_route_kind
+	terminal_snapshot["ordinary_route_eligible"] = run_route_kind == "ordinary" and bool(wave_director.get_snapshot().get("ordinary_route_complete", false))
 	terminal_snapshot = terminal_snapshot.duplicate(true)
 
 func _teardown_run(route: String, reason: String) -> Dictionary:
@@ -485,6 +586,13 @@ func _teardown_run(route: String, reason: String) -> Dictionary:
 	var transient_retirement := _retire_transient_ownership(route, reason, _teardown_generation)
 	world.reset_session()
 	var encounter := spawner.get_snapshot()
+	var post_counts := _profile_counts()
+	var teardown_complete := (
+		bool(transient_retirement.get("complete", false))
+		and int(encounter.get("live", -1)) == 0
+		and int((encounter.get("neighbor_registry", {}) as Dictionary).get("registered_count", -1)) == 0
+		and _counts_are_isolated(post_counts)
+	)
 	teardown_receipt = {
 		"run_serial":run_serial, "route":route, "reason":reason,
 		"boss_retirement":boss_retirement, "boss_reference_cleared":boss == null,
@@ -496,7 +604,8 @@ func _teardown_run(route: String, reason: String) -> Dictionary:
 		"retired_attack_presentations":transient_retirement.get("retired_attack_presentations",0),
 		"remaining_attack_presentations":get_tree().get_nodes_in_group("friendly_attack").size(),
 		"audio_retirement":transient_retirement.get("audio_retirement",{}), "terminal_snapshot_preserved":not terminal_snapshot.is_empty(),
-		"completion_generation":_teardown_generation, "complete":true,
+		"post_counts":post_counts,
+		"completion_generation":_teardown_generation, "complete":teardown_complete,
 	}
 	_teardown_active = false
 	return teardown_receipt.duplicate(true)
@@ -544,6 +653,7 @@ func _prepare_final_profile() -> void:
 	if not OS.has_feature("editor") or run_state not in ["active", "boss"]:
 		return
 	_profile_active = false
+	run_route_kind = "diagnostic_prepared"
 	_profile_samples_ms.clear()
 	_profile_elapsed = 0.0
 	get_tree().paused = false
@@ -553,6 +663,12 @@ func _prepare_final_profile() -> void:
 	experience = 0
 	experience_threshold = 9999
 	var build_receipt := inventory.prepare_legal_build("representative")
+	spawner.configure_validation_roster([
+		"mossling","wispbat","mossling","bone_slinger","grave_brute","mossling","wispbat","mossling",
+		"bone_slinger","grave_brute","mossling","wispbat","mossling","bone_slinger","grave_brute","mossling",
+		"wispbat","mossling","bone_slinger","grave_brute","mossling","wispbat","mossling","bone_slinger",
+		"grave_brute","mossling","wispbat","mossling","bone_slinger","grave_brute","mossling","wispbat",
+	])
 	wave_director.prepare_test_wave(3)
 	var attack_count_before := world.attack_runtime.authorized_count
 	var preparation := spawner.prepare_validation_density(32)
@@ -637,6 +753,7 @@ func _reset_final_profile() -> void:
 	var requested_counts := _profile_counts()
 	var retirement := _retire_transient_ownership("validation_profile_reset", "validation_profile_reset", _teardown_generation)
 	spawner.reset_encounter()
+	spawner.clear_validation_roster()
 	if is_instance_valid(boss):
 		boss.retire_run_actor("validation_profile_reset", _teardown_generation)
 		boss.queue_free()
@@ -679,6 +796,8 @@ func _counts_are_isolated(counts: Dictionary) -> bool:
 		int(counts.get("enemies", -1)) == 0
 		and int(counts.get("bosses", -1)) == 0
 		and int(counts.get("projectiles", -1)) == 0
+		and int(counts.get("pickups", -1)) == 0
+		and int(counts.get("effects", -1)) == 0
 		and int(counts.get("wisp_handles", -1)) == 0
 		and int(counts.get("wisp_interval_targets", -1)) == 0
 		and int(counts.get("active_attack_ledgers", -1)) == 0
@@ -743,6 +862,7 @@ func _record_retry_baseline(reason: String) -> void:
 func _prepare_validation_wave(index: int) -> void:
 	if not OS.has_feature("editor") or run_state not in ["active", "boss"]:
 		return
+	run_route_kind = "diagnostic_prepared"
 	if index >= 3:
 		health.maximum_health = 5000.0
 		health.reset_warden_health()
@@ -756,6 +876,7 @@ func _prepare_validation_wave(index: int) -> void:
 func _prepare_validation_density_checkpoint(target_live: int) -> void:
 	if not OS.has_feature("editor") or run_state not in ["active", "boss"]:
 		return
+	run_route_kind = "diagnostic_prepared"
 	health.maximum_health = 5000.0
 	health.reset_warden_health()
 	_last_health = health.current_health
@@ -807,6 +928,7 @@ func _reset_validation_density() -> void:
 func _prepare_validation_result(validation_outcome: String) -> void:
 	if not OS.has_feature("editor") or run_state not in ["active","boss"]:
 		return
+	run_route_kind = "diagnostic_prepared"
 	inventory.prepare_legal_build("representative")
 	var lantern := inventory.get_stats(&"warden_lantern")
 	var spade := inventory.get_stats(&"gravespade")
@@ -818,6 +940,7 @@ func _prepare_validation_result(validation_outcome: String) -> void:
 	damage_dealt = maxi(damage_dealt,742)
 	damage_taken = maxi(damage_taken,37)
 	if validation_outcome == "victory":
+		wave_director.prepare_test_wave(4)
 		_on_boss_defeated({"validation":true})
 	else:
 		health.current_health = 0.0
@@ -842,6 +965,7 @@ func _mcp_state() -> Dictionary:
 		"wave":{"wave":wave_state.get("wave",0),"wave_count":wave_state.get("wave_count",5),"phase":wave_state.get("phase","idle"),"title":wave_state.get("title","")},
 		"boss":{"active":boss_snapshot.get("active",false),"health":boss_snapshot.get("health",0.0),"health_maximum":boss_snapshot.get("health_maximum",0.0),"phase":boss_snapshot.get("phase",0)},"quit_requested":quit_requested,
 		"result_committed": result_committed, "terminal_snapshot_digest": _terminal_snapshot_digest(), "state_history": state_history,
+		"terminal_commit_count":terminal_commit_count, "run_route_kind":run_route_kind,
 		"upgrade_draft":draft_controller.get_snapshot(), "teardown_receipt":teardown_receipt,
 		"tree_paused": get_tree().paused, "shell_mode": shell.mode,
 		"shell_return_mode": shell.return_mode, "shell_action_latched": shell.action_latched,
@@ -852,6 +976,8 @@ func _mcp_state() -> Dictionary:
 		},
 		"terminal_handoff":terminal_handoff_receipt,
 		"terminal_handoff_active":_terminal_handoff_active,
+		"context_handoff":context_handoff_receipt,
+		"context_handoff_active":_context_handoff_active,
 		"validation_density":validation_density_receipt,
 		"validation_profile":validation_profile_receipt,
 		"validation_profile_sample":validation_profile_sample,
@@ -862,6 +988,7 @@ func _mcp_state() -> Dictionary:
 func _terminal_snapshot_digest() -> Dictionary:
 	if terminal_snapshot.is_empty(): return {}
 	return {"committed":terminal_snapshot.get("committed",false),"commit_run_serial":terminal_snapshot.get("commit_run_serial",0),
+		"commit_count":terminal_snapshot.get("commit_count",0),"route_kind":terminal_snapshot.get("route_kind",""),"ordinary_route_eligible":terminal_snapshot.get("ordinary_route_eligible",false),
 		"outcome":terminal_snapshot.get("outcome",""),"elapsed":terminal_snapshot.get("elapsed",0.0),"wave":terminal_snapshot.get("wave",0),
 		"level":terminal_snapshot.get("level",0),"defeated":terminal_snapshot.get("defeated",0),"damage_dealt":terminal_snapshot.get("damage_dealt",0),
 		"damage_taken":terminal_snapshot.get("damage_taken",0),"weapon_ranks":_terminal_weapon_ranks(),"selected_upgrades":terminal_snapshot.get("selected_upgrades",[])}

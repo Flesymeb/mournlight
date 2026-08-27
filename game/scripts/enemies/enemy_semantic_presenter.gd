@@ -29,9 +29,9 @@ var _base_position := Vector3.ZERO
 var _base_rotation := Vector3.ZERO
 var _base_scale := Vector3.ONE
 
-func configure(next_role_id: String, _accent: Color, stable_id: StringName, generation: int) -> void:
+func configure(next_role_id: String, _accent: Color, stable_id: StringName, generation: int, allocated_variant_index: int = -1) -> void:
 	role_id = next_role_id
-	var variant_index := posmod(String(stable_id).hash() + generation * 17, 2)
+	var variant_index := clampi(allocated_variant_index, 0, 1) if allocated_variant_index >= 0 else posmod(String(stable_id).hash() + generation * 17, 2)
 	variant_id = "%s.variant_%s" % [ROLE_DESCRIPTORS.get(role_id, "unknown"), ["a", "b"][variant_index]]
 	_build_role(variant_index)
 	set_semantic("spawn")

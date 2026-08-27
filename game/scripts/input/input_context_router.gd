@@ -14,6 +14,8 @@ var last_activation_receipt: Dictionary = {}
 var last_context_receipt: Dictionary = {}
 var last_press_receipt: Dictionary = {}
 var last_release_receipt: Dictionary = {}
+var active_transactions: Dictionary = {}
+var completed_transactions: Array[Dictionary] = []
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -42,12 +44,11 @@ func _sync_context() -> void:
 	var next_context := _resolve_context()
 	if next_context == context:
 		return
-	# A context change owns interruption cleanup. A held physical control can
-	# never keep its old gameplay or shell action pressed behind the new page.
-	_release_action(confirm_dispatch)
-	_release_action(back_dispatch)
-	confirm_dispatch = &""
-	back_dispatch = &""
+	# A context change releases the logical action, but never transfers the
+	# still-held physical activation. Its originating transaction survives
+	# until the matching physical release is observed.
+	_release_transaction_action("confirm", "context_changed")
+	_release_transaction_action("back", "context_changed")
 	context = next_context
 	context_generation += 1
 	last_context_receipt = {
@@ -81,37 +82,109 @@ func _back_action() -> StringName:
 	return &""
 
 func _dispatch_press(physical: String, action: StringName) -> void:
+	if active_transactions.has(physical):
+		var duplicate: Dictionary = active_transactions[physical]
+		duplicate["duplicate_press_count"] = int(duplicate.get("duplicate_press_count", 0)) + 1
+		active_transactions[physical] = duplicate
+		last_receipt = duplicate.duplicate(true)
+		return
 	activation_generation += 1
 	if physical == "confirm":
 		confirm_dispatch = action
 	else:
 		back_dispatch = action
-	if action != &"":
-		_parse_action(action, true)
-	last_receipt = {
+	var transaction := {
 		"phase":"pressed", "physical":physical, "logical_action":String(action),
 		"accepted":action != &"", "context":context,
+		"originating_context":context,
+		"originating_context_generation":context_generation,
 		"context_generation":context_generation,
 		"activation_generation":activation_generation,
+		"logical_press_dispatched":action != &"",
+		"logical_release_dispatched":false,
+		"physical_release_observed":false,
+		"resolved_destination":"pending",
+		"downstream_action_count":1 if action != &"" else 0,
+		"duplicate_press_count":0,
 	}
+	active_transactions[physical] = transaction
+	last_receipt = transaction.duplicate(true)
 	last_activation_receipt = last_receipt.duplicate(true)
 	last_press_receipt = last_receipt.duplicate(true)
+	# Publish ownership before synthesizing the logical press. Input parsing may
+	# synchronously invoke page code, which must be able to bind this transaction.
+	if action != &"":
+		_parse_action(action, true)
 
 func _dispatch_release(physical: String) -> void:
-	var action := confirm_dispatch if physical == "confirm" else back_dispatch
-	_release_action(action)
+	var transaction: Dictionary = active_transactions.get(physical, {})
+	var action := StringName(String(transaction.get("logical_action", "")))
+	if not bool(transaction.get("logical_release_dispatched", false)):
+		transaction["logical_release_dispatched"] = action != &""
+		transaction["logical_release_reason"] = "physical_release"
+		active_transactions[physical] = transaction
+		_release_action(action)
+		# A button may commit synchronously on logical release and annotate the
+		# active transaction with its destination.
+		transaction = active_transactions.get(physical, transaction)
 	if physical == "confirm":
 		confirm_dispatch = &""
 	else:
 		back_dispatch = &""
-	last_receipt = {
+	transaction.merge({
 		"phase":"released", "physical":physical, "logical_action":String(action),
-		"accepted":action != &"", "context":context,
-		"context_generation":context_generation,
-		"activation_generation":activation_generation,
-	}
+		"accepted":action != &"", "release_context":context,
+		"release_context_generation":context_generation,
+		"physical_release_observed":true,
+		"release_observation_frame":Engine.get_process_frames(),
+	}, true)
+	if String(transaction.get("resolved_destination", "pending")) == "pending":
+		transaction["resolved_destination"] = context
+	active_transactions.erase(physical)
+	completed_transactions.append(transaction.duplicate(true))
+	if completed_transactions.size() > 12:
+		completed_transactions.pop_front()
+	last_receipt = transaction.duplicate(true)
 	last_activation_receipt = last_receipt.duplicate(true)
 	last_release_receipt = last_receipt.duplicate(true)
+
+func _release_transaction_action(physical: String, reason: String) -> void:
+	if not active_transactions.has(physical):
+		return
+	var transaction: Dictionary = active_transactions[physical]
+	if bool(transaction.get("logical_release_dispatched", false)):
+		return
+	var action := StringName(String(transaction.get("logical_action", "")))
+	transaction["logical_release_dispatched"] = action != &""
+	transaction["logical_release_reason"] = reason
+	active_transactions[physical] = transaction
+	_release_action(action)
+
+func bind_destination(physical: String, destination: String, downstream_action_count: int = 1) -> Dictionary:
+	if not active_transactions.has(physical):
+		return {}
+	var transaction: Dictionary = active_transactions[physical]
+	transaction["resolved_destination"] = destination
+	transaction["downstream_action_count"] = downstream_action_count
+	active_transactions[physical] = transaction
+	last_activation_receipt = transaction.duplicate(true)
+	return transaction.duplicate(true)
+
+func transaction_released(physical: String, expected_activation_generation: int) -> bool:
+	for transaction in completed_transactions:
+		if String(transaction.get("physical", "")) == physical and int(transaction.get("activation_generation", -1)) == expected_activation_generation:
+			return bool(transaction.get("physical_release_observed", false))
+	return false
+
+func transaction_receipt(physical: String, expected_activation_generation: int) -> Dictionary:
+	if active_transactions.has(physical):
+		var active: Dictionary = active_transactions[physical]
+		if int(active.get("activation_generation", -1)) == expected_activation_generation:
+			return active.duplicate(true)
+	for transaction in completed_transactions:
+		if String(transaction.get("physical", "")) == physical and int(transaction.get("activation_generation", -1)) == expected_activation_generation:
+			return transaction.duplicate(true)
+	return {}
 
 func _release_action(action: StringName) -> void:
 	if action != &"":
@@ -135,4 +208,6 @@ func _mcp_state() -> Dictionary:
 		"last_context_receipt":last_context_receipt,
 		"last_press_receipt":last_press_receipt,
 		"last_release_receipt":last_release_receipt,
+		"active_transactions":active_transactions,
+		"completed_transactions":completed_transactions,
 	}
