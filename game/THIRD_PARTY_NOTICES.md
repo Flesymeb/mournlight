@@ -5,6 +5,8 @@ The machine-inspectable aggregate release inventory is `ASSET_PROVENANCE.json`. 
 - Montserrat type family: OFL-1.1; exact staged font receipts are in `assets/fonts/`.
 - Maaack Godot Menus Template interaction reference: MIT; retained under `ui/menus/maaack/` with its complete receipt and attribution.
 - Stylized Possessed Lantern by its Sketchfab author: CC-BY-4.0; exact source receipt is `assets/authored/bellkeeper.glb.receipt.json`.
+- Simple Stylized Lantern (HandPainted) by its Sketchfab author: CC-BY-4.0; exact source receipt is `assets/authored/warden_lantern.glb.receipt.json`. The intact source is used by the Warden and escaped-wisp reward pickup presentation.
+- Stylized Goblin Wizard Fantasy Character by its Sketchfab author: CC-BY-4.0; exact source receipt is `assets/authored/warden_goblin_wizard_candidate.glb.receipt.json`. The intact source is the single Warden presentation bound through product-owned semantic wrapper motion.
 - Audio library materialized from Mark's Boomer Shooter: MIT project code; bundled sounds retain their upstream notices. Exact materialization receipt and upstream `LICENSE.md` are in `assets/audio_library/`.
 - Kenney Starter Kit selected semantic SFX: MIT, revision `185fd2326d74a5cf858cffc616f87cf9696f9cc0`; the copied license and bounded selected recordings are in `assets/audio_semantic/kenney_starter_kit/`.
 - Myconid Spore-Priest, Myconid Spore-Priest-female, Undead Skeleton Warrior, and The Gargoyle Stone-Warden by their respective Sketchfab authors: CC-BY-4.0; exact hash-bound receipts are in `assets/enemies/authored/`.

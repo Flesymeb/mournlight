@@ -15,6 +15,7 @@ var binding_valid := false
 var missing_semantics: Array[String] = []
 var rejected_source_clips: Array[String] = []
 var profile_id := "unbound"
+var terminal_state := ""
 
 func bind(root: Node, profile: Resource) -> void:
 	player = _find_player(root)
@@ -23,6 +24,7 @@ func bind(root: Node, profile: Resource) -> void:
 	missing_semantics.clear()
 	rejected_source_clips.clear()
 	binding_valid = false
+	terminal_state = ""
 	profile_id = "missing_profile"
 	if profile:
 		profile_id = String(profile.get_meta("profile_id", "unnamed"))
@@ -49,6 +51,8 @@ func bind(root: Node, profile: Resource) -> void:
 	_play("idle", true)
 
 func drive(planar_speed: float, dash_phase: String, delta: float) -> void:
+	if not terminal_state.is_empty():
+		return
 	event_hold = maxf(0.0, event_hold - delta)
 	if event_hold > 0.0:
 		return
@@ -60,6 +64,10 @@ func drive(planar_speed: float, dash_phase: String, delta: float) -> void:
 		set_semantic("idle")
 
 func trigger(event_state: String, duration := 0.32) -> void:
+	if not terminal_state.is_empty() and event_state != terminal_state:
+		return
+	if event_state in ["death", "victory"]:
+		terminal_state = event_state
 	set_semantic(event_state, true)
 	event_hold = duration
 
@@ -82,6 +90,7 @@ func _play(state: String, restart: bool) -> void:
 
 func reset() -> void:
 	event_hold = 0.0
+	terminal_state = ""
 	set_semantic("idle", true)
 
 func _find_player(node: Node) -> AnimationPlayer:
@@ -94,8 +103,13 @@ func _find_player(node: Node) -> AnimationPlayer:
 	return null
 
 func get_snapshot() -> Dictionary:
+	var distinct_clips := {}
+	for clip in semantic_clips.values():
+		distinct_clips[String(clip)] = true
 	return {"semantic_state":semantic_state,"previous_state":previous_state,
 		"resolved_clip":String(semantic_clips.get(semantic_state, &"")),"clip_map":semantic_clips,
 		"explicit_profile_mappings":explicit_profile_mappings,"profile_id":profile_id,
 		"binding_valid":binding_valid,"event_hold":event_hold,"missing_semantics":missing_semantics,
-		"rejected_source_clips":rejected_source_clips,"truthful_fail_closed":not binding_valid}
+		"rejected_source_clips":rejected_source_clips,"terminal_state":terminal_state,
+		"explicit_mapping_count":explicit_profile_mappings.size(),
+		"distinct_resolved_clip_count":distinct_clips.size(),"truthful_fail_closed":not binding_valid}

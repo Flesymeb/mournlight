@@ -34,6 +34,7 @@ enum DashPhase { READY, ANTICIPATION, ACTIVE, RECOVERY, COOLDOWN }
 @onready var lantern: Node3D = $PresentationRoot/LanternPivot
 @onready var dash_aura: MeshInstance3D = $DashAura
 @onready var active_ring: MeshInstance3D = $ActiveRing
+@onready var semantic_animation_player: AnimationPlayer = $SemanticAnimationPlayer
 
 var _dash_phase_id := DashPhase.READY
 var _phase_remaining := 0.0
@@ -53,11 +54,11 @@ func _ready() -> void:
 	_base_model_position = model_pivot.position
 	_base_lantern_position = lantern.position
 	_base_presentation_scale = presentation_root.scale
-	_authored_animation = _find_animation_player(model_pivot)
+	_authored_animation = semantic_animation_player
 	animation_binding = WardenAnimationBinding.new()
 	animation_binding.name = "SemanticAnimationBinding"
 	add_child(animation_binding)
-	animation_binding.bind(model_pivot, animation_profile)
+	animation_binding.bind(semantic_animation_player, animation_profile)
 	var attack_runtime := get_node_or_null("Weapons/AttackRuntime")
 	if attack_runtime:
 		attack_runtime.attack_authorized.connect(func(_event: Dictionary) -> void: animation_binding.trigger("cast", 0.34))
@@ -160,10 +161,6 @@ func _update_facing_and_animation(delta: float) -> void:
 	if facing_direction.length_squared() > 0.001:
 		var target_angle := atan2(facing_direction.x, facing_direction.z)
 		presentation_root.rotation.y = lerp_angle(presentation_root.rotation.y, target_angle, 1.0 - exp(-turn_speed * delta))
-	model_pivot.rotation.x = 0.0
-	model_pivot.position = _base_model_position
-	lantern.position = _base_lantern_position
-	presentation_root.scale = _base_presentation_scale
 	animation_binding.drive(planar_speed, dash_phase, delta)
 
 func reset_for_run(spawn_position: Vector3) -> void:
@@ -174,6 +171,11 @@ func reset_for_run(spawn_position: Vector3) -> void:
 	_dash_direction = Vector3.FORWARD
 	_last_move_direction = Vector3.FORWARD
 	dash_cooldown_remaining = 0.0
+	model_pivot.position = _base_model_position
+	model_pivot.rotation = Vector3.ZERO
+	model_pivot.scale = Vector3.ONE
+	lantern.position = _base_lantern_position
+	lantern.rotation = Vector3.ZERO
 	presentation_root.scale = _base_presentation_scale
 	_set_dash_phase(DashPhase.READY, 0.0)
 	animation_binding.reset()

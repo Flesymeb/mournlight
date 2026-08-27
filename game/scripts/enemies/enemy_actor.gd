@@ -240,7 +240,9 @@ func _on_died(event: Dictionary) -> void:
 	collider.set_deferred("disabled", true)
 	telegraph_ring.visible = false
 	lane_cue.visible = false
-	drops.commit_from_death(event)
+	var drop_event := event.duplicate(true)
+	drop_event.position = global_position
+	drops.commit_from_death(drop_event)
 	lifecycle_event.emit(_event("death", {"death_id": event.get("death_id", "")}))
 	defeated.emit(self, event)
 
@@ -294,8 +296,10 @@ func _set_light_budget(role_active: bool, hurt_active: bool) -> void:
 	_hurt_light_active = hurt_active and has_hurt_light_request()
 	if is_instance_valid(role_glow):
 		role_glow.light_energy = 0.52 if _role_light_active else 0.0
+		role_glow.visible = _role_light_active
 	if is_instance_valid(hurt_light):
 		hurt_light.light_energy = 3.2 * clampf(_hurt_light_remaining / 0.24, 0.0, 1.0) if _hurt_light_active else 0.0
+		hurt_light.visible = _hurt_light_active
 
 func _event(phase: String, extra: Dictionary = {}) -> Dictionary:
 	var event := {

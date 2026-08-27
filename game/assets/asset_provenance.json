@@ -14,14 +14,14 @@
       "integration": "One intact authored environment instance under one whole-package calibration transform."
     },
     {
-      "title": "Frost Mage",
-      "source": "https://sketchfab.com/3d-models/frost-mage-0fa86d697034424486af4a06324e12b9",
-      "asset_id": "0fa86d697034424486af4a06324e12b9",
+      "title": "Stylized Goblin Wizard Fantasy Character",
+      "source": "https://sketchfab.com/3d-models/stylized-goblin-wizard-fantasy-character-3f1c0c45e2df40c6af15a505e980f337",
+      "asset_id": "3f1c0c45e2df40c6af15a505e980f337",
       "license": "CC BY 4.0",
-      "sha256": "a83991646c53628e6b3190b4cdac168ab2aaedc8cc91ac5cbed1e4796cb949cf",
-      "receipt": "res://assets/authored/frost_mage.glb.receipt.json",
+      "sha256": "92544b3e33fdf75b09a2299892da0d8241805262fabcc2a9133e8769cda9f04f",
+      "receipt": "res://assets/authored/warden_goblin_wizard_candidate.glb.receipt.json",
       "binding": "res://scenes/player/warden.tscn",
-      "integration": "One intact authored animated character instance under one whole-package calibration transform."
+      "integration": "One intact upright authored character singleton under one whole-package calibration transform; product-owned wrapper motion supplies seven explicit semantic states without editing the source package."
     },
     {
       "title": "Simple Stylized Lantern (HandPainted)",
@@ -31,7 +31,8 @@
       "sha256": "fb4a8f303342eafdd633864bd56a1bbfc648387e00a1ececf268369fdc9b8e01",
       "receipt": "res://assets/authored/warden_lantern.glb.receipt.json",
       "binding": "res://scenes/player/warden.tscn",
-      "integration": "One intact authored lantern instance attached through the product-owned Warden presentation root."
+      "additional_binding": "res://scenes/gameplay/reward_pickup.tscn",
+      "integration": "The intact authored lantern remains attached through the product-owned Warden presentation root and is reused intact at pickup scale for causal escaped-wisp rewards."
     },
     {
       "title": "Stylized Possessed Lantern",

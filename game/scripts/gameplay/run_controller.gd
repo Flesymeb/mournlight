@@ -18,6 +18,8 @@ signal snapshot_changed(snapshot: Dictionary)
 @onready var audio_director: MournlightAudioDirector = $MournlightAudio
 @onready var input_router: InputContextRouter = $InputContextRouter
 const BELLKEEPER_SCENE := preload("res://scenes/enemies/bellkeeper.tscn")
+const REWARD_PICKUP_SCENE := preload("res://scenes/gameplay/reward_pickup.tscn")
+const MAX_ACTIVE_PICKUPS := 16
 
 var run_state := "title"
 var run_serial := 0
@@ -62,6 +64,9 @@ var validation_density_receipt: Dictionary = {}
 var validation_profile_receipt: Dictionary = {}
 var validation_profile_sample: Dictionary = {}
 var validation_retry_baselines: Array[Dictionary] = []
+var validation_profile_cycles: Array[Dictionary] = []
+var pickup_spawned_total := 0
+var pickup_collected_total := 0
 var _profile_samples_ms: Array[float] = []
 var _profile_active := false
 var _profile_elapsed := 0.0
@@ -184,6 +189,8 @@ func _begin_run() -> void:
 	defeated_enemies = 0
 	damage_taken = 0
 	damage_dealt = 0
+	pickup_spawned_total = 0
+	pickup_collected_total = 0
 	outcome = ""
 	selected_upgrades.clear()
 	boss_transition_history.clear()
@@ -389,14 +396,49 @@ func _on_enemy_defeated(_event: Dictionary) -> void:
 	defeated_enemies += 1
 	_emit_snapshot()
 
-func _on_reward_dropped(_event: Dictionary) -> void:
-	experience += 1
+func _on_reward_dropped(event: Dictionary) -> void:
+	_spawn_reward_pickup(event)
+	_emit_snapshot()
+
+func _on_reward_pickup_collected(event: Dictionary) -> void:
+	pickup_collected_total += 1
+	experience += maxi(1, int(event.get("reward_value", 1)))
 	if experience >= experience_threshold:
 		experience -= experience_threshold
 		level += 1
 		experience_threshold = 5 + (level - 1) * 2
 		_open_upgrade_draft()
 	_emit_snapshot()
+
+func _spawn_reward_pickup(event: Dictionary) -> RewardPickup:
+	var active_pickups := get_tree().get_nodes_in_group(&"reward_pickup")
+	if active_pickups.size() >= MAX_ACTIVE_PICKUPS:
+		var merge_target := active_pickups.front() as RewardPickup
+		if is_instance_valid(merge_target):
+			merge_target.merge_reward(event)
+			pickup_spawned_total += 1
+			return merge_target
+	var pickup := REWARD_PICKUP_SCENE.instantiate() as RewardPickup
+	world.add_child(pickup)
+	pickup.configure(warden, event)
+	pickup.collected.connect(_on_reward_pickup_collected)
+	pickup_spawned_total += 1
+	return pickup
+
+func _seed_profile_pickups(count: int) -> int:
+	var seeded := 0
+	for index in range(clampi(count, 0, 8)):
+		var angle := TAU * float(index) / maxf(1.0, float(count))
+		var event := {
+			"accepted":true,
+			"drop_id":"profile.g%04d.pickup.%02d" % [_validation_setup_generation + 1, index],
+			"drop_type":"escaped_wisp",
+			"position":Vector3(cos(angle) * 4.2, 0.05, sin(angle) * 3.6),
+			"profile_seeded":true,
+		}
+		_spawn_reward_pickup(event)
+		seeded += 1
+	return seeded
 
 func _on_encounter_changed(_snapshot: Dictionary) -> void:
 	_emit_snapshot()
@@ -646,14 +688,17 @@ func _retire_transient_ownership(route: String, reason: String, generation: int)
 	var runtime_retirement := world.retire_run_ownership(reason, generation)
 	spawner.stop_encounter()
 	var retired_attack_presentations := _retire_run_group("friendly_attack")
+	var retired_pickups := _retire_run_group("reward_pickup")
 	var audio_retirement := audio_director.retire_run_ownership(route, generation)
 	return {
 		"route": route, "reason": reason, "generation": generation,
 		"runtime_retirement": runtime_retirement,
 		"retired_attack_presentations": retired_attack_presentations,
 		"remaining_attack_presentations": get_tree().get_nodes_in_group("friendly_attack").size(),
+		"retired_pickups":retired_pickups,
+		"remaining_pickups":get_tree().get_nodes_in_group("reward_pickup").size(),
 		"audio_retirement": audio_retirement,
-		"complete": bool(runtime_retirement.get("complete", false)) and get_tree().get_nodes_in_group("friendly_attack").is_empty(),
+		"complete": bool(runtime_retirement.get("complete", false)) and get_tree().get_nodes_in_group("friendly_attack").is_empty() and get_tree().get_nodes_in_group("reward_pickup").is_empty(),
 	}
 
 func _retire_run_group(group_name: StringName) -> int:
@@ -701,6 +746,7 @@ func _prepare_final_profile() -> void:
 	wave_director.prepare_test_wave(3)
 	var attack_count_before := world.attack_runtime.authorized_count
 	var preparation := spawner.prepare_validation_density(32)
+	var seeded_pickups := _seed_profile_pickups(6)
 	if not is_instance_valid(boss):
 		_spawn_bellkeeper()
 	if is_instance_valid(boss):
@@ -722,6 +768,8 @@ func _prepare_final_profile() -> void:
 		"weapon_ranks":_profile_weapon_ranks(),
 		"build_receipt":build_receipt.duplicate(true),
 		"counts":_profile_counts(),
+		"production_pickups_seeded":seeded_pickups,
+		"production_pickup_scene":"res://scenes/gameplay/reward_pickup.tscn",
 		"telegraph_admission":(encounter.get("telegraph_admission",{}) as Dictionary).duplicate(true),
 		"neighbor_registry":(encounter.get("neighbor_registry",{}) as Dictionary).duplicate(true),
 		"ordinary_light_budget":(encounter.get("ordinary_light_budget",{}) as Dictionary).duplicate(true),
@@ -737,6 +785,7 @@ func _prepare_final_profile() -> void:
 		"reset_isolation_pending":true,
 	}
 	validation_density_receipt = validation_profile_receipt.duplicate(true)
+	_record_profile_cycle("prepare", validation_profile_receipt)
 	_emit_snapshot()
 
 func _advance_final_profile() -> void:
@@ -774,6 +823,7 @@ func _advance_profile_sample(delta: float) -> void:
 		"viewport":_profile_viewport_receipt(),
 		"work_caps":_dense_work_caps(spawner.get_snapshot()),
 	}
+	_record_profile_cycle("advance", validation_profile_sample)
 	get_tree().paused = true
 	_emit_snapshot()
 
@@ -805,6 +855,7 @@ func _reset_final_profile() -> void:
 		"next_frame_isolation_pending": true,
 	}
 	validation_density_receipt = validation_profile_receipt.duplicate(true)
+	_record_profile_cycle("reset_immediate", validation_profile_receipt)
 	_emit_snapshot()
 	call_deferred("_capture_profile_next_frame_isolation", setup_generation, run_serial)
 
@@ -817,7 +868,15 @@ func _capture_profile_next_frame_isolation(setup_generation: int, expected_run_s
 	validation_profile_receipt.next_frame_isolation = _counts_are_isolated(next_counts)
 	validation_profile_receipt.next_frame_isolation_pending = false
 	validation_density_receipt = validation_profile_receipt.duplicate(true)
+	_record_profile_cycle("reset_next_frame", validation_profile_receipt)
 	_emit_snapshot()
+
+func _record_profile_cycle(phase: String, receipt: Dictionary) -> void:
+	var entry := receipt.duplicate(true)
+	entry["receipt_phase"] = phase
+	validation_profile_cycles.append(entry)
+	while validation_profile_cycles.size() > 16:
+		validation_profile_cycles.pop_front()
 
 func _counts_are_isolated(counts: Dictionary) -> bool:
 	return (
@@ -889,6 +948,7 @@ func _dense_work_caps(encounter: Dictionary) -> Dictionary:
 		"enemy_pool":spawner.pool_size, "enemy_live":spawner.live_cap,
 		"neighbor_candidates_per_query":int(neighbor_state.get("candidate_budget", 12)),
 		"telegraph_cues":spawner.telegraph_cue_cap,
+		"reward_pickups":MAX_ACTIVE_PICKUPS,
 		"ordinary_role_lights":spawner.role_light_cap,
 		"hurt_lights":spawner.hurt_light_cap,
 		"audio_effect_voices":int(audio_state.get("voice_limit", 0)),
@@ -1055,7 +1115,9 @@ func _mcp_state() -> Dictionary:
 		"validation_density":validation_density_receipt,
 		"validation_profile":validation_profile_receipt,
 		"validation_profile_sample":validation_profile_sample,
+		"validation_profile_cycles":validation_profile_cycles,
 		"validation_retry_baselines":validation_retry_baselines,
+		"reward_pickups":{"spawned_total":pickup_spawned_total,"collected_total":pickup_collected_total,"live":get_tree().get_nodes_in_group("reward_pickup").size()},
 		"shell_focus": String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none",
 	}
 

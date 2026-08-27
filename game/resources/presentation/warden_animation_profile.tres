@@ -2,7 +2,7 @@
 
 [resource]
 resource_name = "Warden explicit semantic animation profile"
-metadata/profile_id = "warden.frost_mage.explicit.v1"
-metadata/source_scene = "res://assets/authored/frost_mage.glb"
-metadata/semantic_clips = {"cast":"","dash":"","death":"","hurt":"","idle":"","move":"","victory":""}
-metadata/validation_note = "The bound Frost Mage exposes no semantically identifiable clips. Empty exact mappings intentionally fail closed; no token inference or unrelated fallback is permitted."
+metadata/profile_id = "warden.goblin_wizard.semantic_wrapper.v2"
+metadata/source_scene = "res://assets/authored/warden_goblin_wizard_candidate.glb"
+metadata/semantic_clips = {"cast":"warden_cast","dash":"warden_dash","death":"warden_death","hurt":"warden_hurt","idle":"warden_idle","move":"warden_move","victory":"warden_victory"}
+metadata/validation_note = "Seven explicit candidate-authored wrapper motions preserve the intact upright Warden Wizard source while animating only product-owned presentation pivots."
