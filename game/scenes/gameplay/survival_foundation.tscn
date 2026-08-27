@@ -1,89 +1,34 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/gameplay/survival_foundation.gd" id="1_foundation"]
 [ext_resource type="PackedScene" path="res://scenes/player/warden.tscn" id="2_warden"]
 [ext_resource type="Script" path="res://scripts/camera/arena_camera.gd" id="3_camera"]
-[ext_resource type="Script" path="res://scripts/ui/pause_overlay.gd" id="4_pause"]
-[ext_resource type="Script" path="res://scripts/ui/lantern_hud_icon.gd" id="5_icon"]
-[ext_resource type="PackedScene" path="res://scenes/world/cemetery_garden.tscn" id="6_cemetery"]
-[ext_resource type="PackedScene" path="res://scenes/combat/combat_target.tscn" id="7_target"]
+[ext_resource type="PackedScene" path="res://scenes/world/cemetery_garden.tscn" id="4_cemetery"]
+[ext_resource type="Script" path="res://scripts/enemies/encounter_spawner.gd" id="5_spawner"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/enemy_actor.tscn" id="6_enemy"]
+[ext_resource type="Resource" path="res://resources/enemies/mossling.tres" id="7_moss"]
+[ext_resource type="Resource" path="res://resources/enemies/wispbat.tres" id="8_bat"]
+[ext_resource type="Resource" path="res://resources/enemies/bone_slinger.tres" id="9_slinger"]
+[ext_resource type="Resource" path="res://resources/enemies/grave_brute.tres" id="10_brute"]
 
 [sub_resource type="Environment" id="Environment_moonlit"]
 background_mode = 1
-background_color = Color(0.012, 0.018, 0.06, 1)
-background_energy_multiplier = 0.72
+background_color = Color(0.003, 0.005, 0.018, 1)
+background_energy_multiplier = 0.22
 ambient_light_source = 3
-ambient_light_color = Color(0.18, 0.23, 0.42, 1)
-ambient_light_energy = 0.74
+ambient_light_color = Color(0.28, 0.34, 0.62, 1)
+ambient_light_energy = 1.12
 reflected_light_source = 2
 tonemap_mode = 2
 glow_enabled = true
-glow_intensity = 0.85
-bloom = 0.13
+glow_intensity = 0.58
+bloom = 0.08
 fog_enabled = true
-fog_light_color = Color(0.12, 0.16, 0.3, 1)
-fog_light_energy = 0.32
-fog_density = 0.008
-fog_height = 1.0
-fog_height_density = 0.12
-
-[sub_resource type="SystemFont" id="Font_authored"]
-font_names = PackedStringArray("DejaVu Sans", "Noto Sans")
-font_weight = 600
-
-[sub_resource type="StyleBoxFlat" id="StyleHUD"]
-bg_color = Color(0.018, 0.021, 0.045, 0.86)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.52, 0.38, 0.18, 0.82)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-shadow_color = Color(0, 0, 0, 0.5)
-shadow_size = 8
-
-[sub_resource type="StyleBoxFlat" id="StyleMeterBG"]
-bg_color = Color(0.05, 0.06, 0.1, 0.92)
-corner_radius_top_left = 3
-corner_radius_top_right = 3
-corner_radius_bottom_right = 3
-corner_radius_bottom_left = 3
-
-[sub_resource type="StyleBoxFlat" id="StyleMeterFill"]
-bg_color = Color(0.96, 0.58, 0.17, 1)
-corner_radius_top_left = 3
-corner_radius_top_right = 3
-corner_radius_bottom_right = 3
-corner_radius_bottom_left = 3
-
-[sub_resource type="StyleBoxFlat" id="StyleHint"]
-bg_color = Color(0.01, 0.012, 0.026, 0.66)
-border_width_top = 1
-border_color = Color(0.56, 0.53, 0.7, 0.32)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-
-[sub_resource type="StyleBoxFlat" id="StylePauseCard"]
-bg_color = Color(0.035, 0.037, 0.065, 0.97)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.72, 0.54, 0.25, 0.85)
-corner_radius_top_left = 4
-corner_radius_top_right = 4
-corner_radius_bottom_right = 4
-corner_radius_bottom_left = 4
-shadow_color = Color(0, 0, 0, 0.68)
-shadow_size = 18
-
-[sub_resource type="StyleBoxFlat" id="StyleLine"]
-bg_color = Color(0.72, 0.53, 0.22, 0.9)
+fog_light_color = Color(0.15, 0.19, 0.38, 1)
+fog_light_energy = 0.38
+fog_density = 0.0035
+fog_height = 0.0
+fog_height_density = 0.045
 
 [node name="SurvivalFoundation" type="Node3D" groups=["mcp_watch"]]
 script = ExtResource("1_foundation")
@@ -93,252 +38,32 @@ environment = SubResource("Environment_moonlit")
 
 [node name="MoonKey" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-54, -32, 0)
-light_color = Color(0.55, 0.68, 1, 1)
-light_energy = 1.25
+light_color = Color(0.62, 0.72, 1, 1)
+light_energy = 1.52
 shadow_enabled = true
-directional_shadow_max_distance = 48.0
+directional_shadow_max_distance = 42.0
 
-[node name="WarmFill" type="DirectionalLight3D" parent="."]
-rotation_degrees = Vector3(-35, 150, 0)
-light_color = Color(0.62, 0.31, 0.18, 1)
-light_energy = 0.24
+[node name="ShadowLift" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-38, 148, 0)
+light_color = Color(0.28, 0.32, 0.58, 1)
+light_energy = 0.58
 light_specular = 0.0
 shadow_enabled = false
 
-[node name="CemeteryGarden" parent="." instance=ExtResource("6_cemetery")]
+[node name="CemeteryGarden" parent="." instance=ExtResource("4_cemetery")]
 
 [node name="Warden" parent="." instance=ExtResource("2_warden")]
-position = Vector3(0, 0.05, 6.0)
+position = Vector3(0, 0.05, 6)
 
-[node name="PossessedLanternA" parent="." instance=ExtResource("7_target")]
-position = Vector3(3.0, 0, 3.0)
-stable_id = &"target.possessed_lantern.a"
-
-[node name="PossessedLanternB" parent="." instance=ExtResource("7_target")]
-position = Vector3(5.5, 0, -3.0)
-stable_id = &"target.possessed_lantern.b"
+[node name="EncounterSpawner" type="Node3D" parent="." groups=["mcp_watch"] node_paths=PackedStringArray("player")]
+script = ExtResource("5_spawner")
+enemy_scene = ExtResource("6_enemy")
+profiles = Array[EnemyProfile]([ExtResource("7_moss"), ExtResource("8_bat"), ExtResource("9_slinger"), ExtResource("10_brute")])
+player = NodePath("../Warden")
 
 [node name="ArenaCamera" type="Camera3D" parent="." groups=["mcp_watch"] node_paths=PackedStringArray("target")]
 process_mode = 1
 script = ExtResource("3_camera")
 target = NodePath("../Warden")
-follow_height = 23.0
-follow_distance = 8.5
-lead_distance = 2.5
-fov = 48.0
 near = 0.15
 far = 90.0
-
-[node name="Interface" type="CanvasLayer" parent="."]
-
-[node name="HUD" type="Control" parent="Interface"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-
-[node name="Identity" type="VBoxContainer" parent="Interface/HUD"]
-layout_mode = 0
-offset_left = 34.0
-offset_top = 29.0
-offset_right = 360.0
-offset_bottom = 95.0
-theme_override_constants/separation = 0
-mouse_filter = 2
-
-[node name="Title" type="Label" parent="Interface/HUD/Identity"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.95, 0.84, 0.59, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)
-theme_override_constants/shadow_offset_x = 2
-theme_override_constants/shadow_offset_y = 2
-theme_override_fonts/font = SubResource("Font_authored")
-theme_override_font_sizes/font_size = 28
-text = "MOURNLIGHT"
-
-[node name="Subtitle" type="Label" parent="Interface/HUD/Identity"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.58, 0.66, 0.79, 1)
-theme_override_fonts/font = SubResource("Font_authored")
-theme_override_font_sizes/font_size = 12
-text = "CEMETERY GARDEN  ·  MOVEMENT RITE"
-
-[node name="CombatCluster" type="Panel" parent="Interface/HUD"]
-layout_mode = 0
-offset_left = 1008.0
-offset_top = 28.0
-offset_right = 1246.0
-offset_bottom = 146.0
-theme_override_styles/panel = SubResource("StyleHUD")
-mouse_filter = 2
-
-[node name="CombatLabel" type="Label" parent="Interface/HUD/CombatCluster"]
-layout_mode = 0
-offset_left = 18.0
-offset_top = 14.0
-offset_right = 220.0
-offset_bottom = 38.0
-theme_override_colors/font_color = Color(1, 0.82, 0.45, 1)
-theme_override_fonts/font = SubResource("Font_authored")
-theme_override_font_sizes/font_size = 14
-text = "AUTOMATIC LANTERN"
-
-[node name="Divider" type="Panel" parent="Interface/HUD/CombatCluster"]
-layout_mode = 0
-offset_left = 18.0
-offset_top = 46.0
-offset_right = 220.0
-offset_bottom = 48.0
-theme_override_styles/panel = SubResource("StyleLine")
-mouse_filter = 2
-
-[node name="WeaponsLabel" type="Label" parent="Interface/HUD/CombatCluster"]
-layout_mode = 0
-offset_left = 18.0
-offset_top = 58.0
-offset_right = 220.0
-offset_bottom = 105.0
-theme_override_colors/font_color = Color(0.63, 0.72, 0.88, 1)
-theme_override_fonts/font = SubResource("Font_authored")
-theme_override_font_sizes/font_size = 11
-text = "WARDEN LANTERN  ·  RANK 1"
-
-[node name="DashCluster" type="Panel" parent="Interface/HUD"]
-layout_mode = 0
-offset_left = 1008.0
-offset_top = 586.0
-offset_right = 1246.0
-offset_bottom = 686.0
-theme_override_styles/panel = SubResource("StyleHUD")
-mouse_filter = 2
-
-[node name="DashIcon" type="Control" parent="Interface/HUD/DashCluster"]
-custom_minimum_size = Vector2(68, 68)
-layout_mode = 2
-script = ExtResource("5_icon")
-
-[node name="DashLabel" type="Label" parent="Interface/HUD/DashCluster"]
-layout_mode = 2
-offset_left = 72.0
-offset_top = 15.0
-offset_right = 220.0
-offset_bottom = 42.0
-mouse_filter = 2
-theme_override_colors/font_color = Color(1, 0.88, 0.63, 1)
-theme_override_fonts/font = SubResource("Font_authored")
-theme_override_font_sizes/font_size = 15
-text = "DASH READY"
-
-[node name="DashMeter" type="ProgressBar" parent="Interface/HUD/DashCluster"]
-layout_mode = 2
-offset_left = 72.0
-offset_top = 48.0
-offset_right = 220.0
-offset_bottom = 59.0
-mouse_filter = 2
-theme_override_styles/background = SubResource("StyleMeterBG")
-theme_override_styles/fill = SubResource("StyleMeterFill")
-value = 100.0
-show_percentage = false
-
-[node name="DashHint" type="Label" parent="Interface/HUD/DashCluster"]
-layout_mode = 2
-offset_left = 72.0
-offset_top = 63.0
-offset_right = 220.0
-offset_bottom = 82.0
-mouse_filter = 2
-theme_override_colors/font_color = Color(0.55, 0.58, 0.68, 1)
-theme_override_fonts/font = SubResource("Font_authored")
-theme_override_font_sizes/font_size = 10
-text = "SPACE  /  SOUTH BUTTON"
-
-[node name="ControlHint" type="PanelContainer" parent="Interface/HUD"]
-layout_mode = 0
-offset_left = 438.0
-offset_top = 663.0
-offset_right = 842.0
-offset_bottom = 704.0
-theme_override_styles/panel = SubResource("StyleHint")
-mouse_filter = 2
-
-[node name="Label" type="Label" parent="Interface/HUD/ControlHint"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.72, 0.74, 0.82, 1)
-theme_override_fonts/font = SubResource("Font_authored")
-theme_override_font_sizes/font_size = 12
-text = "WASD / LEFT STICK  ·  MOVE       ESC / START  ·  PAUSE"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="PauseOverlay" type="Control" parent="Interface"]
-process_mode = 3
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-script = ExtResource("4_pause")
-
-[node name="Shade" type="ColorRect" parent="Interface/PauseOverlay"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.005, 0.008, 0.025, 0.74)
-mouse_filter = 1
-
-[node name="Card" type="Panel" parent="Interface/PauseOverlay/Shade"]
-layout_mode = 0
-offset_left = 390.0
-offset_top = 218.0
-offset_right = 890.0
-offset_bottom = 502.0
-theme_override_styles/panel = SubResource("StylePauseCard")
-
-[node name="Title" type="Label" parent="Interface/PauseOverlay/Shade/Card"]
-layout_mode = 2
-offset_top = 44.0
-offset_right = 500.0
-offset_bottom = 95.0
-theme_override_colors/font_color = Color(1, 0.84, 0.49, 1)
-theme_override_fonts/font = SubResource("Font_authored")
-theme_override_font_sizes/font_size = 34
-text = "NIGHT HELD"
-horizontal_alignment = 1
-
-[node name="Divider" type="Panel" parent="Interface/PauseOverlay/Shade/Card"]
-layout_mode = 2
-offset_left = 92.0
-offset_top = 112.0
-offset_right = 408.0
-offset_bottom = 114.0
-theme_override_styles/panel = SubResource("StyleLine")
-
-[node name="StateValue" type="Label" parent="Interface/PauseOverlay/Shade/Card"]
-layout_mode = 2
-offset_top = 137.0
-offset_right = 500.0
-offset_bottom = 163.0
-theme_override_colors/font_color = Color(0.65, 0.7, 0.82, 1)
-theme_override_fonts/font = SubResource("Font_authored")
-theme_override_font_sizes/font_size = 13
-text = "WARDEN HELD  ·  DASH READY"
-horizontal_alignment = 1
-
-[node name="ResumeHint" type="Label" parent="Interface/PauseOverlay/Shade/Card"]
-layout_mode = 2
-offset_top = 196.0
-offset_right = 500.0
-offset_bottom = 239.0
-theme_override_colors/font_color = Color(0.92, 0.78, 0.53, 1)
-theme_override_fonts/font = SubResource("Font_authored")
-theme_override_font_sizes/font_size = 16
-text = "ESC  /  START\nRESUME THE RITE"
-horizontal_alignment = 1

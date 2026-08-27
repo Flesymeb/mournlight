@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="EnemyProfile" load_steps=2 format=3]
+[ext_resource type="Script" path="res://scripts/enemies/enemy_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+role_id = &"bone_slinger"
+display_name = "Bone Slinger"
+maximum_health = 64.0
+movement_speed = 1.75
+attack_range = 7.5
+attack_damage = 10.0
+telegraph_duration = 0.88
+recovery_duration = 1.35
+presentation_scale = 0.92
+separation_radius = 1.45
+accent_color = Color(0.25, 0.92, 0.88, 1)
+attack_kind = "ranged"

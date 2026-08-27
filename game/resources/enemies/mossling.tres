@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="EnemyProfile" load_steps=2 format=3]
+[ext_resource type="Script" path="res://scripts/enemies/enemy_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+role_id = &"mossling"
+display_name = "Mossling"
+maximum_health = 104.0
+movement_speed = 2.1
+attack_range = 1.3
+attack_damage = 8.0
+telegraph_duration = 0.6
+recovery_duration = 0.9
+presentation_scale = 1.08
+separation_radius = 1.35
+accent_color = Color(0.46, 0.82, 0.34, 1)
+attack_kind = "melee"

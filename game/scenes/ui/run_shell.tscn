@@ -1,0 +1,62 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/gameplay/run_controller.gd" id="1_controller"]
+[ext_resource type="PackedScene" path="res://scenes/gameplay/survival_foundation.tscn" id="2_world"]
+[ext_resource type="PackedScene" path="res://scenes/ui/gameplay_hud.tscn" id="3_hud"]
+[ext_resource type="Script" path="res://scripts/ui/run_shell.gd" id="4_shell"]
+[ext_resource type="Theme" path="res://resources/ui/mournlight_theme.tres" id="5_theme"]
+
+[node name="Mournlight" type="Node" groups=["mcp_watch"]]
+process_mode = 3
+script = ExtResource("1_controller")
+
+[node name="World" parent="." instance=ExtResource("2_world")]
+
+[node name="Interface" type="CanvasLayer" parent="."]
+
+[node name="GameplayHUD" parent="Interface" instance=ExtResource("3_hud")]
+
+[node name="RunShellView" type="Control" parent="Interface" groups=["mcp_watch"]]
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("5_theme")
+script = ExtResource("4_shell")
+
+[node name="PrimaryButton" type="Button" parent="Interface/RunShellView"]
+process_mode = 3
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -140.0
+offset_top = 108.0
+offset_right = 140.0
+offset_bottom = 158.0
+grow_horizontal = 2
+grow_vertical = 2
+focus_neighbor_bottom = NodePath("../SecondaryButton")
+text = "PLAY"
+
+[node name="SecondaryButton" type="Button" parent="Interface/RunShellView"]
+process_mode = 3
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -140.0
+offset_top = 170.0
+offset_right = 140.0
+offset_bottom = 216.0
+grow_horizontal = 2
+grow_vertical = 2
+focus_neighbor_top = NodePath("../PrimaryButton")
+text = "TITLE"

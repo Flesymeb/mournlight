@@ -42,6 +42,7 @@ var _dash_was_pressed := false
 var _visual_time := 0.0
 var _base_model_position := Vector3.ZERO
 var _base_lantern_position := Vector3.ZERO
+var _base_presentation_scale := Vector3.ONE
 var _authored_animation: AnimationPlayer
 
 func _ready() -> void:
@@ -50,6 +51,7 @@ func _ready() -> void:
 	movement_plane_y = global_position.y
 	_base_model_position = model_pivot.position
 	_base_lantern_position = lantern.position
+	_base_presentation_scale = presentation_root.scale
 	_authored_animation = _find_animation_player(model_pivot)
 	_play_authored_idle()
 	_set_dash_phase(DashPhase.READY, 0.0)
@@ -154,15 +156,28 @@ func _update_facing_and_animation(delta: float) -> void:
 	model_pivot.position = _base_model_position + Vector3(0.0, abs(cycle) * 0.026, 0.0)
 	lantern.position = _base_lantern_position + Vector3(0.0, sin(_visual_time * 3.2) * 0.025, 0.0)
 	if _dash_phase_id == DashPhase.ANTICIPATION:
-		presentation_root.scale = presentation_root.scale.lerp(Vector3(1.16, 0.78, 1.16), 1.0 - exp(-18.0 * delta))
+		presentation_root.scale = presentation_root.scale.lerp(_base_presentation_scale * Vector3(1.16, 0.78, 1.16), 1.0 - exp(-18.0 * delta))
 		dash_aura.scale = Vector3.ONE * (0.82 + sin(_visual_time * 22.0) * 0.08)
 	elif _dash_phase_id == DashPhase.ACTIVE:
-		presentation_root.scale = presentation_root.scale.lerp(Vector3(0.82, 1.0, 1.32), 1.0 - exp(-24.0 * delta))
+		presentation_root.scale = presentation_root.scale.lerp(_base_presentation_scale * Vector3(0.82, 1.0, 1.32), 1.0 - exp(-24.0 * delta))
 		active_ring.scale = Vector3.ONE * (1.0 + sin(_visual_time * 30.0) * 0.12)
 	elif _dash_phase_id == DashPhase.RECOVERY:
-		presentation_root.scale = presentation_root.scale.lerp(Vector3(1.08, 0.9, 1.08), 1.0 - exp(-12.0 * delta))
+		presentation_root.scale = presentation_root.scale.lerp(_base_presentation_scale * Vector3(1.08, 0.9, 1.08), 1.0 - exp(-12.0 * delta))
 	else:
-		presentation_root.scale = presentation_root.scale.lerp(Vector3.ONE, 1.0 - exp(-14.0 * delta))
+		presentation_root.scale = presentation_root.scale.lerp(_base_presentation_scale, 1.0 - exp(-14.0 * delta))
+
+func reset_for_run(spawn_position: Vector3) -> void:
+	global_position = spawn_position
+	velocity = Vector3.ZERO
+	planar_velocity = Vector3.ZERO
+	movement_input = Vector2.ZERO
+	_dash_direction = Vector3.FORWARD
+	_last_move_direction = Vector3.FORWARD
+	dash_cooldown_remaining = 0.0
+	presentation_root.scale = _base_presentation_scale
+	_set_dash_phase(DashPhase.READY, 0.0)
+	_play_authored_idle()
+	reset_input_latch()
 
 func _find_animation_player(root: Node) -> AnimationPlayer:
 	if root is AnimationPlayer:

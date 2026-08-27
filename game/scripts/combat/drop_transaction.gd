@@ -25,6 +25,10 @@ func commit_from_death(death_event: Dictionary) -> Dictionary:
 	drop_committed.emit(event)
 	return event
 
+func reset_transaction() -> void:
+	_death_ids.clear()
+	drop_count = 0
+	last_drop_id = ""
+
 func _mcp_state() -> Dictionary:
 	return {"drop_count": drop_count, "last_drop_id": last_drop_id, "committed_death_count": _death_ids.size()}
-

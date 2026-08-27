@@ -1,4 +1,4 @@
-[gd_scene load_steps=22 format=3]
+[gd_scene load_steps=25 format=3]
 
 [ext_resource type="Script" path="res://scripts/player/warden_controller.gd" id="1_controller"]
 [ext_resource type="PackedScene" path="res://assets/authored/frost_mage.glb" id="2_model"]
@@ -14,6 +14,7 @@
 [ext_resource type="PackedScene" path="res://scenes/combat/lantern_bolt.tscn" id="12_bolt"]
 [ext_resource type="PackedScene" path="res://scenes/weapons/gravespade_sweep.tscn" id="13_sweep"]
 [ext_resource type="PackedScene" path="res://scenes/weapons/wandering_wisps.tscn" id="14_wisp"]
+[ext_resource type="Script" path="res://scripts/player/warden_health.gd" id="15_health"]
 
 [sub_resource type="CapsuleShape3D" id="PlayerShape"]
 radius = 0.42
@@ -35,6 +36,14 @@ emission_enabled = true
 emission = Color(0.07, 0.72, 0.88, 1)
 emission_energy_multiplier = 4.0
 
+[sub_resource type="StandardMaterial3D" id="MatWardenHalo"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(1, 0.62, 0.18, 0.32)
+emission_enabled = true
+emission = Color(1, 0.35, 0.06, 1)
+emission_energy_multiplier = 2.2
+
 [sub_resource type="CylinderMesh" id="AuraMesh"]
 material = SubResource("MatAura")
 top_radius = 1.0
@@ -48,6 +57,13 @@ inner_radius = 0.72
 outer_radius = 0.82
 rings = 24
 ring_segments = 6
+
+[sub_resource type="TorusMesh" id="WardenHaloMesh"]
+material = SubResource("MatWardenHalo")
+inner_radius = 0.52
+outer_radius = 0.6
+rings = 28
+ring_segments = 5
 
 [node name="Warden" type="CharacterBody3D" groups=["mcp_watch", "player"]]
 process_mode = 1
@@ -71,7 +87,13 @@ mesh = SubResource("RingMesh")
 cast_shadow = 0
 visible = false
 
+[node name="WardenHalo" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.055, 0)
+mesh = SubResource("WardenHaloMesh")
+cast_shadow = 0
+
 [node name="PresentationRoot" type="Node3D" parent="."]
+scale = Vector3(1.32, 1.32, 1.32)
 
 [node name="ModelPivot" type="Node3D" parent="PresentationRoot"]
 
@@ -93,6 +115,12 @@ light_color = Color(1, 0.52, 0.16, 1)
 light_energy = 2.4
 omni_range = 5.2
 shadow_enabled = true
+
+[node name="HealthComponent" type="Node" parent="." groups=["mcp_watch"]]
+script = ExtResource("15_health")
+actor_id = &"warden"
+maximum_health = 100.0
+current_health = 100.0
 
 [node name="Weapons" type="Node3D" parent="."]
 

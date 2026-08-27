@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="EnemyProfile" load_steps=2 format=3]
+[ext_resource type="Script" path="res://scripts/enemies/enemy_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+role_id = &"wispbat"
+display_name = "Wispbat"
+maximum_health = 38.0
+movement_speed = 4.25
+attack_range = 1.15
+attack_damage = 6.0
+telegraph_duration = 0.42
+recovery_duration = 0.72
+presentation_scale = 0.72
+separation_radius = 1.1
+accent_color = Color(0.85, 0.25, 0.92, 1)
+attack_kind = "flank"

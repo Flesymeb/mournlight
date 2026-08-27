@@ -1,0 +1,79 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy_actor.gd" id="1_actor"]
+[ext_resource type="Script" path="res://scripts/combat/health_component.gd" id="2_health"]
+[ext_resource type="Script" path="res://scripts/combat/drop_transaction.gd" id="3_drop"]
+[ext_resource type="PackedScene" path="res://assets/authored/hostile_lantern.glb" id="4_model"]
+
+[sub_resource type="CapsuleShape3D" id="Shape"]
+radius = 0.55
+height = 1.45
+
+[sub_resource type="StandardMaterial3D" id="CueMat"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.78, 0.18, 0.66, 0.5)
+emission_enabled = true
+emission = Color(0.78, 0.1, 0.56, 1)
+emission_energy_multiplier = 2.8
+
+[sub_resource type="TorusMesh" id="TelegraphMesh"]
+material = SubResource("CueMat")
+inner_radius = 0.78
+outer_radius = 0.9
+rings = 24
+ring_segments = 5
+
+[sub_resource type="BoxMesh" id="LaneMesh"]
+material = SubResource("CueMat")
+size = Vector3(0.18, 0.04, 5.0)
+
+[node name="EnemyActor" type="CharacterBody3D"]
+script = ExtResource("1_actor")
+collision_layer = 2
+collision_mask = 1
+
+[node name="Collider" type="CollisionShape3D" parent="."]
+position = Vector3(0, 0.72, 0)
+shape = SubResource("Shape")
+
+[node name="PresentationRoot" type="Node3D" parent="."]
+
+[node name="ModelPivot" type="Node3D" parent="PresentationRoot"]
+scale = Vector3(0.0085, 0.0085, 0.0085)
+
+[node name="AssetTransform" type="Node3D" parent="PresentationRoot/ModelPivot"]
+position = Vector3(-1.71, 5.08, -9.94)
+
+[node name="AuthoredHostilePackage" parent="PresentationRoot/ModelPivot/AssetTransform" instance=ExtResource("4_model")]
+
+[node name="TelegraphRing" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.07, 0)
+mesh = SubResource("TelegraphMesh")
+cast_shadow = 0
+visible = false
+
+[node name="LaneCue" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.08, -2.5)
+mesh = SubResource("LaneMesh")
+cast_shadow = 0
+visible = false
+
+[node name="HurtLight" type="OmniLight3D" parent="."]
+position = Vector3(0, 0.9, 0)
+light_color = Color(1, 0.18, 0.6, 1)
+light_energy = 0.0
+omni_range = 3.2
+
+[node name="RoleGlow" type="OmniLight3D" parent="."]
+position = Vector3(0, 0.72, 0)
+light_color = Color(0.4, 0.95, 0.7, 1)
+light_energy = 0.7
+light_specular = 0.0
+omni_range = 1.85
+
+[node name="HealthComponent" type="Node" parent="."]
+script = ExtResource("2_health")
+
+[node name="DropTransaction" type="Node" parent="."]
+script = ExtResource("3_drop")
