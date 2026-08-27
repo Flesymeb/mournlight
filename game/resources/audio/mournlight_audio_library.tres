@@ -1,0 +1,16 @@
+[gd_resource type="Resource" load_steps=6 format=3]
+
+[ext_resource type="AudioStream" path="res://assets/audio_library/Music/Marksmans_Mayhem.ogg" id="1"]
+[ext_resource type="AudioStream" path="res://assets/audio_library/SFX/345448__artmasterrich__laserfire_02.wav" id="2"]
+[ext_resource type="AudioStream" path="res://assets/audio_library/SFX/258198__wadaltmon__thompson-smg-shot.wav" id="3"]
+[ext_resource type="AudioStream" path="res://assets/audio_library/SFX/163441__under7dude__man-getting-hit.wav" id="4"]
+[ext_resource type="AudioStream" path="res://assets/audio_library/SFX/621155__ktfreesound__reload-escopeta-m7.wav" id="5"]
+
+[resource]
+resource_name = "Mournlight Semantic Audio Library"
+metadata/_music = ExtResource("1")
+metadata/_cast = ExtResource("2")
+metadata/_impact = ExtResource("3")
+metadata/_hurt = ExtResource("4")
+metadata/_warning = ExtResource("5")
+

@@ -1,0 +1,8 @@
+[gd_resource type="Resource" format=3]
+
+[resource]
+resource_name = "Mournlight Five-Wave Sequence"
+metadata/wave_titles = PackedStringArray("The First Toll", "Crossing Shadows", "Gravewind", "The Long Procession", "The Bellkeeper")
+metadata/durations = PackedFloat32Array(75, 90, 105, 120, 150)
+metadata/live_caps = PackedInt32Array(6, 8, 10, 12, 5)
+

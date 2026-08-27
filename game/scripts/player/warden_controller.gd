@@ -39,11 +39,11 @@ var _phase_remaining := 0.0
 var _dash_direction := Vector3.FORWARD
 var _last_move_direction := Vector3.FORWARD
 var _dash_was_pressed := false
-var _visual_time := 0.0
 var _base_model_position := Vector3.ZERO
 var _base_lantern_position := Vector3.ZERO
 var _base_presentation_scale := Vector3.ONE
 var _authored_animation: AnimationPlayer
+var animation_binding: WardenAnimationBinding
 
 func _ready() -> void:
 	motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
@@ -53,7 +53,17 @@ func _ready() -> void:
 	_base_lantern_position = lantern.position
 	_base_presentation_scale = presentation_root.scale
 	_authored_animation = _find_animation_player(model_pivot)
-	_play_authored_idle()
+	animation_binding = WardenAnimationBinding.new()
+	animation_binding.name = "SemanticAnimationBinding"
+	add_child(animation_binding)
+	animation_binding.bind(model_pivot)
+	var attack_runtime := get_node_or_null("Weapons/AttackRuntime")
+	if attack_runtime:
+		attack_runtime.attack_authorized.connect(func(_event: Dictionary) -> void: animation_binding.trigger("cast", 0.34))
+	var health_component := get_node_or_null("HealthComponent")
+	if health_component:
+		health_component.hurt.connect(func(_event: Dictionary) -> void: animation_binding.trigger("hurt", 0.30))
+		health_component.died.connect(func(_event: Dictionary) -> void: animation_binding.trigger("death", 999.0))
 	_set_dash_phase(DashPhase.READY, 0.0)
 	reset_input_latch()
 
@@ -144,27 +154,16 @@ func _set_dash_phase(next_phase: DashPhase, duration: float) -> void:
 		dash_readiness_changed.emit(true, 0.0)
 
 func _update_facing_and_animation(delta: float) -> void:
-	_visual_time += delta
 	var planar_speed := planar_velocity.length()
 	var facing_direction := _dash_direction if _dash_phase_id == DashPhase.ACTIVE else _last_move_direction
 	if facing_direction.length_squared() > 0.001:
 		var target_angle := atan2(facing_direction.x, facing_direction.z)
 		presentation_root.rotation.y = lerp_angle(presentation_root.rotation.y, target_angle, 1.0 - exp(-turn_speed * delta))
-	var stride := clampf(planar_speed / movement_speed, 0.0, 1.0)
-	var cycle := sin(_visual_time * 10.0) * stride
-	model_pivot.rotation.x = -stride * 0.055
-	model_pivot.position = _base_model_position + Vector3(0.0, abs(cycle) * 0.026, 0.0)
-	lantern.position = _base_lantern_position + Vector3(0.0, sin(_visual_time * 3.2) * 0.025, 0.0)
-	if _dash_phase_id == DashPhase.ANTICIPATION:
-		presentation_root.scale = presentation_root.scale.lerp(_base_presentation_scale * Vector3(1.16, 0.78, 1.16), 1.0 - exp(-18.0 * delta))
-		dash_aura.scale = Vector3.ONE * (0.82 + sin(_visual_time * 22.0) * 0.08)
-	elif _dash_phase_id == DashPhase.ACTIVE:
-		presentation_root.scale = presentation_root.scale.lerp(_base_presentation_scale * Vector3(0.82, 1.0, 1.32), 1.0 - exp(-24.0 * delta))
-		active_ring.scale = Vector3.ONE * (1.0 + sin(_visual_time * 30.0) * 0.12)
-	elif _dash_phase_id == DashPhase.RECOVERY:
-		presentation_root.scale = presentation_root.scale.lerp(_base_presentation_scale * Vector3(1.08, 0.9, 1.08), 1.0 - exp(-12.0 * delta))
-	else:
-		presentation_root.scale = presentation_root.scale.lerp(_base_presentation_scale, 1.0 - exp(-14.0 * delta))
+	model_pivot.rotation.x = 0.0
+	model_pivot.position = _base_model_position
+	lantern.position = _base_lantern_position
+	presentation_root.scale = _base_presentation_scale
+	animation_binding.drive(planar_speed, dash_phase, delta)
 
 func reset_for_run(spawn_position: Vector3) -> void:
 	global_position = spawn_position
@@ -176,7 +175,7 @@ func reset_for_run(spawn_position: Vector3) -> void:
 	dash_cooldown_remaining = 0.0
 	presentation_root.scale = _base_presentation_scale
 	_set_dash_phase(DashPhase.READY, 0.0)
-	_play_authored_idle()
+	animation_binding.reset()
 	reset_input_latch()
 
 func _find_animation_player(root: Node) -> AnimationPlayer:
@@ -187,19 +186,6 @@ func _find_animation_player(root: Node) -> AnimationPlayer:
 		if found:
 			return found
 	return null
-
-func _play_authored_idle() -> void:
-	if not _authored_animation:
-		return
-	var animations := _authored_animation.get_animation_list()
-	for preferred in [&"standby", &"idle", &"Idle", &"Take 001"]:
-		if animations.has(preferred):
-			_authored_animation.play(preferred)
-			return
-	for animation_name in animations:
-		if String(animation_name) != "RESET":
-			_authored_animation.play(animation_name)
-			return
 
 func reset_input_latch() -> void:
 	_dash_was_pressed = Input.is_action_pressed("dash")
@@ -229,4 +215,5 @@ func _mcp_state() -> Dictionary:
 		"movement_plane_y": movement_plane_y,
 		"plane_error": plane_error,
 		"authored_animation": String(_authored_animation.current_animation) if _authored_animation else "none",
+		"semantic_animation": animation_binding.get_snapshot() if animation_binding else {},
 	}

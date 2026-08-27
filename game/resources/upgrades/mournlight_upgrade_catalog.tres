@@ -1,0 +1,6 @@
+[gd_resource type="Resource" format=3]
+
+[resource]
+resource_name = "Twelve truthful Mournlight upgrades"
+metadata/catalog_ids = PackedStringArray("lantern_focus", "lantern_cadence", "lantern_range", "spade_unlock", "spade_edge", "spade_reach", "wisps_unlock", "wisps_orbit", "wisps_radius", "health_max", "dash_cooldown", "recovery")
+

@@ -2,8 +2,17 @@ config_version=5
 
 [application]
 
-config/name="Mournlight — Survival Foundation"
+config/name="Mournlight"
 run/main_scene="res://main.tscn"
+
+[audio]
+
+default_bus_layout="res://default_bus_layout.tres"
+
+[autoload]
+
+AppConfig="*res://ui/menus/maaack/addons/maaacks_menus_template/base/nodes/autoloads/app_config/app_config.tscn"
+SceneLoader="*res://ui/menus/maaack/addons/maaacks_menus_template/base/nodes/autoloads/scene_loader/scene_loader.tscn"
 
 [display]
 

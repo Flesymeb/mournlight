@@ -39,9 +39,9 @@
       "asset_id": "e60a72a4d9de4349ae6b8f6c8976e094",
       "license": "CC BY 4.0",
       "sha256": "20861b1ca7a44ece27259cd82ea1f4bd999e1b3ddfb81ec54dbdd3610d139e6f",
-      "receipt": "res://assets/authored/hostile_lantern.glb.receipt.json",
-      "binding": "res://scenes/combat/combat_target.tscn",
-      "integration": "One intact authored hostile presentation instance used only as the minimum placed legal combat recipient."
+      "receipt": "res://assets/authored/bellkeeper.glb.receipt.json",
+      "binding": "res://scenes/enemies/bellkeeper.tscn",
+      "integration": "One intact authored possessed-lantern singleton scaled as the final-wave Bellkeeper with product-owned telegraph and shared damage authority."
     }
   ]
 }

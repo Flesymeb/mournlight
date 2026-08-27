@@ -54,6 +54,11 @@ func begin_encounter() -> void:
 		_spawn_one(index)
 	_emit_snapshot()
 
+func configure_pressure(cap: int, cadence: float) -> void:
+	live_cap = clampi(cap, 1, pool_size)
+	_spawn_cooldown = minf(_spawn_cooldown, cadence)
+	set_meta("spawn_cadence", maxf(0.35, cadence))
+
 func stop_encounter() -> void:
 	active = false
 	set_process(false)
@@ -84,7 +89,7 @@ func _process(delta: float) -> void:
 	_spawn_cooldown = maxf(0.0, _spawn_cooldown - delta)
 	if _spawn_cooldown <= 0.0 and _active_count() < live_cap:
 		_spawn_one(_spawn_cursor)
-		_spawn_cooldown = 1.45
+		_spawn_cooldown = float(get_meta("spawn_cadence", 1.45))
 
 func _spawn_one(role_offset: int) -> bool:
 	var actor := _next_pooled_actor()

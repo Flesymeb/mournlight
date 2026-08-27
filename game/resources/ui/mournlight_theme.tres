@@ -1,56 +1,56 @@
-[gd_resource type="Theme" load_steps=5 format=3]
+[gd_resource type="Theme" load_steps=9 format=3]
 
-[sub_resource type="StyleBoxFlat" id="ButtonNormal"]
-bg_color = Color(0.035, 0.045, 0.09, 0.9)
+[ext_resource type="FontFile" path="res://assets/fonts/Montserrat-Regular.ttf" id="1"]
+[ext_resource type="FontFile" path="res://assets/fonts/Montserrat-Medium.ttf" id="2"]
+[ext_resource type="FontFile" path="res://assets/fonts/Montserrat-SemiBold.ttf" id="3"]
+[ext_resource type="FontFile" path="res://assets/fonts/Montserrat-Bold.ttf" id="4"]
+
+[sub_resource type="StyleBoxFlat" id="normal"]
+bg_color = Color(0.02, 0.025, 0.055, 0.78)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.55, 0.38, 0.16, 0.65)
+content_margin_left = 18.0
+content_margin_right = 18.0
+
+[sub_resource type="StyleBoxFlat" id="hover"]
+bg_color = Color(0.08, 0.065, 0.08, 0.95)
 border_width_left = 2
 border_width_top = 1
 border_width_right = 2
 border_width_bottom = 1
-border_color = Color(0.55, 0.38, 0.16, 0.92)
-corner_radius_top_left = 2
-corner_radius_top_right = 2
-corner_radius_bottom_right = 2
-corner_radius_bottom_left = 2
+border_color = Color(1, 0.75, 0.3, 1)
+content_margin_left = 18.0
+content_margin_right = 18.0
 
-[sub_resource type="StyleBoxFlat" id="ButtonHover"]
-bg_color = Color(0.09, 0.08, 0.12, 0.96)
-border_width_left = 3
-border_width_top = 2
-border_width_right = 3
-border_width_bottom = 2
-border_color = Color(0.95, 0.65, 0.24, 1)
-corner_radius_top_left = 2
-corner_radius_top_right = 2
-corner_radius_bottom_right = 2
-corner_radius_bottom_left = 2
-
-[sub_resource type="StyleBoxFlat" id="ButtonPressed"]
-bg_color = Color(0.16, 0.11, 0.1, 1)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(1, 0.79, 0.35, 1)
-
-[sub_resource type="StyleBoxFlat" id="ButtonFocus"]
-bg_color = Color(0, 0, 0, 0)
+[sub_resource type="StyleBoxFlat" id="focus"]
+bg_color = Color(0,0,0,0)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.45, 0.95, 0.9, 1)
-expand_margin_left = 5.0
-expand_margin_top = 5.0
-expand_margin_right = 5.0
-expand_margin_bottom = 5.0
+border_color = Color(0.36, 0.96, 0.87, 1)
+expand_margin_left = 4.0
+expand_margin_top = 4.0
+expand_margin_right = 4.0
+expand_margin_bottom = 4.0
+
+[sub_resource type="StyleBoxEmpty" id="empty"]
 
 [resource]
+default_font = ExtResource("1")
 default_font_size = 15
-Button/colors/font_color = Color(0.9, 0.93, 1, 1)
-Button/colors/font_hover_color = Color(1, 0.83, 0.47, 1)
-Button/colors/font_focus_color = Color(1, 0.86, 0.53, 1)
+Label/fonts/font = ExtResource("2")
+Label/colors/font_color = Color(0.87, 0.91, 1, 1)
+Button/fonts/font = ExtResource("3")
 Button/font_sizes/font_size = 15
-Button/styles/normal = SubResource("ButtonNormal")
-Button/styles/hover = SubResource("ButtonHover")
-Button/styles/pressed = SubResource("ButtonPressed")
-Button/styles/focus = SubResource("ButtonFocus")
+Button/colors/font_color = Color(0.88,0.92,1,1)
+Button/colors/font_hover_color = Color(1,0.82,0.46,1)
+Button/colors/font_focus_color = Color(1,0.86,0.53,1)
+Button/styles/normal = SubResource("normal")
+Button/styles/hover = SubResource("hover")
+Button/styles/pressed = SubResource("hover")
+Button/styles/focus = SubResource("focus")
+Button/styles/disabled = SubResource("empty")

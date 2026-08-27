@@ -5,6 +5,12 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/gameplay_hud.tscn" id="3_hud"]
 [ext_resource type="Script" path="res://scripts/ui/run_shell.gd" id="4_shell"]
 [ext_resource type="Theme" path="res://resources/ui/mournlight_theme.tres" id="5_theme"]
+[ext_resource type="Script" path="res://scripts/gameplay/wave_director.gd" id="6_wave"]
+[ext_resource type="Script" path="res://scripts/gameplay/upgrade_draft_controller.gd" id="7_draft_controller"]
+[ext_resource type="PackedScene" path="res://scenes/ui/upgrade_draft.tscn" id="8_draft_view"]
+[ext_resource type="PackedScene" path="res://scenes/audio/mournlight_audio.tscn" id="9_audio"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/bellkeeper.tscn" id="10_boss"]
+[ext_resource type="PackedScene" path="res://ui/menus/maaack/scenes/menus/main_menu/main_menu.tscn" id="11_maaack_main"]
 
 [node name="Mournlight" type="Node" groups=["mcp_watch"]]
 process_mode = 3
@@ -12,9 +18,26 @@ script = ExtResource("1_controller")
 
 [node name="World" parent="." instance=ExtResource("2_world")]
 
+[node name="BossAnchor" type="Node3D" parent="World"]
+position = Vector3(-5.0,0.05,2.0)
+
+[node name="WaveDirector" type="Node" parent="." groups=["mcp_watch"]]
+script = ExtResource("6_wave")
+
+[node name="UpgradeDraftController" type="Node" parent="." groups=["mcp_watch"]]
+process_mode = 3
+script = ExtResource("7_draft_controller")
+
+[node name="MournlightAudio" parent="." instance=ExtResource("9_audio")]
+
 [node name="Interface" type="CanvasLayer" parent="."]
 
 [node name="GameplayHUD" parent="Interface" instance=ExtResource("3_hud")]
+
+[node name="UpgradeDraft" parent="Interface" instance=ExtResource("8_draft_view")]
+
+[node name="MainMenu" parent="Interface" instance=ExtResource("11_maaack_main")]
+process_mode = 3
 
 [node name="RunShellView" type="Control" parent="Interface" groups=["mcp_watch"]]
 process_mode = 3

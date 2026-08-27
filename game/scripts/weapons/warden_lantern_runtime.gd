@@ -21,7 +21,8 @@ var last_attack_id := ""
 var _emitting := false
 
 func _ready() -> void:
-	_build_authored_chime()
+	audio_player.stop()
+	audio_player.stream = null
 
 func _physics_process(delta: float) -> void:
 	if not inventory.is_equipped(weapon_id):
@@ -57,8 +58,6 @@ func _emit_attack(target: Node3D, stats: Dictionary) -> void:
 	last_attack_id = String(event.attack_id)
 	presentation_variant = posmod(emitted_count - 1, 4)
 	attack_phase = "onset"
-	audio_player.pitch_scale = PITCH_VARIANTS[presentation_variant]
-	audio_player.play()
 	if bolt_scene:
 		var bolt := bolt_scene.instantiate()
 		get_tree().current_scene.add_child(bolt)
@@ -92,21 +91,3 @@ func _mcp_state() -> Dictionary:
 		"emitted_count": emitted_count, "resolved_hit_count": resolved_hit_count, "presentation_variant": presentation_variant,
 		"last_attack_id": last_attack_id, "stats": stats,
 	}
-
-func _build_authored_chime() -> void:
-	var mix_rate := 12000
-	var duration := 0.22
-	var frame_count := int(mix_rate * duration)
-	var data := PackedByteArray()
-	data.resize(frame_count * 2)
-	for frame in frame_count:
-		var time := float(frame) / float(mix_rate)
-		var envelope := pow(1.0 - float(frame) / float(frame_count), 2.4)
-		var tone := sin(TAU * 520.0 * time) * 0.56 + sin(TAU * 780.0 * time) * 0.26 + sin(TAU * 1040.0 * time) * 0.12
-		data.encode_s16(frame * 2, int(clampf(tone * envelope, -1.0, 1.0) * 32760.0))
-	var stream := AudioStreamWAV.new()
-	stream.format = AudioStreamWAV.FORMAT_16_BITS
-	stream.mix_rate = mix_rate
-	stream.stereo = false
-	stream.data = data
-	audio_player.stream = stream

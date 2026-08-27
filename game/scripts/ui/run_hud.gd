@@ -14,6 +14,8 @@ const EMBER := Color("ff7f3b")
 const TEAL := Color("5cf4df")
 const VIOLET := Color("c27cff")
 const STONE := Color(0.025, 0.032, 0.065, 0.78)
+const FONT_BODY := preload("res://assets/fonts/Montserrat-Medium.ttf")
+const FONT_NUMERAL := preload("res://assets/fonts/Montserrat-SemiBold.ttf")
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -32,7 +34,7 @@ func _ready() -> void:
 func bind_snapshot(next_snapshot: Dictionary) -> void:
 	snapshot = next_snapshot.duplicate(true)
 	snapshot_serial += 1
-	visible = bool(snapshot.get("world_active", false)) and String(snapshot.get("state", "")) in ["active", "paused"]
+	visible = bool(snapshot.get("world_active", false)) and String(snapshot.get("state", "")) in ["active", "boss", "paused", "draft"]
 	_vitals_meter.set_health(
 		float(snapshot.get("health", 0.0)),
 		maxf(1.0, float(snapshot.get("health_maximum", 1.0))),
@@ -54,6 +56,8 @@ func _draw() -> void:
 	_draw_encounter_cluster(Vector2(viewport.x - 270, 28))
 	_draw_weapon_cluster(Vector2(viewport.x * 0.5 - 128, viewport.y - 106))
 	_draw_dash_cluster(Vector2(viewport.x - 132, viewport.y - 126))
+	if bool(snapshot.get("boss_active", false)):
+		_draw_boss_cluster(Vector2(viewport.x * 0.5 - 260, 72))
 
 func _draw_health_cluster(origin: Vector2) -> void:
 	var current := float(snapshot.get("health", 0.0))
@@ -79,9 +83,19 @@ func _draw_encounter_cluster(origin: Vector2) -> void:
 	var defeated := int(snapshot.get("defeated", 0))
 	var elapsed := float(snapshot.get("elapsed", 0.0))
 	draw_line(origin, origin + Vector2(236, 0), BRASS, 2.0, true)
-	_draw_text("NIGHT WATCH", origin + Vector2(0, 24), 12, GOLD)
+	var wave := int(snapshot.get("wave", 1))
+	var wave_count := int(snapshot.get("wave_count", 5))
+	_draw_text("WAVE %d / %d" % [wave,wave_count], origin + Vector2(0, 24), 12, GOLD)
 	_draw_text("%02d:%02d" % [int(elapsed) / 60, int(elapsed) % 60], origin + Vector2(128, 24), 15, INK, HORIZONTAL_ALIGNMENT_RIGHT, 108)
 	_draw_text("THREATS  %d     BANISHED  %d" % [live, defeated], origin + Vector2(0, 49), 10, SILVER)
+	_draw_text(String(snapshot.get("wave_title","NIGHT WATCH")).to_upper(), origin + Vector2(0, 68), 9, SILVER)
+
+func _draw_boss_cluster(origin: Vector2) -> void:
+	var current := float(snapshot.get("boss_health",0.0))
+	var maximum := maxf(1.0,float(snapshot.get("boss_health_maximum",1.0)))
+	draw_line(origin,origin+Vector2(520,0),Color(VIOLET,0.75),2,true)
+	_draw_text("THE BELLKEEPER   PHASE %d" % int(snapshot.get("boss_phase",1)),origin+Vector2(0,24),13,GOLD,HORIZONTAL_ALIGNMENT_CENTER,520)
+	_draw_carved_bar(Rect2(origin+Vector2(20,34),Vector2(480,14)),current/maximum,VIOLET,EMBER)
 
 func _draw_weapon_cluster(origin: Vector2) -> void:
 	var build: Dictionary = snapshot.get("weapons", {})
@@ -155,7 +169,8 @@ func _draw_health_frame(rect: Rect2) -> void:
 	draw_line(rect.end - Vector2(rect.size.x, 0), rect.end, Color(BRASS, 0.5), 1.0, true)
 
 func _draw_text(value: String, position: Vector2, font_size: int, color: Color, alignment := HORIZONTAL_ALIGNMENT_LEFT, width := -1.0) -> void:
-	draw_string(ThemeDB.fallback_font, position, value, alignment, width, font_size, color)
+	var font: Font = FONT_NUMERAL if value.contains("%") or value.contains("/") else FONT_BODY
+	draw_string(font, position, value, alignment, width, font_size, color)
 
 func _mcp_state() -> Dictionary:
 	return {"snapshot_serial": snapshot_serial, "visible": visible, "bound_snapshot": snapshot}

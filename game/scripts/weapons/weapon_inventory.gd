@@ -49,6 +49,21 @@ func reset_starting_build() -> void:
 	_ranks = {&"warden_lantern": 1}
 	build_changed.emit(get_snapshot())
 
+func unlock_weapon(weapon_id: StringName) -> void:
+	if not equipped_weapon_ids.has(weapon_id) and get_definition(weapon_id):
+		equipped_weapon_ids.append(weapon_id)
+	_ranks[weapon_id] = maxi(1, int(_ranks.get(weapon_id, 0)))
+	build_changed.emit(get_snapshot())
+
+func rank_up(weapon_id: StringName) -> void:
+	var definition := get_definition(weapon_id)
+	if not definition:
+		return
+	if not equipped_weapon_ids.has(weapon_id):
+		equipped_weapon_ids.append(weapon_id)
+	_ranks[weapon_id] = mini(definition.max_rank, maxi(1, int(_ranks.get(weapon_id, 0))) + 1)
+	build_changed.emit(get_snapshot())
+
 func get_snapshot() -> Dictionary:
 	var weapons: Array[Dictionary] = []
 	for definition in definitions:
