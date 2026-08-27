@@ -68,6 +68,17 @@
       }
     },
     {
+      "title": "Cogito Dynamic Footstep System — Stone Footstep 02",
+      "source": "https://freesound.org/people/xmike80x/sounds/706207/",
+      "asset_id": "philip-drobar/cogito:DynamicFootstepSystem/Stone/footstep_stone-02.ogg",
+      "license": "CC0-1.0",
+      "sha256": "3299705b6fe0fae0f6c1069645aefa4ed35c96983e728e0e10fc455281f9211e",
+      "receipt": "res://assets/audio_semantic/cogito_footsteps/footstep_stone_02.ogg.receipt.json",
+      "license_receipt": "res://assets/audio_semantic/cogito_footsteps/DYNAMIC_FOOTSTEP_README.md",
+      "binding": "res://resources/audio/mournlight_audio_library.tres",
+      "integration": "One intact 0.216-second recorded stone footstep replaces segmented playback from the retained 4.9-second walking source. It plays from offset zero under the existing movement-owner cap and 0.28-second retirement window."
+    },
+    {
       "title": "Myconid Spore-Priest",
       "source": "https://sketchfab.com/3d-models/myconid-spore-priest-dbb1d96780ef40debdbe29472a345503",
       "asset_id": "dbb1d96780ef40debdbe29472a345503",

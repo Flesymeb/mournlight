@@ -1,4 +1,4 @@
-[gd_resource type="Resource" load_steps=23 format=3]
+[gd_resource type="Resource" load_steps=24 format=3]
 
 [ext_resource type="AudioStream" path="res://assets/audio_library/Music/Marksmans_Mayhem.ogg" id="1_music"]
 [ext_resource type="AudioStream" path="res://assets/audio_library/SFX/163441__under7dude__man-getting-hit.wav" id="2_hurt"]
@@ -22,6 +22,7 @@
 [ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/gravespade_impact.mp3" id="20_spade_impact"]
 [ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/wisps_onset.wav" id="21_wisps_onset"]
 [ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/wisps_impact.wav" id="22_wisps_impact"]
+[ext_resource type="AudioStream" path="res://assets/audio_semantic/cogito_footsteps/footstep_stone_02.ogg" id="23_footstep_stone"]
 
 [resource]
 resource_name = "Mournlight Semantic Audio Library"
@@ -36,8 +37,8 @@ metadata/rejected_weapon_auditions = Array[AudioStream]([ExtResource("3_lantern"
 metadata/disabled_semantics = {}
 metadata/impact = Array[AudioStream]([ExtResource("12_impact"), ExtResource("6_land")])
 metadata/warden_hurt = Array[AudioStream]([ExtResource("2_hurt")])
-metadata/footstep = Array[AudioStream]([ExtResource("7_walk")])
-metadata/playback_offsets = {"footstep":PackedFloat32Array(0.0, 0.39, 0.76, 1.21, 1.63, 2.02, 2.43, 2.85, 3.23, 3.64, 4.01, 4.45)}
+metadata/footstep = Array[AudioStream]([ExtResource("23_footstep_stone")])
+metadata/playback_offsets = {"footstep":PackedFloat32Array(0.0)}
 metadata/playback_windows = {"footstep":0.28}
 metadata/dash = Array[AudioStream]([ExtResource("8_jump_a"), ExtResource("9_jump_b")])
 metadata/pickup = Array[AudioStream]([ExtResource("10_jump_c")])
@@ -53,7 +54,7 @@ metadata/death = Array[AudioStream]([ExtResource("2_hurt"), ExtResource("13_dest
 metadata/victory = Array[AudioStream]([ExtResource("8_jump_a"), ExtResource("9_jump_b"), ExtResource("10_jump_c")])
 metadata/owners = {"boss_phase":"critical","dash":"movement","death":"critical","enemy_death":"impacts","enemy_warning":"warnings","footstep":"movement","impact":"impacts","pickup":"rewards","ui_back":"ui","ui_confirm":"ui","ui_focus":"ui","upgrade_confirm":"critical","upgrade_open":"critical","victory":"critical","warden_hurt":"critical","weapon_gravespade_impact":"gravespade","weapon_gravespade_onset":"gravespade","weapon_warden_lantern_impact":"lantern","weapon_warden_lantern_onset":"lantern","weapon_wandering_wisps_impact":"wisps","weapon_wandering_wisps_onset":"wisps"}
 metadata/priorities = {"boss_phase":100,"dash":55,"death":100,"enemy_death":35,"enemy_warning":85,"footstep":10,"impact":20,"pickup":60,"ui_back":70,"ui_confirm":75,"ui_focus":45,"upgrade_confirm":95,"upgrade_open":90,"victory":100,"warden_hurt":100,"weapon_gravespade_impact":48,"weapon_gravespade_onset":52,"weapon_warden_lantern_impact":48,"weapon_warden_lantern_onset":52,"weapon_wandering_wisps_impact":42,"weapon_wandering_wisps_onset":46}
-metadata/volumes_db = {"boss_phase":-4.0,"dash":-10.0,"death":-3.0,"enemy_death":-13.0,"enemy_warning":-8.0,"footstep":6.0,"impact":-17.0,"pickup":-11.0,"ui_back":-12.0,"ui_confirm":-10.0,"ui_focus":-18.0,"upgrade_confirm":-7.0,"upgrade_open":-10.0,"victory":-4.0,"warden_hurt":-5.0,"weapon_gravespade_impact":-10.0,"weapon_gravespade_onset":-9.0,"weapon_warden_lantern_impact":-12.0,"weapon_warden_lantern_onset":-11.0,"weapon_wandering_wisps_impact":-16.0,"weapon_wandering_wisps_onset":-15.0}
+metadata/volumes_db = {"boss_phase":-4.0,"dash":-10.0,"death":-3.0,"enemy_death":-13.0,"enemy_warning":-8.0,"footstep":-4.0,"impact":-17.0,"pickup":-11.0,"ui_back":-12.0,"ui_confirm":-10.0,"ui_focus":-18.0,"upgrade_confirm":-7.0,"upgrade_open":-10.0,"victory":-4.0,"warden_hurt":-5.0,"weapon_gravespade_impact":-10.0,"weapon_gravespade_onset":-9.0,"weapon_warden_lantern_impact":-12.0,"weapon_warden_lantern_onset":-11.0,"weapon_wandering_wisps_impact":-16.0,"weapon_wandering_wisps_onset":-15.0}
 metadata/owner_limits = {"critical":3,"gravespade":2,"impacts":3,"lantern":2,"movement":2,"rewards":2,"ui":2,"warnings":2,"wisps":2}
-metadata/source_revision = "cobra-fps-feel-kit@f87f4f1695f2165e1458af6ebee2ae158e804184 + gd-dialog@reference-pool-current"
-metadata/source_license = "Pixabay Content License recordings; MIT source projects"
+metadata/source_revision = "cobra-fps-feel-kit@f87f4f1695f2165e1458af6ebee2ae158e804184 + gd-dialog@reference-pool-current + cogito@03943d34d097"
+metadata/source_license = "Pixabay Content License recordings; MIT source projects; CC0 footstep recording"

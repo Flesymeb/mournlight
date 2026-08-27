@@ -175,26 +175,26 @@ func _streams_for(id: String) -> Array:
 	return value if value is Array else []
 
 func _claim_voice(owner: String, priority: int, owner_limit: int) -> int:
-	var owner_playing: Array[int] = []
+	var owner_allocated: Array[int] = []
 	var lowest_index := -1
 	var lowest_priority := 1000000
 	for index in voices.size():
 		if voice_owners[index] == owner:
-			if voices[index].playing:
-				owner_playing.append(index)
-		if voice_priorities[index] < lowest_priority:
+			owner_allocated.append(index)
+		if not voice_owners[index].is_empty() and voice_priorities[index] < lowest_priority:
 			lowest_priority = voice_priorities[index]
 			lowest_index = index
-	if owner_playing.size() >= owner_limit:
-		var same_owner := owner_playing[0]
-		for index in owner_playing:
+	if owner_allocated.size() >= owner_limit:
+		var same_owner := owner_allocated[0]
+		for index in owner_allocated:
 			if voice_priorities[index] < voice_priorities[same_owner]:
 				same_owner = index
 		return same_owner if priority >= voice_priorities[same_owner] else -1
-	# Owner occupancy is authoritative. Only after it is known to be below the
-	# declared limit may a free global voice be accepted.
+	# Allocation is authoritative immediately after play() is requested. The
+	# engine can report playing=false until its mixer begins, so using that flag
+	# here lets another same-frame semantic overwrite a source before onset.
 	for index in voices.size():
-		if not voices[index].playing:
+		if voice_owners[index].is_empty():
 			return index
 	return lowest_index if priority > lowest_priority else -1
 
