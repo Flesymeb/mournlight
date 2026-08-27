@@ -4,7 +4,7 @@
 resource_name = "Mournlight Five-Wave Sequence"
 metadata/wave_ids = PackedStringArray("first_toll", "crossing_shadows", "gravewind", "long_procession", "bellkeeper")
 metadata/wave_titles = PackedStringArray("The First Toll", "Crossing Shadows", "Gravewind", "The Long Procession", "The Bellkeeper")
-metadata/durations = PackedFloat32Array(75, 90, 105, 120, 150)
+metadata/durations = PackedFloat32Array(75, 90, 105, 150, 120)
 metadata/live_caps = PackedInt32Array(8, 14, 22, 36, 5)
 metadata/cadences = PackedFloat32Array(1.55, 1.15, 0.82, 0.58, 2.4)
 metadata/spawn_budgets = PackedInt32Array(28, 46, 72, 120, 24)
@@ -16,3 +16,5 @@ metadata/elite_every = PackedInt32Array(0, 0, 9, 7, 0)
 metadata/warnings = PackedStringArray("TEACHING PRESSURE", "FLANK PRESSURE", "RANGED ELITE", "MIXED DENSITY", "FINAL TOLL")
 metadata/boss_wave_index = 4
 metadata/route_minutes = 9.066667
+metadata/ordinary_victory_window_seconds = Vector2(420, 600)
+metadata/boss_entry_seconds = 424.0

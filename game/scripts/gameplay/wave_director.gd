@@ -82,12 +82,16 @@ func prepare_test_wave(index: int) -> void:
 
 func get_snapshot() -> Dictionary:
 	var definition := _definition(wave_index) if wave_index >= 0 else {}
+	var expected_ids: PackedStringArray = WAVE_SEQUENCE.get_meta("wave_ids", PackedStringArray())
+	var route_complete := _ordinary_route_complete()
 	return {"phase":phase,"wave":wave_index + 1,"wave_count":_wave_count(),"wave_elapsed":wave_elapsed,
 		"wave_duration":float(definition.get("duration",0.0)),"title":String(definition.get("title","WARMUP")),
 		"warning":String(definition.get("warning","PREPARE")),"total_elapsed":total_elapsed,
 		"boss_spawned":boss_spawned,"terminated":terminated,"definition":definition,
+		"expected_route_wave_ids":Array(expected_ids),
 		"ordinary_route_wave_ids":ordinary_route_wave_ids.duplicate(),
-		"ordinary_route_complete":_ordinary_route_complete(),
+		"ordinary_route_complete":route_complete,
+		"ordinary_route_eligible":route_complete and diagnostic_jump_count == 0,
 		"diagnostic_jump_count":diagnostic_jump_count,
 		"sequence_resource":"res://resources/waves/mournlight_wave_sequence.tres"}
 

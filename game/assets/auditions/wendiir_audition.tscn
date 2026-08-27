@@ -1,0 +1,46 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/auditions/wendiir_dragonkin.glb" id="1_model"]
+
+[sub_resource type="Environment" id="Environment_audition"]
+background_mode = 1
+background_color = Color(0.025, 0.035, 0.08, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.28, 0.34, 0.55, 1)
+ambient_light_energy = 0.8
+
+[sub_resource type="StandardMaterial3D" id="GroundMaterial"]
+albedo_color = Color(0.08, 0.1, 0.15, 1)
+roughness = 0.9
+
+[sub_resource type="PlaneMesh" id="GroundMesh"]
+material = SubResource("GroundMaterial")
+size = Vector2(12, 12)
+
+[node name="WendiirAudition" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_audition")
+
+[node name="KeyLight" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-45, -35, 0)
+light_color = Color(0.72, 0.82, 1, 1)
+light_energy = 1.6
+shadow_enabled = true
+
+[node name="RimLight" type="OmniLight3D" parent="."]
+position = Vector3(-2.5, 2.8, 1.5)
+light_color = Color(1, 0.45, 0.15, 1)
+light_energy = 5.0
+omni_range = 8.0
+
+[node name="Ground" type="MeshInstance3D" parent="."]
+mesh = SubResource("GroundMesh")
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+position = Vector3(0, 1.4, 4.2)
+rotation_degrees = Vector3(-7, 0, 0)
+current = true
+

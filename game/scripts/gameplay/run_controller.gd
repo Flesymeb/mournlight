@@ -552,7 +552,12 @@ func _commit_terminal_snapshot(terminal_outcome: String) -> void:
 	terminal_snapshot["commit_run_serial"] = run_serial
 	terminal_snapshot["commit_count"] = terminal_commit_count
 	terminal_snapshot["route_kind"] = run_route_kind
-	terminal_snapshot["ordinary_route_eligible"] = run_route_kind == "ordinary" and bool(wave_director.get_snapshot().get("ordinary_route_complete", false))
+	var wave_state := wave_director.get_snapshot()
+	terminal_snapshot["ordinary_route_eligible"] = (
+		run_route_kind == "ordinary"
+		and bool(wave_state.get("ordinary_route_complete", false))
+		and int(wave_state.get("diagnostic_jump_count", 0)) == 0
+	)
 	terminal_snapshot = terminal_snapshot.duplicate(true)
 
 func _teardown_run(route: String, reason: String) -> Dictionary:
@@ -697,6 +702,8 @@ func _prepare_final_profile() -> void:
 		"neighbor_registry":(encounter.get("neighbor_registry",{}) as Dictionary).duplicate(true),
 		"ordinary_light_budget":(encounter.get("ordinary_light_budget",{}) as Dictionary).duplicate(true),
 		"pool_counts":{"active":encounter.get("live",0),"pooled":encounter.get("pooled",0)},
+		"work_caps":_dense_work_caps(encounter),
+		"viewport":_profile_viewport_receipt(),
 		"requested_profile":"representative_final_wave_and_bellkeeper",
 		"resolved_profile":"prepared_paused",
 		"preparation_paused":get_tree().paused,
@@ -718,6 +725,8 @@ func _advance_final_profile() -> void:
 		"status":"sampling", "branch_id":validation_profile_receipt.get("branch_id",""),
 		"run_serial":run_serial, "setup_generation":validation_profile_receipt.get("setup_generation",0),
 		"window_seconds":_profile_duration,
+		"viewport":_profile_viewport_receipt(),
+		"work_caps":_dense_work_caps(spawner.get_snapshot()),
 	}
 	get_tree().paused = false
 
@@ -738,6 +747,8 @@ func _advance_profile_sample(delta: float) -> void:
 		"sample_count":sorted.size(), "window_seconds":_profile_elapsed,
 		"frame_ms":{"p50":_percentile(sorted,0.50),"p95":_percentile(sorted,0.95),"p99":_percentile(sorted,0.99),"worst":sorted.back() if not sorted.is_empty() else 0.0},
 		"counts":_profile_counts(),
+		"viewport":_profile_viewport_receipt(),
+		"work_caps":_dense_work_caps(spawner.get_snapshot()),
 	}
 	get_tree().paused = true
 	_emit_snapshot()
@@ -749,36 +760,29 @@ func _reset_final_profile() -> void:
 	_profile_samples_ms.clear()
 	_profile_elapsed = 0.0
 	get_tree().paused = false
-	_teardown_generation += 1
+	var source_run_serial := run_serial
 	var requested_counts := _profile_counts()
-	var retirement := _retire_transient_ownership("validation_profile_reset", "validation_profile_reset", _teardown_generation)
-	spawner.reset_encounter()
-	spawner.clear_validation_roster()
-	if is_instance_valid(boss):
-		boss.retire_run_actor("validation_profile_reset", _teardown_generation)
-		boss.queue_free()
-	boss = null
-	boss_snapshot.clear()
-	world.reset_session()
-	inventory.reset_starting_build()
-	world.set_session_active(true)
-	audio_director.reset_for_run()
 	_validation_setup_generation += 1
+	var setup_generation := _validation_setup_generation
+	var retirement := _teardown_run("validation_profile_reset", "validation_profile_reset")
+	_next_baseline_reason = "validation_profile_reset"
+	_begin_run()
 	var counts := _profile_counts()
 	validation_profile_receipt = {
 		"accepted":true, "reset":true, "branch_id":"final_wave_bellkeeper_profile",
-		"run_serial":run_serial, "setup_generation":_validation_setup_generation,
-		"requested_density":0, "resolved_density":counts.get("enemies",-1),
+		"source_run_serial":source_run_serial, "run_serial":run_serial, "setup_generation":setup_generation,
+		"requested_density":requested_counts.get("enemies",-1), "resolved_density":counts.get("enemies",-1),
 		"requested_profile":"reset", "resolved_profile":"ordinary_run_ready",
 		"requested_counts": requested_counts, "resolved_retirement": retirement,
 		"post_reset_counts":counts, "counts":counts,
 		"reset_isolation":_counts_are_isolated(counts),
+		"route_kind":run_route_kind,
+		"wave_route":_route_qualification(wave_director.get_snapshot()),
 		"next_frame_isolation_pending": true,
 	}
 	validation_density_receipt = validation_profile_receipt.duplicate(true)
-	_transition("active")
 	_emit_snapshot()
-	call_deferred("_capture_profile_next_frame_isolation", _validation_setup_generation, run_serial)
+	call_deferred("_capture_profile_next_frame_isolation", setup_generation, run_serial)
 
 func _capture_profile_next_frame_isolation(setup_generation: int, expected_run_serial: int) -> void:
 	await get_tree().process_frame
@@ -843,6 +847,39 @@ func _profile_counts() -> Dictionary:
 		"wisp_handles":wisps.active_wisp_count,
 		"wisp_interval_targets":wisps._target_next_hit_time.size(),
 		"active_attack_ledgers":world.attack_runtime._hit_ledgers.size(),
+	}
+
+func _profile_viewport_receipt() -> Dictionary:
+	var viewport_size := get_viewport().get_visible_rect().size
+	return {
+		"width":int(viewport_size.x), "height":int(viewport_size.y),
+		"target_width":1920, "target_height":1080,
+		"resolution_qualified":int(viewport_size.x) >= 1920 and int(viewport_size.y) >= 1080,
+	}
+
+func _dense_work_caps(encounter: Dictionary) -> Dictionary:
+	var neighbor_state: Dictionary = encounter.get("neighbor_registry", {})
+	var audio_state := audio_director._mcp_state()
+	var attack_state := world.attack_runtime._mcp_state()
+	return {
+		"enemy_pool":spawner.pool_size, "enemy_live":spawner.live_cap,
+		"neighbor_candidates_per_query":int(neighbor_state.get("candidate_budget", 12)),
+		"telegraph_cues":spawner.telegraph_cue_cap,
+		"ordinary_role_lights":spawner.role_light_cap,
+		"hurt_lights":spawner.hurt_light_cap,
+		"audio_effect_voices":int(audio_state.get("voice_limit", 0)),
+		"completed_attack_history":int(attack_state.get("history_limit", 0)),
+	}
+
+func _route_qualification(wave_state: Dictionary) -> Dictionary:
+	return {
+		"expected_wave_ids":(wave_state.get("expected_route_wave_ids", []) as Array).duplicate(),
+		"observed_wave_ids":(wave_state.get("ordinary_route_wave_ids", []) as Array).duplicate(),
+		"ordinary_route_complete":bool(wave_state.get("ordinary_route_complete", false)),
+		"diagnostic_jump_count":int(wave_state.get("diagnostic_jump_count", 0)),
+		"run_route_kind":run_route_kind,
+		"ordinary_route_eligible":run_route_kind == "ordinary" and bool(wave_state.get("ordinary_route_eligible", false)),
+		"victory_window_seconds":{"minimum":420.0,"maximum":600.0},
 	}
 
 func _record_retry_baseline(reason: String) -> void:
@@ -966,6 +1003,7 @@ func _mcp_state() -> Dictionary:
 		"boss":{"active":boss_snapshot.get("active",false),"health":boss_snapshot.get("health",0.0),"health_maximum":boss_snapshot.get("health_maximum",0.0),"phase":boss_snapshot.get("phase",0)},"quit_requested":quit_requested,
 		"result_committed": result_committed, "terminal_snapshot_digest": _terminal_snapshot_digest(), "state_history": state_history,
 		"terminal_commit_count":terminal_commit_count, "run_route_kind":run_route_kind,
+		"route_qualification":_route_qualification(wave_state),
 		"upgrade_draft":draft_controller.get_snapshot(), "teardown_receipt":teardown_receipt,
 		"tree_paused": get_tree().paused, "shell_mode": shell.mode,
 		"shell_return_mode": shell.return_mode, "shell_action_latched": shell.action_latched,

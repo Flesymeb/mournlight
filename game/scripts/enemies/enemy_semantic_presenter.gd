@@ -106,14 +106,21 @@ func _build_role(variant_index: int) -> void:
 	var variants: Array[Node] = _presentation.get_children()
 	for index in variants.size():
 		var candidate := variants[index] as Node3D
-		candidate.visible = index == variant_index
 		if index == variant_index:
+			candidate.visible = true
 			_active_variant = candidate
+		else:
+			# Each pooled actor needs one authored runtime variant. Removing the
+			# unselected imported hierarchy prevents its hidden skeleton and
+			# AnimationPlayer from consuming dense-wave work.
+			_presentation.remove_child(candidate)
+			candidate.free()
 	if not is_instance_valid(_active_variant):
 		return
 	_base_position = _active_variant.position
 	_base_rotation = _active_variant.rotation
 	_base_scale = _active_variant.scale
+	_apply_dense_render_budget(_active_variant)
 	_apply_role_material_treatment(_active_variant, variant_index)
 	_animation_player = _find_animation_player(_active_variant)
 	_authored_clip = _select_authored_clip(_animation_player)
@@ -170,3 +177,12 @@ func _set_material_recursive(node: Node, material: Material) -> void:
 		(node as GeometryInstance3D).material_override = material
 	for child in node.get_children():
 		_set_material_recursive(child, material)
+
+func _apply_dense_render_budget(node: Node) -> void:
+	if node is GeometryInstance3D:
+		var geometry := node as GeometryInstance3D
+		geometry.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		geometry.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+		geometry.lod_bias = 0.35
+	for child in node.get_children():
+		_apply_dense_render_budget(child)

@@ -13,6 +13,8 @@ extends Camera3D
 @export var visibility_release_seconds := 0.22
 @export var visibility_probe_overscan := 1.25
 
+const VISIBILITY_LAYER := 20
+
 var movement_velocity := Vector3.ZERO
 var framing_target := Vector3.ZERO
 var occlusion_guard_active := false
@@ -21,15 +23,21 @@ var _blocked_seconds := 0.0
 var _clear_seconds := 0.0
 var _visibility_samples_blocked := 0
 var _last_occluder := ""
-var _presentation_meshes: Array[MeshInstance3D] = []
-var _original_overlays: Dictionary = {}
-var _visibility_overlay: StandardMaterial3D
+var _presentation_visuals: Array[VisualInstance3D] = []
+var _original_visual_layers: Dictionary = {}
+var _primary_camera_visibility_layer := true
+var _visibility_viewport: SubViewport
+var _visibility_camera: Camera3D
+var _visibility_canvas: CanvasLayer
+var _visibility_texture: TextureRect
+var _compositor_frame_count := 0
 
 func _ready() -> void:
 	current = true
 	fov = normal_fov
 	if target:
 		_bind_visibility_presentation()
+		_build_visibility_compositor()
 		_snap_to_target()
 
 func set_movement_velocity(value: Vector3) -> void:
@@ -52,22 +60,71 @@ func _process(delta: float) -> void:
 	var desired_position := framing_target + Vector3(0.0, follow_height, follow_distance)
 	global_position = global_position.lerp(desired_position, 1.0 - exp(-follow_damping * delta))
 	look_at(framing_target + Vector3(0.0, 0.65, 0.0), Vector3.UP)
+	_sync_visibility_camera()
 
 func _bind_visibility_presentation() -> void:
-	_visibility_overlay = StandardMaterial3D.new()
-	_visibility_overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_visibility_overlay.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_visibility_overlay.albedo_color = Color(1.0, 0.72, 0.24, 0.64)
-	_visibility_overlay.emission_enabled = true
-	_visibility_overlay.emission = Color(1.0, 0.52, 0.12)
-	_visibility_overlay.emission_energy_multiplier = 1.8
-	_visibility_overlay.no_depth_test = true
-	_visibility_overlay.disable_fog = true
-	for child in target.find_children("*", "MeshInstance3D", true, false):
-		if child is MeshInstance3D and String((child as Node).get_path()).contains("/PresentationRoot/"):
-			var mesh := child as MeshInstance3D
-			_presentation_meshes.append(mesh)
-			_original_overlays[mesh.get_instance_id()] = mesh.material_overlay
+	for child in target.find_children("*", "VisualInstance3D", true, false):
+		if child is VisualInstance3D:
+			var visual := child as VisualInstance3D
+			_presentation_visuals.append(visual)
+			_original_visual_layers[visual.get_instance_id()] = visual.layers
+
+func _build_visibility_compositor() -> void:
+	# The isolation camera shares the live World3D but renders only the Warden's
+	# private visibility layer onto a transparent full-viewport texture. This is
+	# a camera-owned composition boundary: cemetery geometry remains untouched
+	# and cannot depth-occlude the isolated silhouette.
+	_primary_camera_visibility_layer = get_cull_mask_value(VISIBILITY_LAYER)
+	_visibility_viewport = SubViewport.new()
+	_visibility_viewport.name = "WardenVisibilityViewport"
+	_visibility_viewport.transparent_bg = true
+	_visibility_viewport.own_world_3d = false
+	_visibility_viewport.world_3d = get_world_3d()
+	_visibility_viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_ALWAYS
+	_visibility_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	_visibility_viewport.size = get_viewport().get_visible_rect().size
+	add_child(_visibility_viewport)
+	_visibility_camera = Camera3D.new()
+	_visibility_camera.name = "WardenVisibilityCamera"
+	_visibility_camera.cull_mask = 0
+	_visibility_camera.set_cull_mask_value(VISIBILITY_LAYER, true)
+	_visibility_camera.current = true
+	_visibility_viewport.add_child(_visibility_camera)
+	_visibility_canvas = CanvasLayer.new()
+	_visibility_canvas.name = "WardenVisibilityCanvas"
+	_visibility_canvas.layer = 8
+	add_child(_visibility_canvas)
+	_visibility_texture = TextureRect.new()
+	_visibility_texture.name = "WardenVisibilityTexture"
+	_visibility_texture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_visibility_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_visibility_texture.stretch_mode = TextureRect.STRETCH_SCALE
+	_visibility_texture.texture = _visibility_viewport.get_texture()
+	_visibility_texture.visible = false
+	_visibility_canvas.add_child(_visibility_texture)
+	_resize_visibility_compositor()
+	get_viewport().size_changed.connect(_resize_visibility_compositor)
+
+func _resize_visibility_compositor() -> void:
+	if not is_instance_valid(_visibility_viewport) or not is_instance_valid(_visibility_texture):
+		return
+	var viewport_size := get_viewport().get_visible_rect().size
+	_visibility_viewport.size = Vector2i(maxi(1, int(viewport_size.x)), maxi(1, int(viewport_size.y)))
+	_visibility_texture.position = Vector2.ZERO
+	_visibility_texture.size = viewport_size
+
+func _sync_visibility_camera() -> void:
+	if not is_instance_valid(_visibility_camera):
+		return
+	_visibility_camera.global_transform = global_transform
+	_visibility_camera.projection = projection
+	_visibility_camera.fov = fov
+	_visibility_camera.size = size
+	_visibility_camera.near = near
+	_visibility_camera.far = far
+	_visibility_camera.frustum_offset = frustum_offset
+	if occlusion_guard_active:
+		_compositor_frame_count += 1
 
 func _update_visibility_isolation(delta: float) -> void:
 	_visibility_samples_blocked = 0
@@ -113,10 +170,20 @@ func _update_visibility_isolation(delta: float) -> void:
 		_apply_visibility_overlay(occlusion_guard_active)
 
 func _apply_visibility_overlay(active: bool) -> void:
-	for mesh in _presentation_meshes:
-		if not is_instance_valid(mesh):
+	if not is_instance_valid(_visibility_viewport) or not is_instance_valid(_visibility_texture):
+		return
+	for visual in _presentation_visuals:
+		if not is_instance_valid(visual):
 			continue
-		mesh.material_overlay = _visibility_overlay if active else _original_overlays.get(mesh.get_instance_id())
+		if active:
+			visual.layers = 1 << (VISIBILITY_LAYER - 1)
+		else:
+			visual.layers = int(_original_visual_layers.get(visual.get_instance_id(), 1))
+	set_cull_mask_value(VISIBILITY_LAYER, not active and _primary_camera_visibility_layer)
+	_visibility_texture.visible = active
+	_visibility_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED
+	if active:
+		_sync_visibility_camera()
 
 func _snap_to_target() -> void:
 	framing_target = target.global_position
@@ -134,7 +201,13 @@ func _mcp_state() -> Dictionary:
 			"active": occlusion_guard_active, "blocked_samples": _visibility_samples_blocked,
 			"sample_count": 3, "blocked_seconds": _blocked_seconds,
 			"clear_seconds": _clear_seconds, "last_occluder": _last_occluder,
-			"overlay_mesh_count": _presentation_meshes.size(), "probe_overscan": visibility_probe_overscan,
+			"strategy": "shared_world_layer_isolation",
+			"isolated_visual_count": _presentation_visuals.size(),
+			"compositor_visible": _visibility_texture.visible if is_instance_valid(_visibility_texture) else false,
+			"compositor_updates": _visibility_viewport.render_target_update_mode == SubViewport.UPDATE_ALWAYS if is_instance_valid(_visibility_viewport) else false,
+			"compositor_frame_count": _compositor_frame_count,
+			"primary_camera_visibility_layer": get_cull_mask_value(VISIBILITY_LAYER),
+			"probe_overscan": visibility_probe_overscan,
 		},
 		"lead_distance": lead_distance,
 		"fov": fov,

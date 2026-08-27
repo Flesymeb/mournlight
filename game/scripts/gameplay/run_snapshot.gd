@@ -31,6 +31,7 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 		"wave_definition": wave_definition.duplicate(true),
 		"ordinary_route_wave_ids":(wave_snapshot.get("ordinary_route_wave_ids", []) as Array).duplicate(),
 		"ordinary_route_complete":bool(wave_snapshot.get("ordinary_route_complete", false)),
+		"ordinary_route_eligible":String(controller.run_route_kind) == "ordinary" and bool(wave_snapshot.get("ordinary_route_eligible", false)),
 		"diagnostic_jump_count":int(wave_snapshot.get("diagnostic_jump_count", 0)),
 		"run_route_kind":String(controller.run_route_kind),
 		"boss_active": bool(controller.boss_snapshot.get("active",false)),
