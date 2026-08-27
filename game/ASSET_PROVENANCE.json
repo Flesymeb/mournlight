@@ -4,7 +4,7 @@
   "scope": "external runtime assets and adapted code in the release candidate",
   "path_policy": "repository_relative_only",
   "entries": [
-    {"id":"cemetery.low_poly_graveyard","kind":"3d_environment","license":"CC-BY-4.0","receipt":"assets/authored/low_poly_graveyard.glb.receipt.json","license_file":"THIRD_PARTY_NOTICES.md","runtime_bindings":["scenes/world/cemetery_garden.tscn"]},
+    {"id":"cemetery.low_poly_graveyard","kind":"3d_environment","license":"CC-BY-4.0","receipt":"assets/authored/low_poly_graveyard.glb.receipt.json","license_file":"THIRD_PARTY_NOTICES.md","runtime_bindings":["scenes/world/cemetery_garden.tscn"],"qualification":"CEMETERY_PACKAGE_QUALIFICATION.json","source_sha256":"adde2aaf6d361d8437a79c60561bcb30d8427bae38df17047d2fe77f96811616","qualification_status":"package_level_incompatibility_pending_tester_disposition"},
     {"id":"warden.frost_mage","kind":"3d_character","license":"CC-BY-4.0","receipt":"assets/authored/frost_mage.glb.receipt.json","license_file":"THIRD_PARTY_NOTICES.md","runtime_bindings":["scenes/player/warden.tscn","resources/presentation/warden_animation_profile.tres"]},
     {"id":"weapon.warden_lantern","kind":"3d_weapon","license":"CC-BY-4.0","receipt":"assets/authored/warden_lantern.glb.receipt.json","license_file":"THIRD_PARTY_NOTICES.md","runtime_bindings":["scenes/player/warden.tscn","scenes/enemies/presentation/bone_slinger_presenter.tscn"]},
     {"id":"combat.hostile_lantern","kind":"3d_combat_presentation","license":"CC-BY-4.0","receipt":"assets/authored/hostile_lantern.glb.receipt.json","license_file":"THIRD_PARTY_NOTICES.md","runtime_bindings":["scenes/combat/combat_target.tscn"]},

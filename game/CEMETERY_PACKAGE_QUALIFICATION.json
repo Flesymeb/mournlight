@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "package_id": "cemetery.low_poly_graveyard",
+  "family_contract": {
+    "family_id": "cemetery_authored_environment",
+    "prd_style_match": "moonlit stylized cemetery",
+    "source_quality": "whole-authored-environment",
+    "runtime_uses": 1,
+    "runtime_variants": 1,
+    "maximum_share": 1.0,
+    "internal_diversity": ["native streets", "structures", "props", "materials", "landmarks"],
+    "background": "opaque terrain"
+  },
+  "immutable_source": {
+    "path": "assets/authored/low_poly_graveyard.glb",
+    "sha256": "adde2aaf6d361d8437a79c60561bcb30d8427bae38df17047d2fe77f96811616",
+    "size_bytes": 3998540,
+    "receipt": "assets/authored/low_poly_graveyard.glb.receipt.json",
+    "source_asset_id": "bfa0014419ec4295addfa46bd7e21c7b",
+    "license": "CC-BY-4.0",
+    "source_modified": false
+  },
+  "runtime_binding": {
+    "scene": "scenes/world/cemetery_garden.tscn",
+    "instance_path": "CemeteryGarden/PackageTransform/AuthoredCemeteryPackage",
+    "instance_count": 1,
+    "package_transform": {"position": [0.28, 0.02, -147.12], "scale": [2.2, 2.2, 2.2]},
+    "authored_hierarchy_intact": true,
+    "outer_datum_additive_only": true
+  },
+  "retest": {
+    "engine": "Godot 4.7-stable",
+    "renderer": "gl_compatibility",
+    "runtime_visible_only": true,
+    "checked_meshes": 94,
+    "checked_surfaces": 94,
+    "finding_count": 69,
+    "finding_kind": "degenerate_uvs",
+    "severity": "error",
+    "affected_material_tokens": {
+      "Stone": 43,
+      "Metall": 12,
+      "Grass1": 2,
+      "Pumplkin": 2,
+      "Wood": 4,
+      "12 - Default": 1,
+      "CoffinCross": 3,
+      "c": 1,
+      "fly agaric white": 1
+    },
+    "tangent_space_dependency": "Runtime-visible ArrayMesh surfaces retain zero-area UV triangles. Tangent generation can consume those UVs even when a material does not visually emphasize normal mapping; no warning suppression or candidate material override changes that source fact.",
+    "candidate_material_overrides": 0,
+    "warning_suppression": false
+  },
+  "renderer_observations": {
+    "normal_view": "Compatibility renderer displays the intact authored streets, graves, fences, mausoleum, trees, and props with coherent scale and grounded placement.",
+    "dense_view": "The whole package remains one visible environment instance; additive gameplay actors do not alter authored geometry or hierarchy.",
+    "visible_corruption_observed": false,
+    "matte_or_edge_contamination_observed": false,
+    "evidence_views": ["spawn", "keeper post", "mausoleum", "cracked bell", "dense combat"]
+  },
+  "compatibility_conclusion": {
+    "status": "package_level_incompatibility_pending_tester_disposition",
+    "reason": "No receipt-safe import or runtime material setting can eliminate source UV degeneracy without rewriting the immutable mesh data or hiding validator output. The accepted intact package is preserved because the bound Compatibility renderer remains visually coherent, but it does not meet the zero-error validator branch.",
+    "non_destructive_correction_available": false,
+    "raw_source_rewrite_required_to_clear": true,
+    "package_preserved": true,
+    "tester_disposition_required": true
+  }
+}

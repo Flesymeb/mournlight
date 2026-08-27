@@ -12,6 +12,9 @@ extends Camera3D
 @export var visibility_activation_seconds := 0.04
 @export var visibility_release_seconds := 0.22
 @export var visibility_probe_overscan := 1.25
+@export var presentation_body: NodePath
+@export var presentation_lantern: NodePath
+@export var presentation_effects: Array[NodePath] = []
 
 const VISIBILITY_LAYER := 20
 
@@ -24,7 +27,12 @@ var _clear_seconds := 0.0
 var _visibility_samples_blocked := 0
 var _last_occluder := ""
 var _presentation_visuals: Array[VisualInstance3D] = []
+var _source_visuals: Array[VisualInstance3D] = []
+var _effect_visuals: Array[VisualInstance3D] = []
+var _binding_members: Array[Dictionary] = []
 var _original_visual_layers: Dictionary = {}
+var _original_visual_visibility: Dictionary = {}
+var _body_readability_overlay: StandardMaterial3D
 var _primary_camera_visibility_layer := true
 var _visibility_viewport: SubViewport
 var _visibility_camera: Camera3D
@@ -63,11 +71,67 @@ func _process(delta: float) -> void:
 	_sync_visibility_camera()
 
 func _bind_visibility_presentation() -> void:
-	for child in target.find_children("*", "VisualInstance3D", true, false):
+	# The compositor owns a concrete Warden contract rather than assuming every
+	# descendant can move between view layers. Imported skinned geometry stays on
+	# its authored instance and receives a camera-owned no-depth readability pass;
+	# shipped effects use the private layer compositor. No duplicate actor exists.
+	_bind_member("body", presentation_body)
+	_bind_member("lantern", presentation_lantern)
+	for effect_path in presentation_effects:
+		var effect := get_node_or_null(effect_path)
+		if not is_instance_valid(effect):
+			continue
+		var visuals := _collect_visuals(effect)
+		for visual in visuals:
+			_register_visual(visual)
+			_effect_visuals.append(visual)
+		_binding_members.append({"role":"effect", "bound":true, "source_path":String(effect_path), "isolation":"private_layer_compositor", "visual_count":visuals.size()})
+
+func _bind_member(role: String, source_path: NodePath) -> void:
+	var source := get_node_or_null(source_path)
+	var source_members := _collect_visuals(source)
+	for visual in source_members:
+		_register_visual(visual)
+		_source_visuals.append(visual)
+	_binding_members.append({
+		"role":role,
+		"bound":is_instance_valid(source),
+		"source_path":String(source_path),
+		"isolation":"direct_no_depth_guard",
+		"source_visual_count":source_members.size(),
+	})
+
+func _get_body_readability_overlay() -> StandardMaterial3D:
+	if is_instance_valid(_body_readability_overlay):
+		return _body_readability_overlay
+	_body_readability_overlay = StandardMaterial3D.new()
+	_body_readability_overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_body_readability_overlay.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_body_readability_overlay.albedo_color = Color(0.18, 0.82, 0.88, 0.62)
+	_body_readability_overlay.emission_enabled = true
+	_body_readability_overlay.emission = Color(0.08, 0.62, 0.76, 1.0)
+	_body_readability_overlay.emission_energy_multiplier = 1.6
+	_body_readability_overlay.disable_fog = true
+	_body_readability_overlay.no_depth_test = true
+	return _body_readability_overlay
+
+func _collect_visuals(root: Node) -> Array[VisualInstance3D]:
+	var result: Array[VisualInstance3D] = []
+	if not is_instance_valid(root):
+		return result
+	if root is VisualInstance3D:
+		result.append(root as VisualInstance3D)
+	for child in root.find_children("*", "VisualInstance3D", true, false):
 		if child is VisualInstance3D:
-			var visual := child as VisualInstance3D
-			_presentation_visuals.append(visual)
-			_original_visual_layers[visual.get_instance_id()] = visual.layers
+			result.append(child as VisualInstance3D)
+	return result
+
+func _register_visual(visual: VisualInstance3D) -> void:
+	if _presentation_visuals.has(visual):
+		return
+	_presentation_visuals.append(visual)
+	_original_visual_layers[visual.get_instance_id()] = visual.layers
+	_original_visual_visibility[visual.get_instance_id()] = visual.visible
 
 func _build_visibility_compositor() -> void:
 	# The isolation camera shares the live World3D but renders only the Warden's
@@ -172,13 +236,16 @@ func _update_visibility_isolation(delta: float) -> void:
 func _apply_visibility_overlay(active: bool) -> void:
 	if not is_instance_valid(_visibility_viewport) or not is_instance_valid(_visibility_texture):
 		return
-	for visual in _presentation_visuals:
+	for visual in _source_visuals:
+		if is_instance_valid(visual):
+			visual.visible = bool(_original_visual_visibility.get(visual.get_instance_id(), true))
+			visual.layers = int(_original_visual_layers.get(visual.get_instance_id(), 1))
+			if visual is GeometryInstance3D:
+				(visual as GeometryInstance3D).material_overlay = _get_body_readability_overlay() if active else null
+	for visual in _effect_visuals:
 		if not is_instance_valid(visual):
 			continue
-		if active:
-			visual.layers = 1 << (VISIBILITY_LAYER - 1)
-		else:
-			visual.layers = int(_original_visual_layers.get(visual.get_instance_id(), 1))
+		visual.layers = 1 << (VISIBILITY_LAYER - 1) if active else int(_original_visual_layers.get(visual.get_instance_id(), 1))
 	set_cull_mask_value(VISIBILITY_LAYER, not active and _primary_camera_visibility_layer)
 	_visibility_texture.visible = active
 	_visibility_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED
@@ -190,6 +257,20 @@ func _snap_to_target() -> void:
 	global_position = framing_target + Vector3(0.0, follow_height, follow_distance)
 	look_at(framing_target + Vector3(0.0, 0.65, 0.0), Vector3.UP)
 
+func _original_presentation_restored() -> bool:
+	if occlusion_guard_active:
+		return false
+	for visual in _presentation_visuals:
+		if not is_instance_valid(visual):
+			return false
+		if visual.layers != int(_original_visual_layers.get(visual.get_instance_id(), visual.layers)):
+			return false
+		if visual.visible != bool(_original_visual_visibility.get(visual.get_instance_id(), visual.visible)):
+			return false
+		if is_instance_valid(_body_readability_overlay) and visual is GeometryInstance3D and (visual as GeometryInstance3D).material_overlay == _body_readability_overlay:
+			return false
+	return true
+
 func _mcp_state() -> Dictionary:
 	return {
 		"framing_target": framing_target,
@@ -197,12 +278,20 @@ func _mcp_state() -> Dictionary:
 		"follow_height": follow_height,
 		"follow_distance": follow_distance,
 		"occlusion_guard_active": occlusion_guard_active,
+		"presentation_binding_complete": _binding_members.size() == 5 and _source_visuals.size() >= 2 and _effect_visuals.size() == 3,
+		"presentation_roles": ["body", "lantern", "dash_aura", "active_ring", "warden_halo"],
+		"original_presentation_restored": _original_presentation_restored(),
 		"visibility_isolation": {
 			"active": occlusion_guard_active, "blocked_samples": _visibility_samples_blocked,
 			"sample_count": 3, "blocked_seconds": _blocked_seconds,
 			"clear_seconds": _clear_seconds, "last_occluder": _last_occluder,
-			"strategy": "shared_world_layer_isolation",
-			"isolated_visual_count": _presentation_visuals.size(),
+				"strategy": "explicit_whole_warden_binding",
+				"isolated_visual_count": _presentation_visuals.size(),
+				"source_visual_count": _source_visuals.size(),
+				"isolation_visual_count": _source_visuals.size() + _effect_visuals.size(),
+				"effect_visual_count": _effect_visuals.size(),
+				"binding_members": _binding_members.duplicate(true),
+				"binding_complete": _binding_members.size() == 5 and _source_visuals.size() >= 2 and _effect_visuals.size() == 3,
 			"compositor_visible": _visibility_texture.visible if is_instance_valid(_visibility_texture) else false,
 			"compositor_updates": _visibility_viewport.render_target_update_mode == SubViewport.UPDATE_ALWAYS if is_instance_valid(_visibility_viewport) else false,
 			"compositor_frame_count": _compositor_frame_count,

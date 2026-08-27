@@ -30,6 +30,7 @@ var damage_taken := 0
 var damage_dealt := 0
 var outcome := ""
 var selected_upgrades: Array[Dictionary] = []
+var boss_transition_history: Array[Dictionary] = []
 var boss: BellkeeperActor
 var boss_snapshot: Dictionary = {}
 var quit_requested := false
@@ -185,6 +186,7 @@ func _begin_run() -> void:
 	damage_dealt = 0
 	outcome = ""
 	selected_upgrades.clear()
+	boss_transition_history.clear()
 	boss_snapshot.clear()
 	result_committed = false
 	terminal_commit_count = 0
@@ -490,6 +492,13 @@ func _on_draft_choice(index: int) -> void:
 	var choice := draft_controller.choose(index, inventory, health, warden)
 	if choice.is_empty():
 		return
+	var wave_state := wave_director.get_snapshot()
+	choice["draft_serial"] = draft_controller.draft_serial
+	choice["accepted_at_elapsed"] = run_elapsed
+	choice["accepted_at_wave_id"] = String((wave_state.get("definition", {}) as Dictionary).get("id", "warmup"))
+	choice["route_kind"] = run_route_kind
+	choice["natural_choice"] = run_route_kind == "ordinary" and int(wave_state.get("diagnostic_jump_count", 0)) == 0
+	choice["truthful_transaction"] = bool((choice.get("application", {}) as Dictionary).get("accepted", false)) and bool((choice.get("application", {}) as Dictionary).get("matches_projection", false))
 	selected_upgrades.append(choice)
 	draft_view.close()
 	get_tree().paused = false
@@ -513,6 +522,13 @@ func _spawn_bellkeeper() -> void:
 	world.get_node("BossAnchor").add_child(boss)
 	boss.position = Vector3.ZERO
 	boss.configure(warden)
+	var wave_state := wave_director.get_snapshot()
+	boss_transition_history.append({
+		"event":"bellkeeper_spawned", "elapsed":run_elapsed,
+		"wave_id":String((wave_state.get("definition", {}) as Dictionary).get("id", "")),
+		"wave_index":int(wave_state.get("wave", 0)), "route_kind":run_route_kind,
+		"natural_transition":run_route_kind == "ordinary" and int(wave_state.get("diagnostic_jump_count", 0)) == 0,
+	})
 	boss.boss_changed.connect(_on_boss_changed)
 	boss.defeated.connect(_on_boss_defeated)
 	boss.phase_shifted.connect(_on_boss_phase_shifted)
@@ -552,11 +568,19 @@ func _commit_terminal_snapshot(terminal_outcome: String) -> void:
 	terminal_snapshot["commit_run_serial"] = run_serial
 	terminal_snapshot["commit_count"] = terminal_commit_count
 	terminal_snapshot["route_kind"] = run_route_kind
+	terminal_snapshot["natural_build_history"] = selected_upgrades.duplicate(true)
+	terminal_snapshot["boss_transition_history"] = boss_transition_history.duplicate(true)
 	var wave_state := wave_director.get_snapshot()
+	var inside_victory_window := terminal_outcome == "victory" and run_elapsed >= 420.0 and run_elapsed <= 600.0
+	terminal_snapshot["victory_window_seconds"] = {"minimum":420.0, "maximum":600.0, "inside":inside_victory_window}
 	terminal_snapshot["ordinary_route_eligible"] = (
-		run_route_kind == "ordinary"
+		inside_victory_window
+		and run_route_kind == "ordinary"
 		and bool(wave_state.get("ordinary_route_complete", false))
 		and int(wave_state.get("diagnostic_jump_count", 0)) == 0
+		and not boss_transition_history.is_empty()
+		and bool(boss_transition_history[-1].get("natural_transition", false))
+		and _natural_build_history_truthful()
 	)
 	terminal_snapshot = terminal_snapshot.duplicate(true)
 
@@ -880,7 +904,16 @@ func _route_qualification(wave_state: Dictionary) -> Dictionary:
 		"run_route_kind":run_route_kind,
 		"ordinary_route_eligible":run_route_kind == "ordinary" and bool(wave_state.get("ordinary_route_eligible", false)),
 		"victory_window_seconds":{"minimum":420.0,"maximum":600.0},
+		"boss_transition_history":boss_transition_history.duplicate(true),
+		"natural_build_history":selected_upgrades.duplicate(true),
+		"natural_build_history_truthful":_natural_build_history_truthful(),
 	}
+
+func _natural_build_history_truthful() -> bool:
+	for choice in selected_upgrades:
+		if not bool(choice.get("natural_choice", false)) or not bool(choice.get("truthful_transaction", false)):
+			return false
+	return true
 
 func _record_retry_baseline(reason: String) -> void:
 	_retry_baseline_generation += 1
@@ -1003,6 +1036,9 @@ func _mcp_state() -> Dictionary:
 		"boss":{"active":boss_snapshot.get("active",false),"health":boss_snapshot.get("health",0.0),"health_maximum":boss_snapshot.get("health_maximum",0.0),"phase":boss_snapshot.get("phase",0)},"quit_requested":quit_requested,
 		"result_committed": result_committed, "terminal_snapshot_digest": _terminal_snapshot_digest(), "state_history": state_history,
 		"terminal_commit_count":terminal_commit_count, "run_route_kind":run_route_kind,
+		"boss_transition_history":boss_transition_history,
+		"natural_build_history":selected_upgrades,
+		"natural_build_history_truthful":_natural_build_history_truthful(),
 		"route_qualification":_route_qualification(wave_state),
 		"upgrade_draft":draft_controller.get_snapshot(), "teardown_receipt":teardown_receipt,
 		"tree_paused": get_tree().paused, "shell_mode": shell.mode,
