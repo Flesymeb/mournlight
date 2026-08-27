@@ -1,9 +1,22 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/audio/mournlight_audio_director.gd" id="1"]
 [ext_resource type="Resource" path="res://resources/audio/mournlight_audio_library.tres" id="2"]
+[ext_resource type="AudioStream" path="res://assets/audio_semantic/cogito_footsteps/footstep_stone_02.ogg" id="3_footstep"]
 
 [node name="MournlightAudio" type="Node" groups=["mcp_watch"]]
 process_mode = 3
 script = ExtResource("1")
 library = ExtResource("2")
+
+[node name="FootstepVoiceA" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("3_footstep")
+volume_db = -4.0
+bus = &"Effects"
+max_polyphony = 1
+
+[node name="FootstepVoiceB" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("3_footstep")
+volume_db = -4.0
+bus = &"Effects"
+max_polyphony = 1

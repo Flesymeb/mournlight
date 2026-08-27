@@ -5,6 +5,8 @@ extends Node
 
 var music: AudioStreamPlayer
 var voices: Array[AudioStreamPlayer] = []
+var movement_voices: Array[AudioStreamPlayer] = []
+var movement_window_remaining: Array[float] = []
 var voice_owners: Array[String] = []
 var voice_priorities: Array[int] = []
 var voice_semantics: Array[String] = []
@@ -19,6 +21,9 @@ var _footstep_clock := 0.0
 var _movement_was_active := false
 var owner_retire_counts: Dictionary = {}
 var last_owner_retirement: Dictionary = {}
+var footstep_source_starts: Array[Dictionary] = []
+var footstep_source_retirements: Array[Dictionary] = []
+var last_footstep_rejection: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -26,6 +31,14 @@ func _ready() -> void:
 	music.name = "MusicVoice"
 	music.bus = &"Music"
 	add_child(music)
+	for child_name in [&"FootstepVoiceA", &"FootstepVoiceB"]:
+		var movement_voice := get_node_or_null(NodePath(child_name)) as AudioStreamPlayer
+		if movement_voice:
+			movement_voice.bus = &"Effects"
+			movement_voice.max_polyphony = 1
+			movement_voices.append(movement_voice)
+			movement_window_remaining.append(0.0)
+			movement_voice.finished.connect(_on_movement_voice_finished.bind(movement_voices.size() - 1))
 	for index in 12:
 		var voice := AudioStreamPlayer.new()
 		voice.name = "SemanticVoice%02d" % index
@@ -41,6 +54,7 @@ func _ready() -> void:
 	call_deferred("_bind_events")
 
 func _process(delta: float) -> void:
+	_retire_expired_movement_windows(delta)
 	_retire_expired_windows(delta)
 	if get_tree().paused:
 		return
@@ -131,6 +145,8 @@ func _stop_music() -> void:
 	music_state = "silent"
 
 func play_semantic(id: String) -> bool:
+	if id == "footstep":
+		return _play_footstep_direct()
 	var streams := _streams_for(id)
 	if streams.is_empty():
 		missing_source_counts[id] = int(missing_source_counts.get(id, 0)) + 1
@@ -167,6 +183,103 @@ func play_semantic(id: String) -> bool:
 	voice.play(start_offset)
 	semantic_counts[id] = int(semantic_counts.get(id, 0)) + 1
 	return true
+
+func _play_footstep_direct() -> bool:
+	var streams := _streams_for("footstep")
+	if streams.is_empty() or movement_voices.is_empty():
+		missing_source_counts["footstep"] = int(missing_source_counts.get("footstep", 0)) + 1
+		rejected_counts["footstep"] = int(rejected_counts.get("footstep", 0)) + 1
+		last_footstep_rejection = {"reason":"missing_direct_source", "time_msec":Time.get_ticks_msec()}
+		return false
+	var voice_index := -1
+	for index in movement_voices.size():
+		if not movement_voices[index].playing and movement_window_remaining[index] <= 0.0:
+			voice_index = index
+			break
+	if voice_index < 0:
+		bounded_drop_counts["footstep"] = int(bounded_drop_counts.get("footstep", 0)) + 1
+		last_footstep_rejection = {
+			"reason":"movement_voice_limit", "time_msec":Time.get_ticks_msec(),
+			"active_movement_voices":_active_movement_voice_count(), "movement_voice_limit":movement_voices.size(),
+		}
+		return false
+	var cursor := int(_variation_cursor.get("footstep", 0))
+	var stream: AudioStream = streams[cursor % streams.size()]
+	_variation_cursor["footstep"] = cursor + 1
+	var voice := movement_voices[voice_index]
+	# Keep the scene-bound source authoritative. Reassign only if a stale editor
+	# instance did not load the exact accepted stream from the audio scene.
+	if voice.stream != stream:
+		voice.stream = stream
+	var volumes: Dictionary = library.get_meta("volumes_db", {}) if library else {}
+	var offsets: Dictionary = library.get_meta("playback_offsets", {}) if library else {}
+	var windows: Dictionary = library.get_meta("playback_windows", {}) if library else {}
+	var semantic_offsets = offsets.get("footstep", PackedFloat32Array())
+	var start_offset := 0.0
+	if semantic_offsets is PackedFloat32Array and semantic_offsets.size() > 0:
+		start_offset = float(semantic_offsets[cursor % semantic_offsets.size()])
+	voice.volume_db = float(volumes.get("footstep", -4.0))
+	voice.pitch_scale = 0.98 + float(cursor % 3) * 0.02
+	movement_window_remaining[voice_index] = maxf(0.01, float(windows.get("footstep", 0.28)))
+	voice.play(start_offset)
+	semantic_counts["footstep"] = int(semantic_counts.get("footstep", 0)) + 1
+	var receipt := {
+		"voice_path":String(voice.get_path()), "stream_path":voice.stream.resource_path if voice.stream else "",
+		"bus":String(voice.bus), "start_time_msec":Time.get_ticks_msec(), "start_offset_seconds":start_offset,
+		"retirement_window_seconds":movement_window_remaining[voice_index], "voice_index":voice_index,
+		"active_movement_voices":_active_movement_voice_count(), "movement_voice_limit":movement_voices.size(),
+	}
+	footstep_source_starts.append(receipt)
+	while footstep_source_starts.size() > 12:
+		footstep_source_starts.pop_front()
+	last_footstep_rejection.clear()
+	return true
+
+func _retire_expired_movement_windows(delta: float) -> void:
+	for index in movement_voices.size():
+		if movement_window_remaining[index] <= 0.0:
+			continue
+		movement_window_remaining[index] = maxf(0.0, movement_window_remaining[index] - delta)
+		if movement_window_remaining[index] <= 0.0:
+			_retire_movement_voice(index, "window_elapsed")
+
+func _on_movement_voice_finished(index: int) -> void:
+	_retire_movement_voice(index, "source_finished", false)
+
+func _retire_movement_voice(index: int, reason: String, stop_source := true) -> void:
+	if index < 0 or index >= movement_voices.size():
+		return
+	var voice := movement_voices[index]
+	var was_owned := movement_window_remaining[index] > 0.0 or voice.playing
+	if stop_source and voice.playing:
+		voice.stop()
+	movement_window_remaining[index] = 0.0
+	if not was_owned:
+		return
+	var receipt := {
+		"voice_path":String(voice.get_path()), "stream_path":voice.stream.resource_path if voice.stream else "",
+		"bus":String(voice.bus), "retired_time_msec":Time.get_ticks_msec(), "reason":reason,
+		"voice_index":index, "active_movement_voices":_active_movement_voice_count(),
+	}
+	footstep_source_retirements.append(receipt)
+	while footstep_source_retirements.size() > 12:
+		footstep_source_retirements.pop_front()
+	owner_retire_counts["movement"] = int(owner_retire_counts.get("movement", 0)) + 1
+	last_owner_retirement = {"owner":"movement", "reason":reason, "retired":1, "voice_path":String(voice.get_path())}
+
+func _active_movement_voice_count() -> int:
+	var active := 0
+	for index in movement_voices.size():
+		if movement_voices[index].playing or movement_window_remaining[index] > 0.0:
+			active += 1
+	return active
+
+func active_effect_voice_count() -> int:
+	var active := _active_movement_voice_count()
+	for voice in voices:
+		if voice.playing:
+			active += 1
+	return active
 
 func _streams_for(id: String) -> Array:
 	if not library or not library.has_meta(id):
@@ -216,6 +329,8 @@ func _retire_expired_windows(delta: float) -> void:
 			_release_voice(index)
 
 func _retire_semantic(semantic: String, reason: String) -> int:
+	if semantic == "footstep":
+		return _retire_movement_owner(reason)
 	var retired := 0
 	for index in voices.size():
 		if voice_semantics[index] != semantic:
@@ -229,6 +344,8 @@ func _retire_semantic(semantic: String, reason: String) -> int:
 	return retired
 
 func _retire_owner(owner: String, reason: String) -> int:
+	if owner == "movement":
+		return _retire_movement_owner(reason)
 	var retired := 0
 	for index in voices.size():
 		if voice_owners[index] != owner:
@@ -241,7 +358,17 @@ func _retire_owner(owner: String, reason: String) -> int:
 		last_owner_retirement = {"owner":owner, "reason":reason, "retired":retired}
 	return retired
 
+func _retire_movement_owner(reason: String) -> int:
+	var retired := 0
+	for index in movement_voices.size():
+		if movement_voices[index].playing or movement_window_remaining[index] > 0.0:
+			_retire_movement_voice(index, reason)
+			retired += 1
+	return retired
+
 func reset_for_run() -> void:
+	for index in movement_voices.size():
+		_retire_movement_voice(index, "run_reset")
 	for index in voices.size():
 		voices[index].stop()
 		_release_voice(index)
@@ -254,10 +381,17 @@ func reset_for_run() -> void:
 	_movement_was_active = false
 	owner_retire_counts.clear()
 	last_owner_retirement.clear()
+	footstep_source_starts.clear()
+	footstep_source_retirements.clear()
+	last_footstep_rejection.clear()
 
 func retire_run_ownership(route: String, generation: int) -> Dictionary:
 	var stopped_effects := 0
 	var owners_before: Array[String] = []
+	var movement_before := _active_movement_voice_count()
+	if movement_before > 0:
+		owners_before.append("movement")
+		stopped_effects += _retire_movement_owner("route_%s" % route)
 	for index in voices.size():
 		if voices[index].playing:
 			stopped_effects += 1
@@ -267,20 +401,25 @@ func retire_run_ownership(route: String, generation: int) -> Dictionary:
 	_stop_music()
 	_footstep_clock = 0.0
 	_movement_was_active = false
-	return {"route":route, "generation":generation, "stopped_effects":stopped_effects, "owners_before":owners_before, "active_effect_voices":0, "music_state":music_state, "music_playing":music.playing}
+	return {"route":route, "generation":generation, "stopped_effects":stopped_effects, "owners_before":owners_before, "movement_before":movement_before, "active_effect_voices":active_effect_voice_count(), "active_movement_voices":_active_movement_voice_count(), "music_state":music_state, "music_playing":music.playing}
 
 func _mcp_state() -> Dictionary:
-	var playing := 0
+	var playing := _active_movement_voice_count()
 	var active_by_owner: Dictionary = {}
+	if playing > 0:
+		active_by_owner["movement"] = playing
 	for index in voices.size():
 		if voices[index].playing:
 			playing += 1
 			var owner := voice_owners[index]
 			active_by_owner[owner] = int(active_by_owner.get(owner, 0)) + 1
 	return {"music_state":music_state,"music_playing":music.playing,"active_effect_voices":playing,
-		"voice_limit":voices.size(),"active_by_owner":active_by_owner,"semantic_counts":semantic_counts,
+		"voice_limit":voices.size() + movement_voices.size(),"semantic_voice_limit":voices.size(),"active_by_owner":active_by_owner,"semantic_counts":semantic_counts,
 		"rejected_counts":rejected_counts,"missing_source_counts":missing_source_counts,
 		"bounded_drop_counts":bounded_drop_counts,"library_bound":library != null,
 		"owner_retire_counts":owner_retire_counts,"last_owner_retirement":last_owner_retirement,
+		"movement_voice_limit":movement_voices.size(),"active_movement_voices":_active_movement_voice_count(),
+		"footstep_sources":movement_voices.map(func(voice: AudioStreamPlayer) -> Dictionary: return {"path":String(voice.get_path()),"stream_path":voice.stream.resource_path if voice.stream else "","bus":String(voice.bus),"playing":voice.playing,"playback_position":voice.get_playback_position() if voice.playing else 0.0}),
+		"footstep_source_starts":footstep_source_starts,"footstep_source_retirements":footstep_source_retirements,"last_footstep_rejection":last_footstep_rejection,
 		"footstep_window_seconds":float((library.get_meta("playback_windows", {}) as Dictionary).get("footstep", 0.0)) if library else 0.0,
 		"source_revision":String(library.get_meta("source_revision", "")) if library else ""}

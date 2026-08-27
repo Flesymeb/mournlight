@@ -43,6 +43,7 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 		"outcome": String(controller.outcome),
 		"damage_dealt": int(controller.damage_dealt),
 		"selected_upgrades": controller.selected_upgrades.duplicate(true),
+		"warden_animation": warden.animation_binding.get_snapshot() if warden and warden.animation_binding else {},
 		"upgrade_draft": controller.draft_controller.get_snapshot(),
 		"teardown_receipt": controller.teardown_receipt.duplicate(true),
 		"pause_ownership": {

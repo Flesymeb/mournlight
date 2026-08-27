@@ -65,6 +65,7 @@ var validation_profile_receipt: Dictionary = {}
 var validation_profile_sample: Dictionary = {}
 var validation_retry_baselines: Array[Dictionary] = []
 var validation_profile_cycles: Array[Dictionary] = []
+var ordinary_victory_receipt: Dictionary = {}
 var pickup_spawned_total := 0
 var pickup_collected_total := 0
 var _profile_samples_ms: Array[float] = []
@@ -201,6 +202,7 @@ func _begin_run() -> void:
 	outcome = ""
 	selected_upgrades.clear()
 	boss_transition_history.clear()
+	ordinary_victory_receipt.clear()
 	boss_snapshot.clear()
 	result_committed = false
 	terminal_commit_count = 0
@@ -596,11 +598,24 @@ func _on_boss_defeated(_event: Dictionary) -> void:
 		return
 	result_committed = true
 	outcome = "victory"
+	if warden.animation_binding:
+		warden.animation_binding.trigger("victory",999.0)
+	var wave_state := wave_director.get_snapshot()
+	ordinary_victory_receipt = {
+		"route_kind":run_route_kind, "elapsed":run_elapsed,
+		"wave_id":String((wave_state.get("definition", {}) as Dictionary).get("id", "")),
+		"wave_ids":(wave_state.get("ordinary_route_wave_ids", []) as Array).duplicate(),
+		"ordinary_route_complete":bool(wave_state.get("ordinary_route_complete", false)),
+		"diagnostic_jump_count":int(wave_state.get("diagnostic_jump_count", 0)),
+		"animation":warden.animation_binding.get_snapshot() if warden.animation_binding else {},
+		"result_commit_count_before":terminal_commit_count,
+	}
 	_commit_terminal_snapshot("victory")
+	ordinary_victory_receipt["result_commit_count_after"] = terminal_commit_count
+	ordinary_victory_receipt["result_committed"] = result_committed
 	_teardown_run("result", "victory")
 	get_tree().paused = true
 	_transition("victory")
-	if warden.animation_binding: warden.animation_binding.trigger("victory",999.0)
 	_emit_snapshot()
 	call_deferred("_present_result",{})
 
@@ -620,6 +635,7 @@ func _commit_terminal_snapshot(terminal_outcome: String) -> void:
 	terminal_snapshot["route_kind"] = run_route_kind
 	terminal_snapshot["natural_build_history"] = selected_upgrades.duplicate(true)
 	terminal_snapshot["boss_transition_history"] = boss_transition_history.duplicate(true)
+	terminal_snapshot["terminal_animation"] = warden.animation_binding.get_snapshot() if warden.animation_binding else {}
 	var wave_state := wave_director.get_snapshot()
 	var inside_victory_window := terminal_outcome == "victory" and run_elapsed >= 420.0 and run_elapsed <= 600.0
 	terminal_snapshot["victory_window_seconds"] = {"minimum":420.0, "maximum":600.0, "inside":inside_victory_window}
@@ -960,9 +976,7 @@ func _profile_counts() -> Dictionary:
 		if node is Light3D and node.is_visible_in_tree():
 			lights += 1
 	var audio_voices := 0
-	for voice in audio_director.voices:
-		if voice.playing:
-			audio_voices += 1
+	audio_voices = audio_director.active_effect_voice_count()
 	return {
 		"enemies":int(encounter.get("live",0)),
 		"pooled_enemies":int(encounter.get("pooled",0)),
@@ -1043,6 +1057,7 @@ func _record_retry_baseline(reason: String) -> void:
 		"source":reason,
 		"tree_paused":get_tree().paused, "run_state":run_state,
 		"counts":_profile_counts(),
+		"warden_animation":warden.animation_binding.get_snapshot() if warden.animation_binding else {},
 		"world_active":world.session_active,
 		"teardown_generation":teardown_receipt.get("completion_generation",0),
 	}
@@ -1178,6 +1193,7 @@ func _mcp_state() -> Dictionary:
 		"validation_profile_sample":validation_profile_sample,
 		"validation_profile_cycles":validation_profile_cycles,
 		"validation_retry_baselines":validation_retry_baselines,
+		"ordinary_victory_receipt":ordinary_victory_receipt,
 		"reward_pickups":{"spawned_total":pickup_spawned_total,"collected_total":pickup_collected_total,"live":get_tree().get_nodes_in_group("reward_pickup").size()},
 		"shell_focus": String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none",
 	}
@@ -1188,7 +1204,8 @@ func _terminal_snapshot_digest() -> Dictionary:
 		"commit_count":terminal_snapshot.get("commit_count",0),"route_kind":terminal_snapshot.get("route_kind",""),"ordinary_route_eligible":terminal_snapshot.get("ordinary_route_eligible",false),
 		"outcome":terminal_snapshot.get("outcome",""),"elapsed":terminal_snapshot.get("elapsed",0.0),"wave":terminal_snapshot.get("wave",0),
 		"level":terminal_snapshot.get("level",0),"defeated":terminal_snapshot.get("defeated",0),"damage_dealt":terminal_snapshot.get("damage_dealt",0),
-		"damage_taken":terminal_snapshot.get("damage_taken",0),"weapon_ranks":_terminal_weapon_ranks(),"selected_upgrades":terminal_snapshot.get("selected_upgrades",[])}
+		"damage_taken":terminal_snapshot.get("damage_taken",0),"weapon_ranks":_terminal_weapon_ranks(),"selected_upgrades":terminal_snapshot.get("selected_upgrades",[]),
+		"terminal_animation":terminal_snapshot.get("terminal_animation",{})}
 
 func _terminal_weapon_ranks() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
