@@ -5,6 +5,8 @@ The machine-inspectable aggregate release inventory is `ASSET_PROVENANCE.json`. 
 - Montserrat type family: OFL-1.1; exact staged font receipts are in `assets/fonts/`.
 - Maaack Godot Menus Template interaction reference: MIT; retained under `ui/menus/maaack/` with its complete receipt and attribution.
 - Stylized Possessed Lantern by its Sketchfab author: CC-BY-4.0; exact source receipt is `assets/authored/bellkeeper.glb.receipt.json`.
+- Low poly lamp post by dasWarder: CC-BY-4.0; intact 296-triangle source and the exact host acquisition receipt are `assets/landmarks/keeper_post.glb` and `assets/landmarks/keeper_post.glb.receipt.json`.
+- Old Bell by CharlieC: CC-BY-4.0; intact authored cracked-bell source and the exact host acquisition receipt are `assets/landmarks/cracked_bell.glb` and `assets/landmarks/cracked_bell.glb.receipt.json`.
 - Simple Stylized Lantern (HandPainted) by its Sketchfab author: CC-BY-4.0; exact source receipt is `assets/authored/warden_lantern.glb.receipt.json`. The intact source is used by the Warden and escaped-wisp reward pickup presentation.
 - KayKit Character Pack: Adventurers — Mage by Kay Lousberg: CC0-1.0; the copied license and exact archive/file hashes are in `assets/authored/KAYKIT_ADVENTURERS_LICENSE.txt` and `assets/authored/warden_kaykit_mage.glb.receipt.json`. The intact rigged Mage package supplies the Warden’s native skinned hierarchy and seven directly bound authored clips.
 - Audio library materialized from Mark's Boomer Shooter: MIT project code; bundled sounds retain their upstream notices. Exact materialization receipt and upstream `LICENSE.md` are in `assets/audio_library/`.

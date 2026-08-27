@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "product": "Mournlight",
+  "package_id": "warden.kaykit_mage",
+  "source": {
+    "path": "assets/authored/warden_kaykit_mage.glb",
+    "sha256": "cf898585da33fab50c724d31605fb931eb2912e6d2280092141e98ca81ad507d",
+    "immutable_whole_asset": true,
+    "mesh_surgery_performed": false,
+    "transform_or_clip_tuning_performed": false
+  },
+  "hierarchy_and_animation": {
+    "skeleton_bones": 41,
+    "source_clip_count": 76,
+    "profile": "resources/presentation/warden_animation_profile.tres",
+    "binding_valid_required": true,
+    "semantic_clips": {
+      "idle": "Idle",
+      "move": "Running_A",
+      "dash": "Dodge_Forward",
+      "cast": "Spellcast_Shoot",
+      "hurt": "Hit_A",
+      "death": "Death_A",
+      "victory": "Cheer"
+    },
+    "distinct_authored_clip_count": 7
+  },
+  "material_inspection": {
+    "shared_surface_name": "mage_texture",
+    "material": "assets/authored/warden_kaykit_mage.glb::StandardMaterial3D_7bkgx",
+    "albedo_texture": "assets/authored/warden_kaykit_mage_mage_texture.png",
+    "albedo_color": [1.0, 1.0, 1.0, 1.0],
+    "transparency": 0,
+    "runtime_result": "No black, checkerboard, missing-texture, or tangent-corruption artifact was visible on the lit shipped-camera character across the representative semantic-state review."
+  },
+  "representative_state_contract": [
+    "idle",
+    "move",
+    "dash",
+    "cast",
+    "hurt",
+    "death",
+    "victory",
+    "post_retry_idle"
+  ],
+  "validator_findings": [
+    {"id":"uv-01","node":"Mage_LegRight","surface":0,"stat":"8% of triangles have zero UV area","material_use":"mage_texture/albedo","representative_states":["idle","move","dash","death","victory"],"visible_material_impact":false,"disposition":"accepted_source_warning_no_visible_runtime_impact"},
+    {"id":"uv-02","node":"Mage_LegLeft","surface":0,"stat":"8% of triangles have zero UV area","material_use":"mage_texture/albedo","representative_states":["idle","move","dash","death","victory"],"visible_material_impact":false,"disposition":"accepted_source_warning_no_visible_runtime_impact"},
+    {"id":"uv-03","node":"Mage_Body","surface":0,"stat":"9% of triangles have zero UV area","material_use":"mage_texture/albedo","representative_states":["idle","move","dash","cast","hurt","death","victory","post_retry_idle"],"visible_material_impact":false,"disposition":"accepted_source_warning_no_visible_runtime_impact"},
+    {"id":"uv-04","node":"Mage_ArmRight","surface":0,"stat":"21% of triangles have zero UV area","material_use":"mage_texture/albedo","representative_states":["idle","move","dash","cast","hurt","death","victory"],"visible_material_impact":false,"disposition":"accepted_source_warning_no_visible_runtime_impact"},
+    {"id":"uv-05","node":"Mage_ArmLeft","surface":0,"stat":"21% of triangles have zero UV area","material_use":"mage_texture/albedo","representative_states":["idle","move","dash","cast","hurt","death","victory"],"visible_material_impact":false,"disposition":"accepted_source_warning_no_visible_runtime_impact"},
+    {"id":"uv-06","node":"Mage_Hat","surface":0,"stat":"6% of triangles have zero UV area","material_use":"mage_texture/albedo","representative_states":["idle","move","dash","cast","hurt","death","victory","post_retry_idle"],"visible_material_impact":false,"disposition":"accepted_source_warning_no_visible_runtime_impact"},
+    {"id":"uv-07","node":"2H_Staff","surface":0,"stat":"7% of triangles have zero UV area","material_use":"mage_texture/albedo","representative_states":["cast","hurt","death","victory"],"visible_material_impact":false,"disposition":"accepted_source_warning_no_visible_runtime_impact"},
+    {"id":"uv-08","node":"1H_Wand","surface":0,"stat":"12% of triangles have zero UV area","material_use":"mage_texture/albedo","representative_states":["cast","hurt","death","victory"],"visible_material_impact":false,"disposition":"accepted_source_warning_no_visible_runtime_impact"},
+    {"id":"uv-09","node":"Spellbook_open","surface":0,"stat":"30% of triangles have zero UV area","material_use":"mage_texture/albedo","representative_states":["cast","hurt","death","victory"],"visible_material_impact":false,"disposition":"accepted_source_warning_no_visible_runtime_impact"},
+    {"id":"uv-10","node":"Spellbook","surface":0,"stat":"45% of triangles have zero UV area","material_use":"mage_texture/albedo","representative_states":["idle","move","dash","post_retry_idle"],"visible_material_impact":false,"disposition":"accepted_source_warning_no_visible_runtime_impact"}
+  ],
+  "finding_count": 10,
+  "qualification": "accepted_warning_without_visible_material_impact",
+  "reopen_condition": "Reopen package selection only if candidate-bound rendered evidence shows package-level material corruption that cannot be repaired without modifying the immutable GLB."
+}

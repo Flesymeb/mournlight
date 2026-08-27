@@ -942,6 +942,49 @@ func _record_profile_cycle(phase: String, receipt: Dictionary) -> void:
 	while validation_profile_cycles.size() > 16:
 		validation_profile_cycles.pop_front()
 
+func _profile_cycle_comparison() -> Dictionary:
+	var completed: Array[Dictionary] = []
+	var current: Dictionary = {}
+	for entry in validation_profile_cycles:
+		var phase := String(entry.get("receipt_phase", ""))
+		if phase == "prepare":
+			current = {
+				"prepared_run_serial":entry.get("run_serial", -1),
+				"prepare_setup_generation":entry.get("setup_generation", -1),
+				"requested_density":entry.get("requested_density", -1),
+				"resolved_density":entry.get("resolved_density", -1),
+			}
+		elif phase == "advance" and not current.is_empty():
+			current["sample"] = {
+				"sample_count":entry.get("sample_count", 0),
+				"window_seconds":entry.get("window_seconds", 0.0),
+				"frame_ms":(entry.get("frame_ms", {}) as Dictionary).duplicate(true),
+				"renderer":(entry.get("renderer", {}) as Dictionary).duplicate(true),
+			}
+		elif phase == "reset_immediate" and not current.is_empty():
+			current["reset"] = {
+				"source_run_serial":entry.get("source_run_serial", -1),
+				"next_run_serial":entry.get("run_serial", -1),
+				"reset_setup_generation":entry.get("setup_generation", -1),
+				"immediate_isolation":entry.get("reset_isolation", false),
+			}
+		elif phase == "reset_next_frame" and not current.is_empty():
+			var reset: Dictionary = current.get("reset", {})
+			reset["next_frame_isolation"] = entry.get("next_frame_isolation", false)
+			reset["next_frame_counts"] = (entry.get("next_frame_counts", {}) as Dictionary).duplicate(true)
+			current["reset"] = reset
+			current["complete"] = true
+			completed.append(current.duplicate(true))
+			current.clear()
+	while completed.size() > 3:
+		completed.pop_front()
+	return {
+		"required_cycle_count":3,
+		"completed_cycle_count":completed.size(),
+		"cycles":completed,
+		"three_cycle_ready":completed.size() == 3,
+	}
+
 func _counts_are_isolated(counts: Dictionary) -> bool:
 	return (
 		int(counts.get("enemies", -1)) == 0
@@ -1192,6 +1235,7 @@ func _mcp_state() -> Dictionary:
 		"validation_profile":validation_profile_receipt,
 		"validation_profile_sample":validation_profile_sample,
 		"validation_profile_cycles":validation_profile_cycles,
+		"validation_profile_cycle_comparison":_profile_cycle_comparison(),
 		"validation_retry_baselines":validation_retry_baselines,
 		"ordinary_victory_receipt":ordinary_victory_receipt,
 		"reward_pickups":{"spawned_total":pickup_spawned_total,"collected_total":pickup_collected_total,"live":get_tree().get_nodes_in_group("reward_pickup").size()},
