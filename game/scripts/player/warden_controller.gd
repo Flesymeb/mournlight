@@ -180,7 +180,7 @@ func _on_animation_semantic_changed(_previous: String, current: String) -> void:
 	if current in ["death", "victory"]:
 		process_mode = Node.PROCESS_MODE_ALWAYS
 
-func reset_for_run(spawn_position: Vector3) -> void:
+func reset_for_run(spawn_position: Vector3, reset_owner := "run_reset") -> void:
 	process_mode = Node.PROCESS_MODE_PAUSABLE
 	global_position = spawn_position
 	velocity = Vector3.ZERO
@@ -196,7 +196,7 @@ func reset_for_run(spawn_position: Vector3) -> void:
 	lantern.rotation = Vector3.ZERO
 	presentation_root.scale = _base_presentation_scale
 	_set_dash_phase(DashPhase.READY, 0.0)
-	animation_binding.reset()
+	animation_binding.reset(reset_owner)
 	_follow_lantern_socket()
 	reset_input_latch()
 

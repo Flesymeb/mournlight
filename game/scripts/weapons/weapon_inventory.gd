@@ -86,7 +86,28 @@ func get_snapshot() -> Dictionary:
 				"rank": get_rank(definition.weapon_id),
 				"stats": get_stats(definition.weapon_id),
 			})
-	return {"equipped_weapon_ids": equipped_weapon_ids.duplicate(), "weapons": weapons}
+	return {"equipped_weapon_ids": equipped_weapon_ids.duplicate(), "weapons": weapons,
+		"build_identity":_build_identity(weapons)}
+
+func _build_identity(weapons: Array[Dictionary]) -> Dictionary:
+	var lanes: Array[Dictionary] = []
+	var dominant := "starting_lantern"
+	var dominant_rank := -1
+	for weapon in weapons:
+		if not bool(weapon.get("equipped", false)):
+			continue
+		var stats: Dictionary = weapon.get("stats", {})
+		var lane := {
+			"weapon_id":String(weapon.get("weapon_id", "")),
+			"rank":int(weapon.get("rank", 0)),
+			"strategy":String(stats.get("strategy", "")),
+		}
+		lanes.append(lane)
+		if int(lane.rank) > dominant_rank:
+			dominant_rank = int(lane.rank)
+			dominant = String(lane.strategy)
+	return {"dominant_shape":dominant,"dominant_rank":dominant_rank,"lanes":lanes,
+		"supported_shapes":["focused_bolt","threat_sweep","persistent_orbit"]}
 
 func _validate_unique_ids() -> void:
 	var seen: Dictionary = {}

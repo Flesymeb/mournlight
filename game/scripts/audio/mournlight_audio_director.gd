@@ -24,6 +24,10 @@ var last_owner_retirement: Dictionary = {}
 var footstep_source_starts: Array[Dictionary] = []
 var footstep_source_retirements: Array[Dictionary] = []
 var last_footstep_rejection: Dictionary = {}
+var terminal_audio_owner := ""
+var terminal_audio_semantic := ""
+var terminal_audio_generation := 0
+var terminal_audio_reset_generation := 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -88,7 +92,8 @@ func _bind_events() -> void:
 	var health := controller.get_node_or_null("World/Warden/HealthComponent")
 	if health:
 		health.hurt.connect(func(_event: Dictionary) -> void: play_semantic("warden_hurt"))
-		health.died.connect(func(_event: Dictionary) -> void: play_semantic("death"))
+		# RunController owns terminal audio after combat teardown. Health still
+		# owns deformation immediately, without starting a duplicate death voice.
 	var warden := controller.get_node_or_null("World/Warden")
 	if warden:
 		warden.dash_phase_changed.connect(func(phase: String, _invulnerable: bool) -> void:
@@ -118,12 +123,22 @@ func _on_state_changed(_previous: String, current: String) -> void:
 		"boss": _set_music("boss")
 		"failure":
 			_stop_music()
-			play_semantic("death")
+			_acquire_terminal_audio("death", "run_state_failure")
 		"victory":
 			_stop_music()
-			play_semantic("victory")
+			_acquire_terminal_audio("victory", "run_state_victory")
 		"result": _set_music("result")
 		"draft": play_semantic("upgrade_open")
+
+func _acquire_terminal_audio(semantic: String, owner: String) -> bool:
+	if not terminal_audio_semantic.is_empty():
+		return terminal_audio_semantic == semantic
+	if not play_semantic(semantic):
+		return false
+	terminal_audio_generation += 1
+	terminal_audio_semantic = semantic
+	terminal_audio_owner = owner
+	return true
 
 func _set_music(state: String) -> void:
 	var streams := _streams_for("music")
@@ -384,6 +399,9 @@ func reset_for_run() -> void:
 	footstep_source_starts.clear()
 	footstep_source_retirements.clear()
 	last_footstep_rejection.clear()
+	terminal_audio_owner = ""
+	terminal_audio_semantic = ""
+	terminal_audio_reset_generation += 1
 
 func retire_run_ownership(route: String, generation: int) -> Dictionary:
 	var stopped_effects := 0
@@ -401,7 +419,12 @@ func retire_run_ownership(route: String, generation: int) -> Dictionary:
 	_stop_music()
 	_footstep_clock = 0.0
 	_movement_was_active = false
-	return {"route":route, "generation":generation, "stopped_effects":stopped_effects, "owners_before":owners_before, "movement_before":movement_before, "active_effect_voices":active_effect_voice_count(), "active_movement_voices":_active_movement_voice_count(), "music_state":music_state, "music_playing":music.playing}
+	var released_terminal := {"semantic":terminal_audio_semantic,"owner":terminal_audio_owner,"generation":terminal_audio_generation}
+	if route != "result":
+		terminal_audio_owner = ""
+		terminal_audio_semantic = ""
+		terminal_audio_reset_generation += 1
+	return {"route":route, "generation":generation, "stopped_effects":stopped_effects, "owners_before":owners_before, "movement_before":movement_before, "active_effect_voices":active_effect_voice_count(), "active_movement_voices":_active_movement_voice_count(), "music_state":music_state, "music_playing":music.playing, "released_terminal":released_terminal, "terminal_preserved":route == "result"}
 
 func _mcp_state() -> Dictionary:
 	var playing := _active_movement_voice_count()
@@ -418,6 +441,7 @@ func _mcp_state() -> Dictionary:
 		"rejected_counts":rejected_counts,"missing_source_counts":missing_source_counts,
 		"bounded_drop_counts":bounded_drop_counts,"library_bound":library != null,
 		"owner_retire_counts":owner_retire_counts,"last_owner_retirement":last_owner_retirement,
+		"terminal_audio_lease":{"active":not terminal_audio_semantic.is_empty(),"semantic":terminal_audio_semantic,"owner":terminal_audio_owner,"generation":terminal_audio_generation,"reset_generation":terminal_audio_reset_generation},
 		"movement_voice_limit":movement_voices.size(),"active_movement_voices":_active_movement_voice_count(),
 		"footstep_sources":movement_voices.map(func(voice: AudioStreamPlayer) -> Dictionary: return {"path":String(voice.get_path()),"stream_path":voice.stream.resource_path if voice.stream else "","bus":String(voice.bus),"playing":voice.playing,"playback_position":voice.get_playback_position() if voice.playing else 0.0}),
 		"footstep_source_starts":footstep_source_starts,"footstep_source_retirements":footstep_source_retirements,"last_footstep_rejection":last_footstep_rejection,

@@ -54,6 +54,15 @@ var _hurt_light_owners: Dictionary = {}
 var _light_peak_active := 0
 var _light_peak_requested := 0
 var _baseline_live_cap := 10
+var _validation_cohort_active := false
+var _validation_cohort_target := 0
+var _validation_cohort_generation := 0
+var _validation_cohort_start_live := 0
+var _validation_cohort_minimum_live := 0
+var _validation_cohort_replenished := 0
+var _validation_cohort_deaths := 0
+var _validation_cohort_maintenance_ticks := 0
+var _validation_cohort_last_receipt: Dictionary = {}
 
 const LANES := [
 	Vector3(-10.2, 0.05, -7.8), Vector3(-4.2, 0.05, -8.8),
@@ -102,6 +111,7 @@ func configure_pressure(definition: Dictionary) -> void:
 	set_meta("spawn_cadence", cadence)
 
 func stop_encounter() -> void:
+	end_validation_profile_cohort("encounter_stopped")
 	active = false
 	set_process(false)
 	for actor in _pool:
@@ -116,6 +126,7 @@ func stop_encounter() -> void:
 	_emit_snapshot()
 
 func reset_encounter(preserve_pressure: bool = false) -> void:
+	end_validation_profile_cohort("encounter_reset")
 	active = false
 	set_process(false)
 	spawned_total = 0
@@ -164,6 +175,7 @@ func _process(delta: float) -> void:
 	if _spawn_cooldown <= 0.0 and _active_count() < live_cap and _wave_spawned < _spawn_budget:
 		_spawn_one(_spawn_cursor)
 		_spawn_cooldown = float(get_meta("spawn_cadence", 1.45))
+	_maintain_validation_profile_cohort()
 
 func _spawn_one(role_offset: int) -> bool:
 	var actor := _next_pooled_actor()
@@ -229,6 +241,63 @@ func prepare_validation_density(target_live: int) -> Dictionary:
 	_update_light_budget()
 	return {"accepted": _active_count() >= bounded_target, "target": bounded_target,
 		"live": _active_count(), "attempts": attempts, "cap": live_cap}
+
+func begin_validation_profile_cohort(target_live: int, setup_generation: int) -> Dictionary:
+	if not OS.has_feature("editor") or not active:
+		return {"accepted":false,"reason":"release_guard_or_inactive"}
+	_validation_cohort_active = true
+	_validation_cohort_target = clampi(target_live, 1, mini(live_cap, pool_size))
+	_validation_cohort_generation = setup_generation
+	_validation_cohort_start_live = _active_count()
+	_validation_cohort_minimum_live = _validation_cohort_start_live
+	_validation_cohort_replenished = 0
+	_validation_cohort_deaths = 0
+	_validation_cohort_maintenance_ticks = 0
+	_maintain_validation_profile_cohort()
+	_validation_cohort_last_receipt = get_validation_profile_cohort_snapshot()
+	return _validation_cohort_last_receipt.duplicate(true)
+
+func end_validation_profile_cohort(reason: String) -> Dictionary:
+	if not _validation_cohort_active:
+		return _validation_cohort_last_receipt.duplicate(true)
+	_maintain_validation_profile_cohort()
+	_validation_cohort_last_receipt = get_validation_profile_cohort_snapshot()
+	_validation_cohort_last_receipt["active"] = false
+	_validation_cohort_last_receipt["end_reason"] = reason
+	_validation_cohort_last_receipt["end_live"] = _active_count()
+	_validation_cohort_active = false
+	return _validation_cohort_last_receipt.duplicate(true)
+
+func _maintain_validation_profile_cohort() -> void:
+	if not _validation_cohort_active or not OS.has_feature("editor") or not active:
+		return
+	_validation_cohort_maintenance_ticks += 1
+	var attempts := 0
+	while _active_count() < _validation_cohort_target and attempts < pool_size:
+		# Diagnostic cohort admission intentionally bypasses only the authored
+		# wave spawn budget. It uses the same pool, spawn validation, role roster,
+		# combat actor and reward lifecycle as production spawning.
+		if not _spawn_one(_wave_spawned):
+			break
+		_validation_cohort_replenished += 1
+		attempts += 1
+	_validation_cohort_minimum_live = mini(_validation_cohort_minimum_live, _active_count())
+
+func get_validation_profile_cohort_snapshot() -> Dictionary:
+	return {
+		"active":_validation_cohort_active,
+		"setup_generation":_validation_cohort_generation,
+		"requested":_validation_cohort_target,
+		"start":_validation_cohort_start_live,
+		"minimum":_validation_cohort_minimum_live,
+		"current":_active_count(),
+		"replenished":_validation_cohort_replenished,
+		"combat_deaths":_validation_cohort_deaths,
+		"maintenance_ticks":_validation_cohort_maintenance_ticks,
+		"pool_size":pool_size,
+		"wave_budget_bypass_only":true,
+		"combat_causality_preserved":true,
+	}
 
 func _select_profile(sequence_index: int) -> EnemyProfile:
 	if profiles.is_empty():
@@ -429,6 +498,8 @@ func _actor_key(actor: EnemyActor) -> String:
 
 func _on_enemy_defeated(actor: EnemyActor, event: Dictionary) -> void:
 	defeated_total += 1
+	if _validation_cohort_active:
+		_validation_cohort_deaths += 1
 	var report := event.duplicate(true)
 	report.stable_id = String(actor.stable_id)
 	report.role_id = String(actor.profile.role_id)
@@ -442,6 +513,9 @@ func _on_enemy_defeated(actor: EnemyActor, event: Dictionary) -> void:
 			return
 		actor.remove_from_group("active_enemies")
 		actor.return_to_pool()
+		# The real death and reward transaction is complete before the same
+		# authoritative pool boundary admits its deterministic replacement.
+		_maintain_validation_profile_cohort()
 		_emit_snapshot()
 	)
 
@@ -503,6 +577,7 @@ func get_snapshot() -> Dictionary:
 		"variant_balance":_variant_balance_receipt(role_variants),
 		"validation_roster_active":not _validation_role_sequence.is_empty(),
 		"validation_roster_size":_validation_role_sequence.size(),
+		"validation_profile_cohort":get_validation_profile_cohort_snapshot() if _validation_cohort_active else _validation_cohort_last_receipt.duplicate(true),
 		"rejected_spawns": rejected_spawn_count, "last_spawn_receipt": last_spawn_receipt,
 		"last_lifecycle_event": last_lifecycle_event,
 		"wave_id": _wave_id, "wave_spawned": _wave_spawned, "spawn_budget": _spawn_budget,
@@ -562,5 +637,6 @@ func _mcp_state() -> Dictionary:
 		"ordinary_light_budget":snapshot.get("ordinary_light_budget", {}),
 		"dense_presentation_budget":snapshot.get("dense_presentation_budget", {}),
 		"neighbor_registry":snapshot.get("neighbor_registry", {}),
+		"validation_profile_cohort":snapshot.get("validation_profile_cohort", {}),
 		"last_lifecycle_event":snapshot.get("last_lifecycle_event", {}),
 	}

@@ -56,9 +56,9 @@ func set_session_active(value: bool) -> void:
 	for runtime in [$Warden/Weapons/WardenLanternRuntime, $Warden/Weapons/GravespadeRuntime, $Warden/Weapons/WanderingWispsRuntime]:
 		runtime.set_physics_process(value)
 
-func reset_session(reset_presentation := true) -> void:
+func reset_session(reset_presentation := true, presentation_reset_owner := "run_reset") -> void:
 	if reset_presentation:
-		warden.reset_for_run(Vector3(0, 0.05, 6.0))
+		warden.reset_for_run(Vector3(0, 0.05, 6.0), presentation_reset_owner)
 	else:
 		# Result teardown retires combat ownership but leaves the authored
 		# terminal deformation and lantern attachment alive until Retry/Title.

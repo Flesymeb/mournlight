@@ -211,7 +211,7 @@ func _begin_run() -> void:
 	terminal_snapshot.clear()
 	draft_controller.reset()
 	audio_director.reset_for_run()
-	world.reset_session()
+	world.reset_session(true, "begin_run_%s" % _next_baseline_reason)
 	_health_accounting_suspended = true
 	health.maximum_health = 100.0
 	health.reset_warden_health()
@@ -382,8 +382,9 @@ func _on_warden_failed(event: Dictionary) -> void:
 		return
 	result_committed = true
 	outcome = "failure"
+	if warden.animation_binding:
+		warden.animation_binding.acquire_terminal_lease("death", "run_controller.failure", run_serial)
 	_commit_terminal_snapshot("failure")
-	if warden.animation_binding: warden.animation_binding.trigger("death",999.0)
 	_teardown_run("result", "failure")
 	get_tree().paused = true
 	_transition("failure")
@@ -643,7 +644,7 @@ func _on_boss_defeated(_event: Dictionary) -> void:
 	result_committed = true
 	outcome = "victory"
 	if warden.animation_binding:
-		warden.animation_binding.trigger("victory",999.0)
+		warden.animation_binding.acquire_terminal_lease("victory", "run_controller.bellkeeper_defeat", run_serial)
 	var wave_state := wave_director.get_snapshot()
 	ordinary_victory_receipt = {
 		"transaction_id":"victory.r%04d" % run_serial,
@@ -736,7 +737,14 @@ func _teardown_run(route: String, reason: String) -> Dictionary:
 		boss.queue_free()
 	boss = null
 	var transient_retirement := _retire_transient_ownership(route, reason, _teardown_generation)
-	world.reset_session(route != "result")
+	# Combat ownership always retires without touching terminal deformation.
+	# Title resets here; Retry/fresh-start/profile reset do their single reset
+	# in _begin_run(), while result preserves the lease.
+	world.reset_session(false)
+	var presentation_reset: Dictionary = {}
+	if route == "title":
+		warden.reset_for_run(Vector3(0, 0.05, 6.0), "title")
+		presentation_reset = warden.animation_binding.get_snapshot() if warden.animation_binding else {}
 	var encounter := spawner.get_snapshot()
 	var post_counts := _profile_counts()
 	var teardown_complete := (
@@ -756,6 +764,7 @@ func _teardown_run(route: String, reason: String) -> Dictionary:
 		"retired_attack_presentations":transient_retirement.get("retired_attack_presentations",0),
 		"remaining_attack_presentations":get_tree().get_nodes_in_group("friendly_attack").size(),
 		"audio_retirement":transient_retirement.get("audio_retirement",{}), "terminal_snapshot_preserved":not terminal_snapshot.is_empty(),
+		"presentation_reset":presentation_reset,
 		"post_counts":post_counts,
 		"completion_generation":_teardown_generation, "complete":teardown_complete,
 	}
@@ -878,6 +887,7 @@ func _advance_final_profile() -> void:
 	_profile_active = true
 	_profile_origin = "diagnostic_prepared"
 	_profile_start_counts = _profile_counts()
+	var cohort := spawner.begin_validation_profile_cohort(32, int(validation_profile_receipt.get("setup_generation", 0)))
 	validation_profile_sample = {
 		"status":"sampling", "branch_id":validation_profile_receipt.get("branch_id",""),
 		"sample_kind":_profile_origin, "route_kind":run_route_kind,
@@ -886,6 +896,7 @@ func _advance_final_profile() -> void:
 		"viewport":_profile_viewport_receipt(),
 		"renderer":_profile_renderer_receipt(),
 		"start_counts":_profile_start_counts.duplicate(true),
+		"cohort_start":cohort,
 		"work_caps":_dense_work_caps(spawner.get_snapshot()),
 	}
 	get_tree().paused = false
@@ -927,6 +938,7 @@ func _advance_profile_sample(delta: float) -> void:
 	sorted.sort()
 	var sample_branch := String(validation_profile_sample.get("branch_id", ""))
 	var sample_setup_generation := int(validation_profile_sample.get("setup_generation", _validation_setup_generation))
+	var cohort := spawner.end_validation_profile_cohort("sample_complete") if _profile_origin == "diagnostic_prepared" else {}
 	validation_profile_sample = {
 		"status":"complete", "branch_id":sample_branch,
 		"sample_kind":_profile_origin, "route_kind":run_route_kind,
@@ -937,6 +949,11 @@ func _advance_profile_sample(delta: float) -> void:
 		"frame_ms":{"p50":_percentile(sorted,0.50),"p95":_percentile(sorted,0.95),"p99":_percentile(sorted,0.99),"worst":sorted.back() if not sorted.is_empty() else 0.0},
 		"start_counts":_profile_start_counts.duplicate(true),
 		"end_counts":_profile_counts(), "counts":_profile_counts(),
+		"cohort":cohort,
+		"requested_enemy_workload":int(cohort.get("requested", _profile_start_counts.get("enemies", 0))),
+		"minimum_enemy_workload":int(cohort.get("minimum", _profile_start_counts.get("enemies", 0))),
+		"end_enemy_workload":int(cohort.get("end_live", _profile_counts().get("enemies", 0))),
+		"replenished_enemy_count":int(cohort.get("replenished", 0)),
 		"viewport":_profile_viewport_receipt(),
 		"renderer":_profile_renderer_receipt(),
 		"wave_end":wave_director.get_snapshot().duplicate(true),
@@ -954,6 +971,7 @@ func _reset_final_profile() -> void:
 	_profile_origin = ""
 	_profile_samples_ms.clear()
 	_profile_elapsed = 0.0
+	spawner.end_validation_profile_cohort("profile_reset")
 	get_tree().paused = false
 	var source_run_serial := run_serial
 	var requested_counts := _profile_counts()
@@ -1017,6 +1035,10 @@ func _profile_cycle_comparison() -> Dictionary:
 				"window_seconds":entry.get("window_seconds", 0.0),
 				"frame_ms":(entry.get("frame_ms", {}) as Dictionary).duplicate(true),
 				"renderer":(entry.get("renderer", {}) as Dictionary).duplicate(true),
+				"requested_enemy_workload":entry.get("requested_enemy_workload", -1),
+				"minimum_enemy_workload":entry.get("minimum_enemy_workload", -1),
+				"end_enemy_workload":entry.get("end_enemy_workload", -1),
+				"replenished_enemy_count":entry.get("replenished_enemy_count", 0),
 			}
 		elif phase == "reset_immediate" and not current.is_empty():
 			current["reset"] = {
