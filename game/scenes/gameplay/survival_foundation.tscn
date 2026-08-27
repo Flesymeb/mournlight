@@ -70,6 +70,6 @@ target = NodePath("../Warden")
 near = 0.15
 far = 90.0
 arena_limit = Vector2(8.4, 6.8)
-presentation_body = NodePath("../Warden/PresentationRoot/ModelPivot/AssetTransform/AuthoredWardenWizard")
+presentation_body = NodePath("../Warden/PresentationRoot/ModelPivot/AssetTransform/AuthoredWardenMage")
 presentation_lantern = NodePath("../Warden/PresentationRoot/LanternPivot/AuthoredLantern")
 presentation_effects = Array[NodePath]([NodePath("../Warden/DashAura"), NodePath("../Warden/ActiveRing"), NodePath("../Warden/WardenHalo")])

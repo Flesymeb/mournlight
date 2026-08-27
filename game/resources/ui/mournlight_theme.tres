@@ -1,32 +1,13 @@
-[gd_resource type="Theme" load_steps=9 format=3]
+[gd_resource type="Theme" format=3 uid="uid://jleyaim05cr"]
 
-[ext_resource type="FontFile" path="res://assets/fonts/Montserrat-Regular.ttf" id="1"]
-[ext_resource type="FontFile" path="res://assets/fonts/Montserrat-Medium.ttf" id="2"]
-[ext_resource type="FontFile" path="res://assets/fonts/Montserrat-SemiBold.ttf" id="3"]
-[ext_resource type="FontFile" path="res://assets/fonts/Montserrat-Bold.ttf" id="4"]
+[ext_resource type="FontFile" uid="uid://dw5itnrmxo8b0" path="res://assets/fonts/Montserrat-Regular.ttf" id="1"]
+[ext_resource type="FontFile" uid="uid://v0abxbi48eyh" path="res://assets/fonts/Montserrat-Medium.ttf" id="2"]
+[ext_resource type="FontFile" uid="uid://buo53g7bpc6er" path="res://assets/fonts/Montserrat-SemiBold.ttf" id="3"]
 
-[sub_resource type="StyleBoxFlat" id="normal"]
-bg_color = Color(0.02, 0.025, 0.055, 0.78)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.55, 0.38, 0.16, 0.65)
-content_margin_left = 18.0
-content_margin_right = 18.0
-
-[sub_resource type="StyleBoxFlat" id="hover"]
-bg_color = Color(0.08, 0.065, 0.08, 0.95)
-border_width_left = 2
-border_width_top = 1
-border_width_right = 2
-border_width_bottom = 1
-border_color = Color(1, 0.75, 0.3, 1)
-content_margin_left = 18.0
-content_margin_right = 18.0
+[sub_resource type="StyleBoxEmpty" id="empty"]
 
 [sub_resource type="StyleBoxFlat" id="focus"]
-bg_color = Color(0,0,0,0)
+bg_color = Color(0, 0, 0, 0)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
@@ -37,20 +18,38 @@ expand_margin_top = 4.0
 expand_margin_right = 4.0
 expand_margin_bottom = 4.0
 
-[sub_resource type="StyleBoxEmpty" id="empty"]
+[sub_resource type="StyleBoxFlat" id="hover"]
+content_margin_left = 18.0
+content_margin_right = 18.0
+bg_color = Color(0.08, 0.065, 0.08, 0.95)
+border_width_left = 2
+border_width_top = 1
+border_width_right = 2
+border_width_bottom = 1
+border_color = Color(1, 0.75, 0.3, 1)
+
+[sub_resource type="StyleBoxFlat" id="normal"]
+content_margin_left = 18.0
+content_margin_right = 18.0
+bg_color = Color(0.02, 0.025, 0.055, 0.78)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.55, 0.38, 0.16, 0.65)
 
 [resource]
 default_font = ExtResource("1")
 default_font_size = 15
-Label/fonts/font = ExtResource("2")
-Label/colors/font_color = Color(0.87, 0.91, 1, 1)
-Button/fonts/font = ExtResource("3")
+Button/colors/font_color = Color(0.88, 0.92, 1, 1)
+Button/colors/font_focus_color = Color(1, 0.86, 0.53, 1)
+Button/colors/font_hover_color = Color(1, 0.82, 0.46, 1)
 Button/font_sizes/font_size = 15
-Button/colors/font_color = Color(0.88,0.92,1,1)
-Button/colors/font_hover_color = Color(1,0.82,0.46,1)
-Button/colors/font_focus_color = Color(1,0.86,0.53,1)
-Button/styles/normal = SubResource("normal")
-Button/styles/hover = SubResource("hover")
-Button/styles/pressed = SubResource("hover")
-Button/styles/focus = SubResource("focus")
+Button/fonts/font = ExtResource("3")
 Button/styles/disabled = SubResource("empty")
+Button/styles/focus = SubResource("focus")
+Button/styles/hover = SubResource("hover")
+Button/styles/normal = SubResource("normal")
+Button/styles/pressed = SubResource("hover")
+Label/colors/font_color = Color(0.87, 0.91, 1, 1)
+Label/fonts/font = ExtResource("2")

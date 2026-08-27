@@ -32,9 +32,10 @@ enum DashPhase { READY, ANTICIPATION, ACTIVE, RECOVERY, COOLDOWN }
 @onready var presentation_root: Node3D = $PresentationRoot
 @onready var model_pivot: Node3D = $PresentationRoot/ModelPivot
 @onready var lantern: Node3D = $PresentationRoot/LanternPivot
+@onready var authored_character: Node3D = $PresentationRoot/ModelPivot/AssetTransform/AuthoredWardenMage
+@onready var lantern_socket: Node3D = $PresentationRoot/ModelPivot/AssetTransform/AuthoredWardenMage/Rig/Skeleton3D/handslot_r
 @onready var dash_aura: MeshInstance3D = $DashAura
 @onready var active_ring: MeshInstance3D = $ActiveRing
-@onready var semantic_animation_player: AnimationPlayer = $SemanticAnimationPlayer
 
 var _dash_phase_id := DashPhase.READY
 var _phase_remaining := 0.0
@@ -54,20 +55,25 @@ func _ready() -> void:
 	_base_model_position = model_pivot.position
 	_base_lantern_position = lantern.position
 	_base_presentation_scale = presentation_root.scale
-	_authored_animation = semantic_animation_player
+	_authored_animation = _find_animation_player(authored_character)
 	animation_binding = WardenAnimationBinding.new()
 	animation_binding.name = "SemanticAnimationBinding"
 	add_child(animation_binding)
-	animation_binding.bind(semantic_animation_player, animation_profile)
+	animation_binding.semantic_state_changed.connect(_on_animation_semantic_changed)
+	animation_binding.bind(authored_character, animation_profile)
 	var attack_runtime := get_node_or_null("Weapons/AttackRuntime")
 	if attack_runtime:
-		attack_runtime.attack_authorized.connect(func(_event: Dictionary) -> void: animation_binding.trigger("cast", 0.34))
+		attack_runtime.attack_authorized.connect(func(_event: Dictionary) -> void: animation_binding.trigger("cast", 0.55))
 	var health_component := get_node_or_null("HealthComponent")
 	if health_component:
-		health_component.hurt.connect(func(_event: Dictionary) -> void: animation_binding.trigger("hurt", 0.30))
+		health_component.hurt.connect(func(_event: Dictionary) -> void: animation_binding.trigger("hurt", 0.42))
 		health_component.died.connect(func(_event: Dictionary) -> void: animation_binding.trigger("death", 999.0))
 	_set_dash_phase(DashPhase.READY, 0.0)
+	_follow_lantern_socket()
 	reset_input_latch()
+
+func _process(_delta: float) -> void:
+	_follow_lantern_socket()
 
 func _physics_process(delta: float) -> void:
 	movement_input = Input.get_vector("move_left", "move_right", "move_forward", "move_back", 0.24).limit_length(1.0)
@@ -163,7 +169,19 @@ func _update_facing_and_animation(delta: float) -> void:
 		presentation_root.rotation.y = lerp_angle(presentation_root.rotation.y, target_angle, 1.0 - exp(-turn_speed * delta))
 	animation_binding.drive(planar_speed, dash_phase, delta)
 
+func _follow_lantern_socket() -> void:
+	if not is_instance_valid(lantern_socket) or not is_instance_valid(lantern):
+		return
+	var upright_basis := Basis.from_euler(Vector3(0.0, presentation_root.global_rotation.y, 0.0))
+	var hanging_offset := upright_basis * Vector3(0.0, -0.22, 0.04)
+	lantern.global_transform = Transform3D(upright_basis, lantern_socket.global_position + hanging_offset)
+
+func _on_animation_semantic_changed(_previous: String, current: String) -> void:
+	if current in ["death", "victory"]:
+		process_mode = Node.PROCESS_MODE_ALWAYS
+
 func reset_for_run(spawn_position: Vector3) -> void:
+	process_mode = Node.PROCESS_MODE_PAUSABLE
 	global_position = spawn_position
 	velocity = Vector3.ZERO
 	planar_velocity = Vector3.ZERO
@@ -179,6 +197,7 @@ func reset_for_run(spawn_position: Vector3) -> void:
 	presentation_root.scale = _base_presentation_scale
 	_set_dash_phase(DashPhase.READY, 0.0)
 	animation_binding.reset()
+	_follow_lantern_socket()
 	reset_input_latch()
 
 func _find_animation_player(root: Node) -> AnimationPlayer:

@@ -1,7 +1,7 @@
-[gd_scene load_steps=27 format=3]
+[gd_scene load_steps=26 format=3]
 
 [ext_resource type="Script" path="res://scripts/player/warden_controller.gd" id="1_controller"]
-[ext_resource type="PackedScene" path="res://assets/authored/warden_goblin_wizard_candidate.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/authored/warden_kaykit_mage.glb" id="2_model"]
 [ext_resource type="PackedScene" path="res://assets/authored/warden_lantern.glb" id="3_lantern"]
 [ext_resource type="Script" path="res://scripts/weapons/weapon_inventory.gd" id="4_inventory"]
 [ext_resource type="Script" path="res://scripts/combat/attack_runtime.gd" id="5_attack"]
@@ -16,7 +16,6 @@
 [ext_resource type="PackedScene" path="res://scenes/weapons/wandering_wisps.tscn" id="14_wisp"]
 [ext_resource type="Script" path="res://scripts/player/warden_health.gd" id="15_health"]
 [ext_resource type="Resource" path="res://resources/presentation/warden_animation_profile.tres" id="16_animation_profile"]
-[ext_resource type="AnimationLibrary" path="res://resources/presentation/warden_semantic_animation_library.tres" id="17_animation_library"]
 
 [sub_resource type="CapsuleShape3D" id="PlayerShape"]
 radius = 0.42
@@ -95,26 +94,21 @@ position = Vector3(0, 0.055, 0)
 mesh = SubResource("WardenHaloMesh")
 cast_shadow = 0
 
-[node name="SemanticAnimationPlayer" type="AnimationPlayer" parent="."]
-root_node = NodePath("..")
-libraries/ = ExtResource("17_animation_library")
-
 [node name="PresentationRoot" type="Node3D" parent="."]
-scale = Vector3(1.32, 1.32, 1.32)
+scale = Vector3(0.58, 0.58, 0.58)
 
 [node name="ModelPivot" type="Node3D" parent="PresentationRoot"]
 
 [node name="AssetTransform" type="Node3D" parent="PresentationRoot/ModelPivot"]
 position = Vector3(0, 0.02, 0)
-scale = Vector3(1.5, 1.5, 1.5)
 
-[node name="AuthoredWardenWizard" parent="PresentationRoot/ModelPivot/AssetTransform" instance=ExtResource("2_model")]
+[node name="AuthoredWardenMage" parent="PresentationRoot/ModelPivot/AssetTransform" instance=ExtResource("2_model")]
 
 [node name="LanternPivot" type="Node3D" parent="PresentationRoot"]
 position = Vector3(0.52, 0.62, 0.18)
-scale = Vector3(0.15, 0.15, 0.15)
 
 [node name="AuthoredLantern" parent="PresentationRoot/LanternPivot" instance=ExtResource("3_lantern")]
+scale = Vector3(0.15, 0.15, 0.15)
 
 [node name="WarmLight" type="OmniLight3D" parent="PresentationRoot/LanternPivot"]
 position = Vector3(0, 0.15, 0)

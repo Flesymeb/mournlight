@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/authored/warden_kaykit_mage.glb" id="1_mage"]
+
+[node name="WardenSelectedPackageInspection" type="Node3D"]
+metadata/_edit_group_ = true
+metadata/development_only = true
+metadata/selection = "KayKit Mage intact authored package; runtime binding remains scenes/player/warden.tscn"
+
+[node name="AuthoredWardenMage" parent="." instance=ExtResource("1_mage")]

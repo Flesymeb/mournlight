@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "license_notice": "The following authored assets are used under Creative Commons Attribution 4.0. Titles and linked Sketchfab model pages identify and credit their respective creators; no endorsement is implied.",
-  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "license_notice": "Authored assets retain the exact license recorded per entry. Titles and source links identify their creators for auditability; no endorsement is implied.",
+  "license_url": "see each asset entry",
   "assets": [
     {
       "title": "Low Poly Graveyard",
@@ -14,14 +14,14 @@
       "integration": "One intact authored environment instance under one whole-package calibration transform."
     },
     {
-      "title": "Stylized Goblin Wizard Fantasy Character",
-      "source": "https://sketchfab.com/3d-models/stylized-goblin-wizard-fantasy-character-3f1c0c45e2df40c6af15a505e980f337",
-      "asset_id": "3f1c0c45e2df40c6af15a505e980f337",
-      "license": "CC BY 4.0",
-      "sha256": "92544b3e33fdf75b09a2299892da0d8241805262fabcc2a9133e8769cda9f04f",
-      "receipt": "res://assets/authored/warden_goblin_wizard_candidate.glb.receipt.json",
+      "title": "KayKit Character Pack: Adventurers — Mage",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0",
+      "asset_id": "kaykit-adventurers-1.0-mage",
+      "license": "CC0-1.0",
+      "sha256": "cf898585da33fab50c724d31605fb931eb2912e6d2280092141e98ca81ad507d",
+      "receipt": "res://assets/authored/warden_kaykit_mage.glb.receipt.json",
       "binding": "res://scenes/player/warden.tscn",
-      "integration": "One intact upright authored character singleton under one whole-package calibration transform; product-owned wrapper motion supplies seven explicit semantic states without editing the source package."
+      "integration": "One intact rigged, textured Mage singleton with its 41-bone Skeleton3D, skinned meshes, hand attachments, native material/texture, and 76 authored clips. Mournlight binds seven distinct deformation clips through an external semantic adapter without editing imported package children."
     },
     {
       "title": "Simple Stylized Lantern (HandPainted)",

@@ -71,6 +71,8 @@ var _profile_samples_ms: Array[float] = []
 var _profile_active := false
 var _profile_elapsed := 0.0
 var _profile_duration := 4.0
+var _profile_origin := ""
+var _profile_start_counts: Dictionary = {}
 var _next_baseline_reason := "fresh_start"
 var _retry_baseline_generation := 0
 
@@ -180,6 +182,11 @@ func start_run() -> void:
 
 func _begin_run() -> void:
 	get_tree().paused = false
+	_profile_active = false
+	_profile_origin = ""
+	_profile_samples_ms.clear()
+	_profile_elapsed = 0.0
+	_profile_start_counts.clear()
 	_transition("initializing")
 	run_serial += 1
 	run_elapsed = 0.0
@@ -555,6 +562,7 @@ func _on_wave_phase_changed(snapshot: Dictionary) -> void:
 			spawner.begin_encounter()
 		if int(snapshot.get("wave",1)) == 5:
 			_transition("boss")
+			_begin_passive_ordinary_profile(snapshot)
 	_emit_snapshot()
 
 func _spawn_bellkeeper() -> void:
@@ -655,7 +663,7 @@ func _teardown_run(route: String, reason: String) -> Dictionary:
 		boss.queue_free()
 	boss = null
 	var transient_retirement := _retire_transient_ownership(route, reason, _teardown_generation)
-	world.reset_session()
+	world.reset_session(route != "result")
 	var encounter := spawner.get_snapshot()
 	var post_counts := _profile_counts()
 	var teardown_complete := (
@@ -727,6 +735,7 @@ func _prepare_final_profile() -> void:
 	if not OS.has_feature("editor") or run_state not in ["active", "boss"]:
 		return
 	_profile_active = false
+	_profile_origin = "diagnostic_prepared"
 	run_route_kind = "diagnostic_prepared"
 	_profile_samples_ms.clear()
 	_profile_elapsed = 0.0
@@ -794,14 +803,43 @@ func _advance_final_profile() -> void:
 	_profile_samples_ms.clear()
 	_profile_elapsed = 0.0
 	_profile_active = true
+	_profile_origin = "diagnostic_prepared"
+	_profile_start_counts = _profile_counts()
 	validation_profile_sample = {
 		"status":"sampling", "branch_id":validation_profile_receipt.get("branch_id",""),
+		"sample_kind":_profile_origin, "route_kind":run_route_kind,
 		"run_serial":run_serial, "setup_generation":validation_profile_receipt.get("setup_generation",0),
 		"window_seconds":_profile_duration,
 		"viewport":_profile_viewport_receipt(),
+		"renderer":_profile_renderer_receipt(),
+		"start_counts":_profile_start_counts.duplicate(true),
 		"work_caps":_dense_work_caps(spawner.get_snapshot()),
 	}
 	get_tree().paused = false
+
+func _begin_passive_ordinary_profile(wave_snapshot: Dictionary) -> void:
+	if run_route_kind != "ordinary" or _profile_active:
+		return
+	if int(wave_snapshot.get("wave", 0)) != 5 or int(wave_snapshot.get("diagnostic_jump_count", 0)) != 0:
+		return
+	_profile_samples_ms.clear()
+	_profile_elapsed = 0.0
+	_profile_active = true
+	_profile_origin = "ordinary_final_wave_passive"
+	_profile_start_counts = _profile_counts()
+	validation_profile_sample = {
+		"status":"sampling", "branch_id":"ordinary_final_wave_window",
+		"sample_kind":_profile_origin, "route_kind":run_route_kind,
+		"passive":true, "diagnostic_mutation":false,
+		"run_serial":run_serial, "setup_generation":_validation_setup_generation,
+		"window_seconds":_profile_duration,
+		"viewport":_profile_viewport_receipt(),
+		"renderer":_profile_renderer_receipt(),
+		"start_counts":_profile_start_counts.duplicate(true),
+		"wave_start":wave_snapshot.duplicate(true),
+		"work_caps":_dense_work_caps(spawner.get_snapshot()),
+	}
+	_emit_snapshot()
 
 func _advance_profile_sample(delta: float) -> void:
 	if not _profile_active or get_tree().paused:
@@ -814,23 +852,33 @@ func _advance_profile_sample(delta: float) -> void:
 	_profile_active = false
 	var sorted := _profile_samples_ms.duplicate()
 	sorted.sort()
+	var sample_branch := String(validation_profile_sample.get("branch_id", ""))
+	var sample_setup_generation := int(validation_profile_sample.get("setup_generation", _validation_setup_generation))
 	validation_profile_sample = {
-		"status":"complete", "branch_id":validation_profile_receipt.get("branch_id",""),
-		"run_serial":run_serial, "setup_generation":validation_profile_receipt.get("setup_generation",0),
+		"status":"complete", "branch_id":sample_branch,
+		"sample_kind":_profile_origin, "route_kind":run_route_kind,
+		"passive":_profile_origin == "ordinary_final_wave_passive",
+		"diagnostic_mutation":_profile_origin == "diagnostic_prepared",
+		"run_serial":run_serial, "setup_generation":sample_setup_generation,
 		"sample_count":sorted.size(), "window_seconds":_profile_elapsed,
 		"frame_ms":{"p50":_percentile(sorted,0.50),"p95":_percentile(sorted,0.95),"p99":_percentile(sorted,0.99),"worst":sorted.back() if not sorted.is_empty() else 0.0},
-		"counts":_profile_counts(),
+		"start_counts":_profile_start_counts.duplicate(true),
+		"end_counts":_profile_counts(), "counts":_profile_counts(),
 		"viewport":_profile_viewport_receipt(),
+		"renderer":_profile_renderer_receipt(),
+		"wave_end":wave_director.get_snapshot().duplicate(true),
 		"work_caps":_dense_work_caps(spawner.get_snapshot()),
 	}
 	_record_profile_cycle("advance", validation_profile_sample)
-	get_tree().paused = true
+	if _profile_origin == "diagnostic_prepared":
+		get_tree().paused = true
 	_emit_snapshot()
 
 func _reset_final_profile() -> void:
 	if not OS.has_feature("editor"):
 		return
 	_profile_active = false
+	_profile_origin = ""
 	_profile_samples_ms.clear()
 	_profile_elapsed = 0.0
 	get_tree().paused = false
@@ -938,6 +986,19 @@ func _profile_viewport_receipt() -> Dictionary:
 		"width":int(viewport_size.x), "height":int(viewport_size.y),
 		"target_width":1920, "target_height":1080,
 		"resolution_qualified":int(viewport_size.x) >= 1920 and int(viewport_size.y) >= 1080,
+	}
+
+func _profile_renderer_receipt() -> Dictionary:
+	return {
+		"rendering_method":RenderingServer.get_current_rendering_method(),
+		"rendering_driver":RenderingServer.get_current_rendering_driver_name(),
+		"adapter_name":RenderingServer.get_video_adapter_name(),
+		"adapter_vendor":RenderingServer.get_video_adapter_vendor(),
+		"adapter_type":int(RenderingServer.get_video_adapter_type()),
+		"adapter_api_version":RenderingServer.get_video_adapter_api_version(),
+		"adapter_driver_info":OS.get_video_adapter_driver_info(),
+		"project_name":String(ProjectSettings.get_setting("application/config/name", "Mournlight")),
+		"profile_identity":"mournlight.release.final_wave.v1",
 	}
 
 func _dense_work_caps(encounter: Dictionary) -> Dictionary:

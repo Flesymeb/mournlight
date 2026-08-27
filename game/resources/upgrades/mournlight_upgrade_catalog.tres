@@ -1,27 +1,24 @@
-[gd_resource type="Resource" script_class="MournlightUpgradeCatalog" load_steps=27 format=3]
+[gd_resource type="Resource" script_class="MournlightUpgradeCatalog" format=3 uid="uid://vhp4f1bxblwq"]
 
-[ext_resource type="Script" path="res://scripts/gameplay/upgrade_catalog.gd" id="1_catalog"]
-[ext_resource type="Script" path="res://scripts/gameplay/upgrade_definition.gd" id="2_upgrade"]
-[ext_resource type="Texture2D" path="res://assets/ui/upgrades/lantern_focus.svg" id="3_lf"]
-[ext_resource type="Texture2D" path="res://assets/ui/upgrades/lantern_cadence.svg" id="4_lc"]
-[ext_resource type="Texture2D" path="res://assets/ui/upgrades/lantern_range.svg" id="5_lr"]
-[ext_resource type="Texture2D" path="res://assets/ui/upgrades/spade_unlock.svg" id="6_su"]
-[ext_resource type="Texture2D" path="res://assets/ui/upgrades/spade_edge.svg" id="7_se"]
-[ext_resource type="Texture2D" path="res://assets/ui/upgrades/spade_reach.svg" id="8_sr"]
-[ext_resource type="Texture2D" path="res://assets/ui/upgrades/wisps_unlock.svg" id="9_wu"]
-[ext_resource type="Texture2D" path="res://assets/ui/upgrades/wisps_orbit.svg" id="10_wo"]
-[ext_resource type="Texture2D" path="res://assets/ui/upgrades/wisps_radius.svg" id="11_wr"]
-[ext_resource type="Texture2D" path="res://assets/ui/upgrades/health_max.svg" id="12_hm"]
-[ext_resource type="Texture2D" path="res://assets/ui/upgrades/dash_cooldown.svg" id="13_dc"]
-[ext_resource type="Texture2D" path="res://assets/ui/upgrades/recovery.svg" id="14_re"]
+[ext_resource type="Script" uid="uid://d1sy6ejtrxbky" path="res://scripts/gameplay/upgrade_catalog.gd" id="1_catalog"]
+[ext_resource type="Script" uid="uid://uc1n1yhs2pgg" path="res://scripts/gameplay/upgrade_definition.gd" id="2_upgrade"]
+[ext_resource type="Texture2D" uid="uid://dgg1i6ii88oxb" path="res://assets/ui/upgrades/lantern_focus.svg" id="3_lf"]
+[ext_resource type="Texture2D" uid="uid://kub62turur5y" path="res://assets/ui/upgrades/lantern_cadence.svg" id="4_lc"]
+[ext_resource type="Texture2D" uid="uid://c5p2o1mflxo5g" path="res://assets/ui/upgrades/lantern_range.svg" id="5_lr"]
+[ext_resource type="Texture2D" uid="uid://dsvn6qiq4fr6h" path="res://assets/ui/upgrades/spade_unlock.svg" id="6_su"]
+[ext_resource type="Texture2D" uid="uid://c44sfr8bd7yso" path="res://assets/ui/upgrades/spade_edge.svg" id="7_se"]
+[ext_resource type="Texture2D" uid="uid://5eeamwbh6sll" path="res://assets/ui/upgrades/spade_reach.svg" id="8_sr"]
+[ext_resource type="Texture2D" uid="uid://byi5k2782mow8" path="res://assets/ui/upgrades/wisps_unlock.svg" id="9_wu"]
+[ext_resource type="Texture2D" uid="uid://dy11phs4r4ju8" path="res://assets/ui/upgrades/wisps_orbit.svg" id="10_wo"]
+[ext_resource type="Texture2D" uid="uid://dlpqricllci5g" path="res://assets/ui/upgrades/wisps_radius.svg" id="11_wr"]
+[ext_resource type="Texture2D" uid="uid://bfotnfn02ovbb" path="res://assets/ui/upgrades/health_max.svg" id="12_hm"]
+[ext_resource type="Texture2D" uid="uid://dtq602j2r72n1" path="res://assets/ui/upgrades/dash_cooldown.svg" id="13_dc"]
+[ext_resource type="Texture2D" uid="uid://dyhi0nqoh34hy" path="res://assets/ui/upgrades/recovery.svg" id="14_re"]
 
 [sub_resource type="Resource" id="lantern_focus"]
 script = ExtResource("2_upgrade")
 upgrade_id = &"lantern_focus"
 title = "Focused Flame"
-category = "lantern"
-action = "weapon_rank"
-weapon_id = &"warden_lantern"
 required_weapon_rank = 1
 icon = ExtResource("3_lf")
 
@@ -29,9 +26,6 @@ icon = ExtResource("3_lf")
 script = ExtResource("2_upgrade")
 upgrade_id = &"lantern_cadence"
 title = "Quick Wick"
-category = "lantern"
-action = "weapon_rank"
-weapon_id = &"warden_lantern"
 required_weapon_rank = 2
 icon = ExtResource("4_lc")
 
@@ -39,9 +33,6 @@ icon = ExtResource("4_lc")
 script = ExtResource("2_upgrade")
 upgrade_id = &"lantern_range"
 title = "Long Vigil"
-category = "lantern"
-action = "weapon_rank"
-weapon_id = &"warden_lantern"
 required_weapon_rank = 3
 icon = ExtResource("5_lr")
 
@@ -50,7 +41,6 @@ script = ExtResource("2_upgrade")
 upgrade_id = &"spade_unlock"
 title = "Gravespade"
 category = "gravespade"
-action = "weapon_rank"
 weapon_id = &"gravespade"
 required_weapon_rank = 0
 icon = ExtResource("6_su")
@@ -60,7 +50,6 @@ script = ExtResource("2_upgrade")
 upgrade_id = &"spade_edge"
 title = "Moon-honed Edge"
 category = "gravespade"
-action = "weapon_rank"
 weapon_id = &"gravespade"
 required_weapon_rank = 1
 icon = ExtResource("7_se")
@@ -70,7 +59,6 @@ script = ExtResource("2_upgrade")
 upgrade_id = &"spade_reach"
 title = "Wide Burial"
 category = "gravespade"
-action = "weapon_rank"
 weapon_id = &"gravespade"
 required_weapon_rank = 2
 icon = ExtResource("8_sr")
@@ -80,7 +68,6 @@ script = ExtResource("2_upgrade")
 upgrade_id = &"wisps_unlock"
 title = "Wandering Wisps"
 category = "wisps"
-action = "weapon_rank"
 weapon_id = &"wandering_wisps"
 required_weapon_rank = 0
 icon = ExtResource("9_wu")
@@ -90,7 +77,6 @@ script = ExtResource("2_upgrade")
 upgrade_id = &"wisps_orbit"
 title = "Restless Orbit"
 category = "wisps"
-action = "weapon_rank"
 weapon_id = &"wandering_wisps"
 required_weapon_rank = 1
 icon = ExtResource("10_wo")
@@ -100,7 +86,6 @@ script = ExtResource("2_upgrade")
 upgrade_id = &"wisps_radius"
 title = "Procession Ring"
 category = "wisps"
-action = "weapon_rank"
 weapon_id = &"wandering_wisps"
 required_weapon_rank = 2
 icon = ExtResource("11_wr")
@@ -136,6 +121,6 @@ weapon_id = &""
 icon = ExtResource("14_re")
 
 [resource]
-script = ExtResource("1_catalog")
 resource_name = "Twelve authoritative Mournlight upgrades"
+script = ExtResource("1_catalog")
 upgrades = Array[Resource]([SubResource("lantern_focus"), SubResource("lantern_cadence"), SubResource("lantern_range"), SubResource("spade_unlock"), SubResource("spade_edge"), SubResource("spade_reach"), SubResource("wisps_unlock"), SubResource("wisps_orbit"), SubResource("wisps_radius"), SubResource("health_max"), SubResource("dash_cooldown"), SubResource("recovery")])

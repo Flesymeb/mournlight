@@ -1,8 +1,8 @@
 [gd_resource type="Resource" format=3]
 
 [resource]
-resource_name = "Warden explicit semantic animation profile"
-metadata/profile_id = "warden.goblin_wizard.semantic_wrapper.v2"
-metadata/source_scene = "res://assets/authored/warden_goblin_wizard_candidate.glb"
-metadata/semantic_clips = {"cast":"warden_cast","dash":"warden_dash","death":"warden_death","hurt":"warden_hurt","idle":"warden_idle","move":"warden_move","victory":"warden_victory"}
-metadata/validation_note = "Seven explicit candidate-authored wrapper motions preserve the intact upright Warden Wizard source while animating only product-owned presentation pivots."
+resource_name = "Warden KayKit Mage authored semantic animation profile"
+metadata/profile_id = "warden.kaykit_mage.authored_deformation.v1"
+metadata/source_scene = "res://assets/authored/warden_kaykit_mage.glb"
+metadata/semantic_clips = {"cast":"Spellcast_Shoot","dash":"Dodge_Forward","death":"Death_A","hurt":"Hit_A","idle":"Idle","move":"Running_A","victory":"Cheer"}
+metadata/validation_note = "Seven explicit semantics resolve to distinct clips authored on the intact KayKit Mage 41-bone deformation hierarchy; no wrapper transform animation is accepted."
