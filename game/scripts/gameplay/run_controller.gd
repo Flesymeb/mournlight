@@ -58,6 +58,10 @@ func _ready() -> void:
 	draft_view.choice_requested.connect(_on_draft_choice)
 	world.attack_runtime.hit_resolved.connect(_on_player_hit_resolved)
 	warden.dash_phase_changed.connect(_on_dash_changed)
+	if OS.has_feature("editor"):
+		for action in [&"validation_prepare_wave4", &"validation_prepare_boss"]:
+			if not InputMap.has_action(action):
+				InputMap.add_action(action)
 	_enter_title()
 
 func _process(delta: float) -> void:
@@ -69,6 +73,14 @@ func _process(delta: float) -> void:
 		_emit_snapshot()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if OS.has_feature("editor") and event.is_action_pressed(&"validation_prepare_wave4"):
+		_prepare_validation_wave(3)
+		get_viewport().set_input_as_handled()
+		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"validation_prepare_boss"):
+		_prepare_validation_wave(4)
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("pause") and not event.is_echo():
 		if run_state in ["active","boss"]:
 			_pause_run()
@@ -104,8 +116,7 @@ func start_run() -> void:
 	world.set_session_active(true)
 	title_menu.hide()
 	shell.set_mode("hidden")
-	spawner.configure_pressure(6,1.75)
-	spawner.begin_encounter()
+	spawner.reset_encounter()
 	wave_director.begin()
 	_transition("active")
 	_emit_snapshot()
@@ -124,6 +135,11 @@ func retry_run() -> void:
 func _enter_title() -> void:
 	get_tree().paused = false
 	spawner.stop_encounter()
+	wave_director.reset()
+	if is_instance_valid(boss):
+		boss.queue_free()
+	boss = null
+	boss_snapshot.clear()
 	world.reset_session()
 	world.set_session_active(false)
 	hud.clear_snapshot()
@@ -154,6 +170,9 @@ func _on_warden_failed(event: Dictionary) -> void:
 	result_committed = true
 	spawner.stop_encounter()
 	wave_director.terminate("failure")
+	world.set_session_active(false)
+	if is_instance_valid(boss):
+		boss.terminate("failure")
 	outcome = "failure"
 	if warden.animation_binding: warden.animation_binding.trigger("death",999.0)
 	get_tree().paused = true
@@ -239,7 +258,9 @@ func _on_draft_choice(index: int) -> void:
 func _on_wave_phase_changed(snapshot: Dictionary) -> void:
 	if String(snapshot.get("phase","")) == "active":
 		var definition: Dictionary = snapshot.get("definition",{})
-		spawner.configure_pressure(int(definition.get("cap",10)),float(definition.get("cadence",1.45)))
+		spawner.configure_pressure(definition)
+		if not spawner.active:
+			spawner.begin_encounter()
 		if int(snapshot.get("wave",1)) == 5:
 			_transition("boss")
 	_emit_snapshot()
@@ -253,7 +274,7 @@ func _spawn_bellkeeper() -> void:
 	boss.configure(warden)
 	boss.boss_changed.connect(_on_boss_changed)
 	boss.defeated.connect(_on_boss_defeated)
-	boss.phase_shifted.connect(func(_phase: int) -> void: audio_director.play_semantic("boss_phase",preload("res://assets/audio_library/SFX/621155__ktfreesound__reload-escopeta-m7.wav"),-5.0))
+	boss.phase_shifted.connect(func(_phase: int) -> void: audio_director.play_semantic("boss_phase"))
 	boss_snapshot = boss.get_snapshot()
 
 func _on_boss_changed(snapshot: Dictionary) -> void:
@@ -284,6 +305,19 @@ func _transition(next_state: String) -> void:
 	run_state = next_state
 	state_history.append(next_state)
 	state_changed.emit(previous, next_state)
+
+func _prepare_validation_wave(index: int) -> void:
+	if not OS.has_feature("editor") or run_state not in ["active", "boss"]:
+		return
+	if index >= 3:
+		health.maximum_health = 5000.0
+		health.reset_warden_health()
+		_last_health = health.current_health
+		experience = 0
+		experience_threshold = 9999
+	wave_director.prepare_test_wave(index)
+	if index == 3:
+		spawner.prepare_validation_density(32)
 
 func _emit_snapshot() -> void:
 	if not is_node_ready():

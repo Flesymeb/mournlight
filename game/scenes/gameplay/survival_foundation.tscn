@@ -60,6 +60,7 @@ script = ExtResource("5_spawner")
 enemy_scene = ExtResource("6_enemy")
 profiles = Array[EnemyProfile]([ExtResource("7_moss"), ExtResource("8_bat"), ExtResource("9_slinger"), ExtResource("10_brute")])
 player = NodePath("../Warden")
+pool_size = 40
 
 [node name="ArenaCamera" type="Camera3D" parent="." groups=["mcp_watch"] node_paths=PackedStringArray("target")]
 process_mode = 1
@@ -67,3 +68,4 @@ script = ExtResource("3_camera")
 target = NodePath("../Warden")
 near = 0.15
 far = 90.0
+arena_limit = Vector2(8.4, 6.8)

@@ -42,6 +42,29 @@
       "receipt": "res://assets/authored/bellkeeper.glb.receipt.json",
       "binding": "res://scenes/enemies/bellkeeper.tscn",
       "integration": "One intact authored possessed-lantern singleton scaled as the final-wave Bellkeeper with product-owned telegraph and shared damage authority."
+    },
+    {
+      "title": "Kenney Starter Kit FPS selected semantic SFX",
+      "source": "https://github.com/KenneyNL/Starter-Kit-FPS",
+      "asset_id": "kenney-starter-kit-fps@185fd2326d74a5cf858cffc616f87cf9696f9cc0",
+      "license": "MIT",
+      "sha256": "61bd699125ba609cd60c264ad81c58cd0836617605fc21423eae475d45bf2f14",
+      "receipt": "res://assets/audio_semantic/kenney_starter_kit/LICENSE.md",
+      "binding": "res://resources/audio/mournlight_audio_library.tres",
+      "integration": "Eleven bounded source recordings copied as candidate-owned SFX auditions. The firearm-derived weapon auditions are retained in the data-backed rejection receipt but deliberately have no playable semantic mapping; non-weapon recordings retain event ownership, priority, polyphony and deterministic variation.",
+      "runtime_files": {
+        "blaster.ogg": "9ddb14d878e6af60941f7e7f7c97563c16b1c6cb1471658bb5211fcde1897783",
+        "blaster_repeater.ogg": "cba57117005b2ebe355dc67c2c72f92ba390a24a89ef28facf23814779d0cb0d",
+        "enemy_attack.ogg": "fdbd0e559acd5c01122f47cac2fda1ed24460a2bc130aeec91734ab67acb0411",
+        "enemy_destroy.ogg": "3205e84c18ab40eabdb70fa8a779489b666f1e452e3815b3c2b3b71fb418d006",
+        "enemy_hurt.ogg": "59e4ed89a582a03e96086ce031ae30b46630d371fc02d2c566059bd4e0d1dab8",
+        "jump_a.ogg": "8aba76c0bedcbb0eed297d1617500f48fefc674272b168b3f06418a2ab0a940b",
+        "jump_b.ogg": "47e6e32edfebfb884b9dfd6116dccf0cda81af09bd36009022cf99464837e59c",
+        "jump_c.ogg": "3e854bd28b41b4e8e21a1e3e84ac2325a893971969a2e3b63edf26b44d3b1e2f",
+        "land.ogg": "145a1c17125dc4d344ac135bc5073e35ea12e19700ca30ee6e1e477010b4dca0",
+        "walking.ogg": "51d44e4ce2e06607f7be1bb7fe60d7630c78fdbcd608e7c65d5a8910cc88680c",
+        "weapon_change.ogg": "0b39e0f0d733cae3c44a838d67ab8c8510cf3b245016e398a7eb9ab13cda1449"
+      }
     }
   ]
 }

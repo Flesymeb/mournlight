@@ -54,6 +54,7 @@ func set_session_active(value: bool) -> void:
 
 func reset_session() -> void:
 	warden.reset_for_run(Vector3(0, 0.05, 6.0))
+	attack_runtime.reset_runtime()
 	for runtime in [$Warden/Weapons/WardenLanternRuntime, $Warden/Weapons/GravespadeRuntime, $Warden/Weapons/WanderingWispsRuntime]:
 		if runtime.has_method("reset_runtime"):
 			runtime.reset_runtime()

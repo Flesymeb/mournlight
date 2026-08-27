@@ -3,13 +3,13 @@
 [ext_resource type="PackedScene" path="res://assets/authored/low_poly_graveyard.glb" id="1_cemetery"]
 
 [sub_resource type="BoxShape3D" id="GroundShape"]
-size = Vector3(32, 0.7, 24)
+size = Vector3(23.2, 0.7, 21.2)
 
 [sub_resource type="BoxShape3D" id="NorthSouthShape"]
-size = Vector3(32.8, 2.2, 0.7)
+size = Vector3(24.0, 2.2, 0.7)
 
 [sub_resource type="BoxShape3D" id="EastWestShape"]
-size = Vector3(0.7, 2.2, 24)
+size = Vector3(0.7, 2.2, 22.0)
 
 [sub_resource type="BoxShape3D" id="MausoleumShape"]
 size = Vector3(4.6, 3.8, 3.4)
@@ -37,7 +37,7 @@ position = Vector3(0, -0.38, 0)
 shape = SubResource("GroundShape")
 
 [node name="NorthBoundary" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(0, 1.1, -12)
+position = Vector3(0, 1.1, -10.6)
 collision_layer = 1
 collision_mask = 1
 
@@ -45,7 +45,7 @@ collision_mask = 1
 shape = SubResource("NorthSouthShape")
 
 [node name="SouthBoundary" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(0, 1.1, 12)
+position = Vector3(0, 1.1, 10.6)
 collision_layer = 1
 collision_mask = 1
 
@@ -53,7 +53,7 @@ collision_mask = 1
 shape = SubResource("NorthSouthShape")
 
 [node name="EastBoundary" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(16, 1.1, 0)
+position = Vector3(11.6, 1.1, 0)
 collision_layer = 1
 collision_mask = 1
 
@@ -61,7 +61,7 @@ collision_mask = 1
 shape = SubResource("EastWestShape")
 
 [node name="WestBoundary" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(-16, 1.1, 0)
+position = Vector3(-11.6, 1.1, 0)
 collision_layer = 1
 collision_mask = 1
 
@@ -90,11 +90,32 @@ position = Vector3(0, 0.05, 3)
 [node name="KeeperLanternPostAnchor" type="Marker3D" parent="OuterDatum" groups=["landmark_anchor"]]
 position = Vector3(-4.8, 0, 1.8)
 
+[node name="WarmLandmarkLight" type="OmniLight3D" parent="OuterDatum/KeeperLanternPostAnchor"]
+position = Vector3(0, 2.1, 0)
+light_color = Color(1, 0.53, 0.19, 1)
+light_energy = 3.2
+omni_range = 6.5
+shadow_enabled = true
+
 [node name="SmallMausoleumAnchor" type="Marker3D" parent="OuterDatum" groups=["landmark_anchor"]]
 position = Vector3(8.6, 0, -7.4)
 
+[node name="MausoleumMoonLift" type="OmniLight3D" parent="OuterDatum/SmallMausoleumAnchor"]
+position = Vector3(0, 2.4, 0)
+light_color = Color(0.27, 0.68, 0.9, 1)
+light_energy = 1.7
+omni_range = 5.5
+shadow_enabled = false
+
 [node name="CrackedMoonBellAnchor" type="Marker3D" parent="OuterDatum" groups=["landmark_anchor"]]
 position = Vector3(-10.2, 0, -7.5)
+
+[node name="BellLanternLight" type="OmniLight3D" parent="OuterDatum/CrackedMoonBellAnchor"]
+position = Vector3(0, 2.6, 0)
+light_color = Color(0.82, 0.25, 0.66, 1)
+light_energy = 2.0
+omni_range = 5.8
+shadow_enabled = false
 
 [node name="TargetAnchorA" type="Marker3D" parent="OuterDatum" groups=["combat_anchor"]]
 position = Vector3(4.8, 0, 1.6)

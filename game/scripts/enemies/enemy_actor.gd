@@ -28,6 +28,7 @@ var death_count := 0
 var _lifetime := 0.0
 var _flank_sign := 1.0
 var _pool_return_pending := false
+var retirement_count := 0
 
 func _ready() -> void:
 	add_to_group("combat_targets")
@@ -76,6 +77,21 @@ func return_to_pool() -> void:
 	lane_cue.visible = false
 	_pool_return_pending = false
 	lifecycle_event.emit(_event("pool_return"))
+
+func retire_from_pressure(reason: String, reconciliation_id: int) -> Dictionary:
+	if state == "pooled":
+		return {}
+	retirement_count += 1
+	var receipt := _event("retired", {
+		"reason": reason,
+		"reconciliation_id": reconciliation_id,
+		"retirement_count": retirement_count,
+		"reward_committed": false,
+		"defeat_committed": false,
+	})
+	lifecycle_event.emit(receipt)
+	return_to_pool()
+	return receipt
 
 func _physics_process(delta: float) -> void:
 	_lifetime += delta
@@ -224,4 +240,5 @@ func _mcp_state() -> Dictionary:
 		"health": health.current_health, "maximum_health": health.maximum_health,
 		"hurt_count": hurt_count, "death_count": death_count, "target_valid": is_instance_valid(target),
 		"velocity": velocity, "pool_return_pending": _pool_return_pending,
+		"retirement_count": retirement_count,
 	}

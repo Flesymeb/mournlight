@@ -5,13 +5,8 @@ signal phase_changed(snapshot: Dictionary)
 signal boss_requested
 signal victory_requested
 
-const WAVES := [
-	{"title":"The First Toll","duration":75.0,"cap":6,"cadence":1.75,"warning":"TEACHING PRESSURE"},
-	{"title":"Crossing Shadows","duration":90.0,"cap":8,"cadence":1.35,"warning":"FLANK PRESSURE"},
-	{"title":"Gravewind","duration":105.0,"cap":10,"cadence":1.10,"warning":"RANGED ELITE"},
-	{"title":"The Long Procession","duration":120.0,"cap":12,"cadence":0.90,"warning":"MIXED DENSITY"},
-	{"title":"The Bellkeeper","duration":150.0,"cap":5,"cadence":2.5,"warning":"FINAL TOLL"},
-]
+const WAVE_SEQUENCE := preload("res://resources/waves/mournlight_wave_sequence.tres")
+const ROLE_KEYS := ["mossling", "wispbat", "bone_slinger", "grave_brute"]
 
 var phase := "idle"
 var wave_index := -1
@@ -55,10 +50,10 @@ func _process(delta: float) -> void:
 	if phase != "active":
 		return
 	wave_elapsed += delta
-	if wave_index == 4 and not boss_spawned:
+	if wave_index == _boss_wave_index() and not boss_spawned:
 		boss_spawned = true
 		boss_requested.emit()
-	if wave_elapsed >= float(WAVES[wave_index].duration) and wave_index < 4:
+	if wave_elapsed >= float(_definition(wave_index).duration) and wave_index < _wave_count() - 1:
 		_start_wave(wave_index + 1)
 
 func _start_wave(index: int) -> void:
@@ -71,14 +66,48 @@ func _emit() -> void:
 	phase_changed.emit(get_snapshot())
 
 func prepare_test_wave(index: int) -> void:
+	if not OS.has_feature("editor"):
+		return
 	_start_wave(clampi(index, 0, 4))
 
 func get_snapshot() -> Dictionary:
-	var definition: Dictionary = WAVES[wave_index] if wave_index >= 0 else {}
-	return {"phase":phase,"wave":wave_index + 1,"wave_count":5,"wave_elapsed":wave_elapsed,
+	var definition := _definition(wave_index) if wave_index >= 0 else {}
+	return {"phase":phase,"wave":wave_index + 1,"wave_count":_wave_count(),"wave_elapsed":wave_elapsed,
 		"wave_duration":float(definition.get("duration",0.0)),"title":String(definition.get("title","WARMUP")),
 		"warning":String(definition.get("warning","PREPARE")),"total_elapsed":total_elapsed,
-		"boss_spawned":boss_spawned,"terminated":terminated,"definition":definition}
+		"boss_spawned":boss_spawned,"terminated":terminated,"definition":definition,
+		"sequence_resource":"res://resources/waves/mournlight_wave_sequence.tres"}
+
+func _wave_count() -> int:
+	var ids: PackedStringArray = WAVE_SEQUENCE.get_meta("wave_ids", PackedStringArray())
+	return ids.size()
+
+func _boss_wave_index() -> int:
+	return int(WAVE_SEQUENCE.get_meta("boss_wave_index", _wave_count() - 1))
+
+func _definition(index: int) -> Dictionary:
+	if index < 0 or index >= _wave_count():
+		return {}
+	var ids: PackedStringArray = WAVE_SEQUENCE.get_meta("wave_ids")
+	var titles: PackedStringArray = WAVE_SEQUENCE.get_meta("wave_titles")
+	var durations: PackedFloat32Array = WAVE_SEQUENCE.get_meta("durations")
+	var caps: PackedInt32Array = WAVE_SEQUENCE.get_meta("live_caps")
+	var cadences: PackedFloat32Array = WAVE_SEQUENCE.get_meta("cadences")
+	var budgets: PackedInt32Array = WAVE_SEQUENCE.get_meta("spawn_budgets")
+	var warnings: PackedStringArray = WAVE_SEQUENCE.get_meta("warnings")
+	var elite_every: PackedInt32Array = WAVE_SEQUENCE.get_meta("elite_every")
+	var weights := {}
+	for role in ROLE_KEYS:
+		var values: PackedInt32Array = WAVE_SEQUENCE.get_meta(role + "_weights")
+		weights[role] = int(values[index])
+	return {
+		"id": ids[index], "index": index, "title": titles[index],
+		"duration": float(durations[index]), "cap": int(caps[index]),
+		"cadence": float(cadences[index]), "spawn_budget": int(budgets[index]),
+		"composition_weights": weights, "elite_every": int(elite_every[index]),
+		"elite_enabled": int(elite_every[index]) > 0, "warning": warnings[index],
+		"boss_wave": index == _boss_wave_index(),
+	}
 
 func _mcp_state() -> Dictionary:
 	return get_snapshot()
