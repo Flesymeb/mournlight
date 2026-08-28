@@ -2408,8 +2408,11 @@ func _profile_workload_window(start: Dictionary, finish: Dictionary) -> Dictiona
 func _first_run_guidance_snapshot() -> Dictionary:
 	var bindings := {
 		"move":input_router.binding_label([&"move_forward", &"move_left", &"move_back", &"move_right"], 4),
-		"dash":input_router.binding_label([&"context_confirm"], 2),
-		"confirm":input_router.binding_label([&"context_confirm"], 2),
+		# Dash owns the physical Space/south-button action in gameplay. Menu
+		# confirmation is a separate standard UI binding on keyboard (Enter),
+		# while the south button remains context-routed on gamepad.
+		"dash":input_router.binding_label([&"dash"], 2),
+		"confirm":input_router.binding_label([&"context_confirm"] if input_router.active_device == "gamepad" else [&"ui_accept"], 2),
 		"help":input_router.binding_label([&"guidance_help"], 2),
 	}
 	if _first_run_guidance_completed:
