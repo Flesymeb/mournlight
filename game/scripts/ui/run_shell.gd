@@ -251,6 +251,7 @@ func set_mode(next_mode: String, next_summary: Dictionary = {}) -> void:
 	summary = next_summary.duplicate(true)
 	action_latched = false
 	visible = mode != "hidden"
+	body_label.add_theme_font_size_override("font_size", 14)
 	_set_auxiliary_visibility(false, false)
 	match mode:
 		"title":
@@ -262,8 +263,9 @@ func set_mode(next_mode: String, next_summary: Dictionary = {}) -> void:
 		"settings":
 			_refresh_settings_page()
 		"credits":
+			body_label.add_theme_font_size_override("font_size", 13)
 			_configure("CREDITS & NOTICES","MOURNLIGHT — RELEASE CANDIDATE",
-				"MOURNLIGHT — DESIGN, CODE & CEMETERY GARDEN\nAuthored production assembled for this release candidate.\n\nMontserrat typography — SIL Open Font License.\nBellkeeper / possessed lantern — CC BY 4.0.\nMaaack menu navigation mechanism — MIT.\nAudio sources — credited library.\n\nComplete release manifest: ASSET_PROVENANCE.json\nHuman-readable notices: THIRD_PARTY_NOTICES.md\n\nThank you for keeping the last lantern lit.",
+				"MOURNLIGHT — DESIGN, CODE & RELEASE ASSEMBLY\n\nCemetery garden, keeper post, cracked bell, lantern props and enemy character sources — CC BY 4.0.\nKayKit Adventurers Mage / Warden rig and authored animation clips — CC0 1.0.\nMontserrat typography — SIL Open Font License 1.1.\nMaaack menu navigation and GodotX vitals adaptations — MIT (bundled font/icon notices retained).\nBoomer Shooter library plus Kenney, Cogito, COBRA and gd-dialog selected audio — upstream licenses retained.\n\nExact revisions, hashes, receipts and runtime bindings:\nASSET_PROVENANCE.json  ·  THIRD_PARTY_NOTICES.md\n\nThank you for keeping the last lantern lit.",
 				[["back","BACK"]])
 		"result":
 			var won := String(summary.get("outcome","failure")) == "victory"

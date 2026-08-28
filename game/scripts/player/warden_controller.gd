@@ -50,6 +50,12 @@ var _base_lantern_position := Vector3.ZERO
 var _base_presentation_scale := Vector3.ONE
 var _authored_animation: AnimationPlayer
 var animation_binding: WardenAnimationBinding
+var _victory_vfx_active := false
+var _victory_vfx_remaining := 0.0
+var _victory_vfx_duration := 0.0
+var _victory_vfx_generation := -1
+var victory_vfx_event_count := 0
+var victory_vfx_receipt: Dictionary = {}
 
 func _ready() -> void:
 	motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
@@ -75,8 +81,9 @@ func _ready() -> void:
 	_follow_lantern_socket()
 	reset_input_latch()
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	_follow_lantern_socket()
+	_advance_victory_presentation(delta)
 
 func _physics_process(delta: float) -> void:
 	movement_input = Input.get_vector("move_left", "move_right", "move_forward", "move_back", 0.24).limit_length(1.0)
@@ -183,6 +190,54 @@ func _on_animation_semantic_changed(_previous: String, current: String) -> void:
 	if current in ["death", "victory"]:
 		process_mode = Node.PROCESS_MODE_ALWAYS
 
+func begin_victory_presentation(duration: float, run_generation: int) -> Dictionary:
+	if _victory_vfx_active and _victory_vfx_generation == run_generation:
+		return victory_vfx_receipt.duplicate(true)
+	_victory_vfx_active = true
+	_victory_vfx_duration = maxf(0.1, duration)
+	_victory_vfx_remaining = _victory_vfx_duration
+	_victory_vfx_generation = run_generation
+	victory_vfx_event_count += 1
+	velocity = Vector3.ZERO
+	planar_velocity = Vector3.ZERO
+	movement_input = Vector2.ZERO
+	locomotion_state = "victory"
+	dash_aura.visible = false
+	active_ring.visible = true
+	active_ring.scale = Vector3.ONE
+	victory_vfx_receipt = {
+		"event_id":"warden.victory.r%04d" % run_generation,
+		"generation":run_generation,
+		"event_count":victory_vfx_event_count,
+		"duration_seconds":_victory_vfx_duration,
+		"started_process_frame":Engine.get_process_frames(),
+		"active":true,
+		"owner":"run_controller.victory_transaction",
+	}
+	return victory_vfx_receipt.duplicate(true)
+
+func _advance_victory_presentation(delta: float) -> void:
+	if not _victory_vfx_active:
+		return
+	_victory_vfx_remaining = maxf(0.0, _victory_vfx_remaining - delta)
+	var progress := 1.0 - _victory_vfx_remaining / maxf(0.1, _victory_vfx_duration)
+	var pulse := 1.0 + 0.22 * sin(progress * TAU * 2.0)
+	active_ring.scale = Vector3.ONE * pulse
+	victory_vfx_receipt["elapsed_seconds"] = _victory_vfx_duration - _victory_vfx_remaining
+	victory_vfx_receipt["remaining_seconds"] = _victory_vfx_remaining
+
+func end_victory_presentation(reason: String) -> Dictionary:
+	var was_active := _victory_vfx_active
+	_victory_vfx_active = false
+	_victory_vfx_remaining = 0.0
+	active_ring.visible = false
+	active_ring.scale = Vector3.ONE
+	victory_vfx_receipt["active"] = false
+	victory_vfx_receipt["completed"] = was_active
+	victory_vfx_receipt["retired_reason"] = reason
+	victory_vfx_receipt["retired_process_frame"] = Engine.get_process_frames()
+	return victory_vfx_receipt.duplicate(true)
+
 func reset_for_run(spawn_position: Vector3, reset_owner := "run_reset") -> void:
 	process_mode = Node.PROCESS_MODE_PAUSABLE
 	global_position = spawn_position
@@ -200,6 +255,10 @@ func reset_for_run(spawn_position: Vector3, reset_owner := "run_reset") -> void:
 	lantern.position = _base_lantern_position
 	lantern.rotation = Vector3.ZERO
 	presentation_root.scale = _base_presentation_scale
+	end_victory_presentation(reset_owner)
+	_victory_vfx_generation = -1
+	victory_vfx_event_count = 0
+	victory_vfx_receipt.clear()
 	_set_dash_phase(DashPhase.READY, 0.0)
 	animation_binding.reset(reset_owner)
 	_follow_lantern_socket()
@@ -245,4 +304,5 @@ func _mcp_state() -> Dictionary:
 		"plane_error": plane_error,
 		"authored_animation": String(_authored_animation.current_animation) if _authored_animation else "none",
 		"semantic_animation": animation_binding.get_snapshot() if animation_binding else {},
+		"victory_vfx":{"active":_victory_vfx_active,"remaining_seconds":_victory_vfx_remaining,"duration_seconds":_victory_vfx_duration,"generation":_victory_vfx_generation,"event_count":victory_vfx_event_count,"receipt":victory_vfx_receipt},
 	}
