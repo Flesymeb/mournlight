@@ -9,13 +9,32 @@ extends Camera3D
 @export var lead_damping := 5.0
 @export var arena_limit := Vector2(10.5, 8.5)
 @export var normal_fov := 48.0
-@export var safe_frame_fraction := Vector2(0.18, 0.24)
+@export var safe_frame_fraction := Vector2(0.08, 0.10)
 @export var safe_frame_activation_buffer := 0.04
 @export var safe_frame_correction_damping := 11.0
 @export var safe_frame_max_correction := 1.25
 @export var safe_frame_actor_half_width := 0.72
 @export var safe_frame_actor_half_depth := 0.48
 @export var safe_frame_actor_height := 2.05
+@export var coverage_group := &"active_enemies"
+@export_range(1, 12, 1) var coverage_subject_limit := 8
+@export var coverage_radius := 12.5
+@export var coverage_frame_fraction := Vector2(0.07, 0.10)
+@export var coverage_actor_half_width := 0.62
+@export var coverage_actor_half_depth := 0.48
+@export var coverage_actor_height := 1.5
+@export var coverage_max_correction := 2.8
+@export var coverage_correction_damping := 8.0
+@export var coverage_threat_weight := 0.18
+@export var arena_fill_limit := Vector2(6.2, 4.6)
+@export var obstruction_inward_weight := 0.38
+@export var obstruction_lateral_bypass := 0.0
+@export var obstruction_height_boost := 0.8
+@export var obstruction_distance_reduction := 0.5
+@export var obstruction_fov_boost := 2.0
+@export var coverage_occluder_visuals: Array[NodePath] = []
+@export_range(0.0, 1.0, 0.01) var coverage_occluder_transparency := 0.78
+@export var coverage_settle_seconds := 0.28
 @export var visibility_activation_seconds := 0.04
 @export var visibility_release_seconds := 0.22
 @export var visibility_probe_overscan := 1.25
@@ -36,6 +55,20 @@ var projected_margins := {"left":0.0, "right":0.0, "top":0.0, "bottom":0.0, "min
 var _lead := Vector3.ZERO
 var _safe_frame_offset := Vector3.ZERO
 var _safe_frame_screen_shift := Vector2.ZERO
+var _coverage_offset := Vector3.ZERO
+var _coverage_screen_shift := Vector2.ZERO
+var _coverage_subject_paths: Array[String] = []
+var _coverage_receipt: Dictionary = {}
+var _coverage_response_source := "spawn"
+var _coverage_settled_seconds := 0.0
+var _coverage_obstructed_count := 0
+var _coverage_obstructing_path := ""
+var _arena_containment_active := false
+var _obstruction_response_strength := 0.0
+var _obstruction_bypass_sign := 0.0
+var _coverage_occluder_visual_bindings: Array[GeometryInstance3D] = []
+var _coverage_occluder_original_transparency: Dictionary = {}
+var _coverage_occluder_original_visibility: Dictionary = {}
 var _blocked_seconds := 0.0
 var _clear_seconds := 0.0
 var _visibility_samples_blocked := 0
@@ -63,6 +96,7 @@ func _ready() -> void:
 	if target:
 		_bind_visibility_presentation()
 		_bind_tall_occluders()
+		_bind_coverage_occluder_visuals()
 		_build_visibility_compositor()
 		_snap_to_target()
 
@@ -77,39 +111,207 @@ func _process(delta: float) -> void:
 		desired_lead = movement_velocity.normalized() * lead_distance
 	_lead = _lead.lerp(desired_lead, 1.0 - exp(-lead_damping * delta))
 	var requested_target := target.global_position + _lead
-	var arena_target := requested_target
-	arena_target.x = clampf(arena_target.x, -arena_limit.x, arena_limit.x)
-	arena_target.z = clampf(arena_target.z, -arena_limit.y, arena_limit.y)
-	var before := _measure_projected_safe_frame()
+	var subjects := _select_coverage_subjects()
+	var arena_target := _compose_arena_target(requested_target, subjects)
+	var desired_obstruction_strength := 1.0 if _coverage_obstructed_count > 0 else 0.0
+	var obstruction_damping := 7.0 if desired_obstruction_strength > _obstruction_response_strength else 1.8
+	_obstruction_response_strength = lerpf(_obstruction_response_strength, desired_obstruction_strength, 1.0 - exp(-obstruction_damping * delta))
+	_apply_coverage_occluder_fade()
+	var before := _measure_subject_coverage(subjects)
 	var activation_fraction := Vector2(
-		safe_frame_fraction.x + safe_frame_activation_buffer,
-		safe_frame_fraction.y + safe_frame_activation_buffer
+		coverage_frame_fraction.x + safe_frame_activation_buffer,
+		coverage_frame_fraction.y + safe_frame_activation_buffer
 	)
 	var approaching_edge := not _margins_inside_fraction(before, activation_fraction)
 	var inside_release_band := _margins_inside_fraction(before, Vector2(activation_fraction.x + safe_frame_activation_buffer, activation_fraction.y + safe_frame_activation_buffer))
 	var desired_offset := Vector3.ZERO
-	_safe_frame_screen_shift = Vector2.ZERO
+	_coverage_screen_shift = Vector2.ZERO
 	if approaching_edge:
-		_safe_frame_screen_shift = _screen_shift_into_fraction(before, activation_fraction)
-		desired_offset = _safe_frame_offset + _screen_shift_to_ground_correction(before, _safe_frame_screen_shift)
+		_coverage_screen_shift = _screen_shift_into_fraction(before, activation_fraction)
+		desired_offset = _coverage_offset + _screen_shift_to_ground_correction(before, _coverage_screen_shift)
 		desired_offset.y = 0.0
-		desired_offset = desired_offset.limit_length(safe_frame_max_correction)
+		desired_offset = desired_offset.limit_length(coverage_max_correction)
 	elif safe_frame_correction_active and not inside_release_band:
-		desired_offset = _safe_frame_offset
-	_safe_frame_offset = _safe_frame_offset.lerp(desired_offset, 1.0 - exp(-safe_frame_correction_damping * delta))
-	framing_target = arena_target + _safe_frame_offset
-	fov = normal_fov
-	var desired_position := framing_target + Vector3(0.0, follow_height, follow_distance)
+		desired_offset = _coverage_offset
+	_coverage_offset = _coverage_offset.lerp(desired_offset, 1.0 - exp(-coverage_correction_damping * delta))
+	_safe_frame_offset = _coverage_offset
+	_safe_frame_screen_shift = _coverage_screen_shift
+	framing_target = arena_target + _coverage_offset
+	framing_target.x = clampf(framing_target.x, -arena_fill_limit.x, arena_fill_limit.x)
+	framing_target.z = clampf(framing_target.z, -arena_fill_limit.y, arena_fill_limit.y)
+	fov = normal_fov + obstruction_fov_boost * _obstruction_response_strength
+	var effective_height := follow_height + obstruction_height_boost * _obstruction_response_strength
+	var effective_distance := follow_distance - obstruction_distance_reduction * _obstruction_response_strength
+	var desired_position := framing_target + Vector3(0.0, effective_height, effective_distance)
+	desired_position.x += _obstruction_bypass_sign * obstruction_lateral_bypass * _obstruction_response_strength
 	global_position = global_position.lerp(desired_position, 1.0 - exp(-follow_damping * delta))
 	look_at(framing_target + Vector3(0.0, 0.65, 0.0), Vector3.UP)
-	var after := _measure_projected_safe_frame()
-	projected_margins = (after.get("margins", {}) as Dictionary).duplicate(true)
-	safe_frame_ok = bool(after.get("inside_fraction", false))
-	safe_frame_correction_active = _safe_frame_offset.length_squared() > 0.0025 or not safe_frame_ok
+	var warden_after := _measure_projected_safe_frame()
+	var after := _measure_subject_coverage(subjects)
+	projected_margins = (warden_after.get("margins", {}) as Dictionary).duplicate(true)
+	var coverage_inside := bool(after.get("inside_fraction", false))
+	var warden_inside := bool(warden_after.get("inside_fraction", false))
+	var arena_fill_ok := absf(framing_target.x) <= arena_fill_limit.x + 0.01 and absf(framing_target.z) <= arena_fill_limit.y + 0.01
+	var obstruction_resolved := _coverage_obstructed_count == 0 or (_coverage_occluder_visual_bindings.size() > 0 and _obstruction_response_strength >= 0.65)
+	safe_frame_ok = warden_inside and coverage_inside and arena_fill_ok and obstruction_resolved
+	safe_frame_correction_active = _coverage_offset.length_squared() > 0.0025 or not safe_frame_ok or _arena_containment_active
+	_update_coverage_receipt(after, warden_inside, coverage_inside, arena_fill_ok, delta)
 	# Projected containment owns framing. Sightline isolation remains a secondary
 	# response to cemetery geometry that genuinely crosses the camera-to-Warden ray.
 	_update_visibility_isolation(delta)
 	_sync_visibility_camera()
+
+func _select_coverage_subjects() -> Array[Node3D]:
+	var subjects: Array[Node3D] = []
+	if is_instance_valid(target):
+		subjects.append(target)
+	var candidates: Array[Dictionary] = []
+	for member in get_tree().get_nodes_in_group(coverage_group):
+		if not member is Node3D or not is_instance_valid(member) or member == target:
+			continue
+		var actor := member as Node3D
+		var distance_squared := actor.global_position.distance_squared_to(target.global_position)
+		if distance_squared > coverage_radius * coverage_radius:
+			continue
+		var state := String(actor.get("state"))
+		var danger_priority := 0 if state in ["telegraph", "damage", "attack"] else 1
+		candidates.append({"node":actor, "priority":danger_priority, "distance_squared":distance_squared, "path":String(actor.get_path())})
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if int(a.priority) != int(b.priority):
+			return int(a.priority) < int(b.priority)
+		if not is_equal_approx(float(a.distance_squared), float(b.distance_squared)):
+			return float(a.distance_squared) < float(b.distance_squared)
+		return String(a.path) < String(b.path)
+	)
+	for index in mini(coverage_subject_limit, candidates.size()):
+		subjects.append(candidates[index].node as Node3D)
+	_coverage_subject_paths.clear()
+	for subject in subjects:
+		_coverage_subject_paths.append(String(subject.get_path()))
+	return subjects
+
+func _compose_arena_target(requested_target: Vector3, subjects: Array[Node3D]) -> Vector3:
+	var composed := requested_target
+	composed.x = clampf(composed.x, -arena_fill_limit.x, arena_fill_limit.x)
+	composed.z = clampf(composed.z, -arena_fill_limit.y, arena_fill_limit.y)
+	_arena_containment_active = not is_equal_approx(composed.x, requested_target.x) or not is_equal_approx(composed.z, requested_target.z)
+	if subjects.size() > 1:
+		var threat_center := Vector3.ZERO
+		for index in range(1, subjects.size()):
+			threat_center += subjects[index].global_position
+		threat_center /= float(subjects.size() - 1)
+		threat_center.y = composed.y
+		composed = composed.lerp(threat_center, coverage_threat_weight)
+	_coverage_obstructed_count = 0
+	_coverage_obstructing_path = ""
+	_obstruction_bypass_sign = 0.0
+	for subject in subjects:
+		var obstruction := _find_registered_subject_occluder(subject)
+		if obstruction.is_empty():
+			continue
+		_coverage_obstructed_count += 1
+		if _coverage_obstructing_path.is_empty():
+			_coverage_obstructing_path = obstruction
+			var obstruction_node := get_node_or_null(obstruction) as Node3D
+			if is_instance_valid(obstruction_node):
+				_obstruction_bypass_sign = -1.0 if target.global_position.x <= obstruction_node.global_position.x else 1.0
+	if _coverage_obstructed_count > 0:
+		var inward := Vector3.ZERO
+		inward.y = composed.y
+		composed = composed.lerp(inward, obstruction_inward_weight)
+	composed.x = clampf(composed.x, -arena_fill_limit.x, arena_fill_limit.x)
+	composed.z = clampf(composed.z, -arena_fill_limit.y, arena_fill_limit.y)
+	return composed
+
+func _find_registered_subject_occluder(subject: Node3D) -> String:
+	var subject_points := [subject.global_position + Vector3.UP * 0.35, subject.global_position + Vector3.UP * 1.0]
+	for binding in _tall_occluder_bindings:
+		if not bool(binding.get("bound", false)):
+			continue
+		for shape in binding.get("shapes", []):
+			if not is_instance_valid(shape) or shape.disabled:
+				continue
+			for subject_point in subject_points:
+				if _sight_segment_intersects_shape_volume(global_position, subject_point, shape):
+					return String(binding.get("resolved_path", binding.get("source_path", "")))
+	return ""
+
+func _measure_subject_coverage(subjects: Array[Node3D]) -> Dictionary:
+	var viewport_size := get_viewport().get_visible_rect().size
+	if viewport_size.x <= 1.0 or viewport_size.y <= 1.0 or subjects.is_empty():
+		return {"inside_fraction":false, "viewport":viewport_size, "margins":{}, "rect":Rect2(), "center":Vector2.ZERO, "classifications":[]}
+	var min_screen := Vector2(INF, INF)
+	var max_screen := Vector2(-INF, -INF)
+	var classifications: Array[Dictionary] = []
+	for subject in subjects:
+		var half_width := safe_frame_actor_half_width if subject == target else coverage_actor_half_width
+		var half_depth := safe_frame_actor_half_depth if subject == target else coverage_actor_half_depth
+		var actor_height := safe_frame_actor_height if subject == target else coverage_actor_height
+		var subject_min := Vector2(INF, INF)
+		var subject_max := Vector2(-INF, -INF)
+		var behind := false
+		for x_offset in [-half_width, half_width]:
+			for y_offset in [0.05, actor_height]:
+				for z_offset in [-half_depth, half_depth]:
+					var world_point := subject.global_position + Vector3(x_offset, y_offset, z_offset)
+					if is_position_behind(world_point):
+						behind = true
+						continue
+					var screen := unproject_position(world_point)
+					subject_min.x = minf(subject_min.x, screen.x)
+					subject_min.y = minf(subject_min.y, screen.y)
+					subject_max.x = maxf(subject_max.x, screen.x)
+					subject_max.y = maxf(subject_max.y, screen.y)
+		if behind or subject_min.x == INF:
+			classifications.append({"path":String(subject.get_path()), "classification":"behind"})
+			continue
+		min_screen.x = minf(min_screen.x, subject_min.x)
+		min_screen.y = minf(min_screen.y, subject_min.y)
+		max_screen.x = maxf(max_screen.x, subject_max.x)
+		max_screen.y = maxf(max_screen.y, subject_max.y)
+		var on_screen := subject_min.x >= 0.0 and subject_min.y >= 0.0 and subject_max.x <= viewport_size.x and subject_max.y <= viewport_size.y
+		classifications.append({"path":String(subject.get_path()), "classification":"on_screen" if on_screen else "partial_or_offscreen", "rect":Rect2(subject_min, subject_max - subject_min)})
+	if min_screen.x == INF:
+		return {"inside_fraction":false, "viewport":viewport_size, "margins":{}, "rect":Rect2(), "center":Vector2.ZERO, "classifications":classifications}
+	var margins := {"left":min_screen.x, "right":viewport_size.x - max_screen.x, "top":min_screen.y, "bottom":viewport_size.y - max_screen.y}
+	margins["minimum"] = minf(minf(float(margins.left), float(margins.right)), minf(float(margins.top), float(margins.bottom)))
+	var receipt := {"viewport":viewport_size, "center":(min_screen + max_screen) * 0.5, "rect":Rect2(min_screen, max_screen - min_screen), "margins":margins, "classifications":classifications}
+	receipt["inside_fraction"] = _margins_inside_fraction(receipt, coverage_frame_fraction) and classifications.all(func(item: Dictionary) -> bool: return String(item.classification) == "on_screen")
+	return receipt
+
+func _update_coverage_receipt(after: Dictionary, warden_inside: bool, coverage_inside: bool, arena_fill_ok: bool, delta: float) -> void:
+	if safe_frame_ok and movement_velocity.length_squared() <= 0.01:
+		_coverage_settled_seconds += delta
+	else:
+		_coverage_settled_seconds = 0.0
+	var reasons: Array[String] = []
+	if _arena_containment_active:
+		reasons.append("arena_inward_containment")
+	if not coverage_inside:
+		reasons.append("multi_subject_projection")
+	if _coverage_obstructed_count > 0:
+		reasons.append("registered_tall_obstruction")
+	if reasons.is_empty():
+		reasons.append("stable_follow")
+	_coverage_response_source = "+".join(reasons)
+	_coverage_receipt = {
+		"evaluated_subject_count":_coverage_subject_paths.size(),
+		"evaluated_subject_paths":_coverage_subject_paths.duplicate(),
+		"dangerous_actor_count":maxi(0, _coverage_subject_paths.size() - 1),
+		"subject_limit":coverage_subject_limit,
+		"coverage_radius":coverage_radius,
+		"warden_inside":warden_inside,
+		"coverage_inside":coverage_inside,
+		"arena_fill_ok":arena_fill_ok,
+		"arena_containment_active":_arena_containment_active,
+		"obstructed_subject_count":_coverage_obstructed_count,
+		"obstructing_path":_coverage_obstructing_path,
+		"response_source":_coverage_response_source,
+		"settled":_coverage_settled_seconds >= coverage_settle_seconds,
+		"settled_seconds":_coverage_settled_seconds,
+		"classifications":(after.get("classifications", []) as Array).duplicate(true),
+		"projected_margins":(after.get("margins", {}) as Dictionary).duplicate(true),
+	}
 
 func _measure_projected_safe_frame() -> Dictionary:
 	var viewport_size := get_viewport().get_visible_rect().size
@@ -218,6 +420,30 @@ func _bind_tall_occluders() -> void:
 			"bound":is_instance_valid(body) and not shapes.is_empty(),
 			"shape_count":shapes.size(),
 		})
+
+func _bind_coverage_occluder_visuals() -> void:
+	_coverage_occluder_visual_bindings.clear()
+	_coverage_occluder_original_transparency.clear()
+	_coverage_occluder_original_visibility.clear()
+	for source_path in coverage_occluder_visuals:
+		var source := get_node_or_null(source_path)
+		for member in _collect_visuals(source):
+			if not member is GeometryInstance3D:
+				continue
+			var visual := member as GeometryInstance3D
+			if _coverage_occluder_visual_bindings.has(visual):
+				continue
+			_coverage_occluder_visual_bindings.append(visual)
+			_coverage_occluder_original_transparency[visual.get_instance_id()] = visual.transparency
+			_coverage_occluder_original_visibility[visual.get_instance_id()] = visual.visible
+
+func _apply_coverage_occluder_fade() -> void:
+	for visual in _coverage_occluder_visual_bindings:
+		if not is_instance_valid(visual):
+			continue
+		var original := float(_coverage_occluder_original_transparency.get(visual.get_instance_id(), 0.0))
+		visual.transparency = lerpf(original, coverage_occluder_transparency, _obstruction_response_strength)
+		visual.visible = bool(_coverage_occluder_original_visibility.get(visual.get_instance_id(), true)) and _obstruction_response_strength < 0.65
 
 func _bind_member(role: String, source_path: NodePath) -> void:
 	var source := get_node_or_null(source_path)
@@ -445,6 +671,7 @@ func _apply_visibility_overlay(active: bool) -> void:
 func _snap_to_target() -> void:
 	framing_target = target.global_position
 	_safe_frame_offset = Vector3.ZERO
+	_coverage_offset = Vector3.ZERO
 	global_position = framing_target + Vector3(0.0, follow_height, follow_distance)
 	look_at(framing_target + Vector3(0.0, 0.65, 0.0), Vector3.UP)
 
@@ -474,6 +701,19 @@ func _mcp_state() -> Dictionary:
 		"safe_frame_screen_shift":_safe_frame_screen_shift,
 		"projected_margins":projected_margins.duplicate(true),
 		"safe_frame_fraction":safe_frame_fraction,
+		"multi_subject_coverage":_coverage_receipt.duplicate(true),
+		"coverage_frame_fraction":coverage_frame_fraction,
+		"coverage_offset":_coverage_offset,
+		"coverage_screen_shift":_coverage_screen_shift,
+		"arena_fill_limit":arena_fill_limit,
+		"camera_response_source":_coverage_response_source,
+		"obstruction_response_strength":_obstruction_response_strength,
+		"obstruction_bypass_sign":_obstruction_bypass_sign,
+		"coverage_occluder_visual_count":_coverage_occluder_visual_bindings.size(),
+		"coverage_occluder_transparency":coverage_occluder_transparency * _obstruction_response_strength,
+		"coverage_occluders_isolated":_coverage_occluder_visual_bindings.size() > 0 and _obstruction_response_strength >= 0.65,
+		"effective_follow_height":follow_height + obstruction_height_boost * _obstruction_response_strength,
+		"effective_follow_distance":follow_distance - obstruction_distance_reduction * _obstruction_response_strength,
 		"isolated_visual_count": _presentation_visuals.size(),
 		"movement_velocity": movement_velocity,
 		"follow_height": follow_height,
@@ -488,7 +728,7 @@ func _mcp_state() -> Dictionary:
 		"original_presentation_restored": _original_presentation_restored(),
 		"primary_camera_visibility_layer": get_cull_mask_value(VISIBILITY_LAYER),
 		"source_visual_count": _source_visuals.size(),
-		"visibility_strategy": "projected_safe_frame_with_secondary_private_layer_compositor",
+		"visibility_strategy": "deterministic_multi_subject_arena_containment_with_secondary_private_layer_compositor",
 		"tall_occluder_registry":{
 			"requested_count":tall_occluders.size(),
 			"bound_count":_tall_occluder_bindings.filter(func(binding: Dictionary) -> bool: return bool(binding.get("bound", false))).size(),

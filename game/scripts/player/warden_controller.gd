@@ -325,6 +325,7 @@ func reset_for_run(spawn_position: Vector3, reset_owner := "run_reset") -> void:
 	velocity = Vector3.ZERO
 	planar_velocity = Vector3.ZERO
 	movement_input = Vector2.ZERO
+	locomotion_state = "idle"
 	_dash_direction = Vector3.FORWARD
 	_last_move_direction = Vector3.FORWARD
 	_pending_dash_generation = -1
@@ -342,6 +343,7 @@ func reset_for_run(spawn_position: Vector3, reset_owner := "run_reset") -> void:
 	lantern.rotation = Vector3.ZERO
 	presentation_root.scale = _base_presentation_scale
 	end_victory_presentation(reset_owner)
+	_victory_vfx_duration = 0.0
 	_victory_vfx_generation = -1
 	victory_vfx_event_count = 0
 	victory_vfx_receipt.clear()

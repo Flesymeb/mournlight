@@ -340,6 +340,7 @@ func _begin_context_handoff(source: String, destination: String, physical: Strin
 			"destination_exposed":true, "downstream_action_count":1,
 			"teardown_complete":bool(teardown_receipt.get("complete", false)),
 			"teardown_generation":int(teardown_receipt.get("completion_generation", 0)),
+			"reset_invariants":(teardown_receipt.get("reset_invariants", {}) as Dictionary).duplicate(true),
 			"focus_target":"Play" if destination == "title" else "Resume",
 			"quit_requested":quit_requested,
 		}
@@ -364,6 +365,7 @@ func _begin_context_handoff(source: String, destination: String, physical: Strin
 		"downstream_action_count":1,
 		"teardown_complete":bool(teardown_receipt.get("complete", false)),
 		"teardown_generation":int(teardown_receipt.get("completion_generation", 0)),
+		"reset_invariants":(teardown_receipt.get("reset_invariants", {}) as Dictionary).duplicate(true),
 	}
 	if source == "result":
 		_terminal_handoff_active = true
@@ -472,6 +474,7 @@ func _finalize_victory_retry(transaction: Dictionary) -> void:
 		and bool(retry_state.get("terminal_commit_count_reset", false))
 		and String(retry_animation.get("semantic_state", "")) == "idle"
 		and String(retry_animation.get("resolved_clip", "")) == "Idle"
+		and bool((_terminal_reset_invariants("retry") as Dictionary).get("complete", false))
 		and _counts_are_isolated(retry_state.get("counts", {}))
 	)
 	var stages: Array = transaction.get("stages", [])
@@ -890,6 +893,7 @@ func _teardown_run(route: String, reason: String) -> Dictionary:
 		presentation_reset = warden.animation_binding.get_snapshot() if warden.animation_binding else {}
 	var encounter := spawner.get_snapshot()
 	var post_counts := _profile_counts()
+	var reset_invariants := _terminal_reset_invariants(route)
 	var teardown_complete := (
 		bool(transient_retirement.get("complete", false))
 		and int(encounter.get("live", -1)) == 0
@@ -908,11 +912,50 @@ func _teardown_run(route: String, reason: String) -> Dictionary:
 		"remaining_attack_presentations":get_tree().get_nodes_in_group("friendly_attack").size(),
 		"audio_retirement":transient_retirement.get("audio_retirement",{}), "terminal_snapshot_preserved":not terminal_snapshot.is_empty(),
 		"presentation_reset":presentation_reset,
+		"reset_invariants":reset_invariants,
 		"post_counts":post_counts,
 		"completion_generation":_teardown_generation, "complete":teardown_complete,
 	}
 	_teardown_active = false
 	return teardown_receipt.duplicate(true)
+
+func _terminal_reset_invariants(destination: String) -> Dictionary:
+	var animation := warden.animation_binding.get_snapshot() if warden.animation_binding else {}
+	var movement := warden.get_movement_snapshot()
+	var warden_state := warden._mcp_state()
+	var victory_vfx: Dictionary = warden_state.get("victory_vfx", {})
+	var audio_state := audio_director._mcp_state()
+	var counts := _profile_counts()
+	var reset_expected := destination in ["title", "retry", "fresh_start", "profile_reset"]
+	var idle_complete := (
+		String(movement.get("locomotion_state", "")) == "idle"
+		and (movement.get("velocity", Vector3.ONE) as Vector3).length_squared() <= 0.0001
+		and (movement.get("movement_input", Vector2.ONE) as Vector2).length_squared() <= 0.0001
+		and String(movement.get("dash_phase", "")) == "ready"
+		and not bool(movement.get("invulnerable", true))
+		and String(animation.get("semantic_state", "")) == "idle"
+		and String(animation.get("resolved_clip", "")) == "Idle"
+		and not bool((animation.get("terminal_lease", {}) as Dictionary).get("active", false))
+		and not bool(victory_vfx.get("active", false))
+		and not bool((audio_state.get("terminal_audio_lease", {}) as Dictionary).get("active", false))
+		and int(audio_state.get("terminal_active_voice_count", -1)) == 0
+	)
+	return {
+		"destination":destination,
+		"reset_expected":reset_expected,
+		"complete":idle_complete if reset_expected else true,
+		"locomotion_state":movement.get("locomotion_state", ""),
+		"movement_input":movement.get("movement_input", Vector2.ZERO),
+		"planar_velocity":movement.get("velocity", Vector3.ZERO),
+		"dash_phase":movement.get("dash_phase", ""),
+		"dash_invulnerable":movement.get("invulnerable", false),
+		"animation":animation,
+		"victory_vfx":victory_vfx,
+		"terminal_audio_lease":audio_state.get("terminal_audio_lease", {}),
+		"terminal_voice_count":audio_state.get("terminal_active_voice_count", -1),
+		"actors":{"enemies":counts.get("enemies", -1), "bosses":counts.get("bosses", -1), "projectiles":counts.get("projectiles", -1), "pickups":counts.get("pickups", -1)},
+		"run_serial":run_serial,
+	}
 
 func _retire_transient_ownership(route: String, reason: String, generation: int) -> Dictionary:
 	# Both ordinary lifecycle routes and the dense diagnostic reset enter this
@@ -1486,6 +1529,7 @@ func _record_retry_baseline(reason: String) -> void:
 		"tree_paused":get_tree().paused, "run_state":run_state,
 		"counts":_profile_counts(),
 		"warden_animation":warden.animation_binding.get_snapshot() if warden.animation_binding else {},
+		"reset_invariants":_terminal_reset_invariants("retry" if reason == "retry" else "fresh_start"),
 		"world_active":world.session_active,
 		"teardown_generation":teardown_receipt.get("completion_generation",0),
 	}
