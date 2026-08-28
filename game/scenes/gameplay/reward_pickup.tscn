@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/gameplay/reward_pickup.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://assets/authored/warden_lantern.glb" id="2_lantern"]
@@ -21,6 +21,21 @@ ring_segments = 5
 [sub_resource type="SphereShape3D" id="PickupShape"]
 radius = 0.75
 
+[sub_resource type="StandardMaterial3D" id="TailMaterial"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(1, 0.78, 0.28, 0.5)
+emission_enabled = true
+emission = Color(1, 0.48, 0.08, 1)
+emission_energy_multiplier = 2.0
+
+[sub_resource type="SphereMesh" id="TailMesh"]
+material = SubResource("TailMaterial")
+radius = 0.075
+height = 0.15
+radial_segments = 8
+rings = 4
+
 [node name="RewardPickup" type="Area3D" groups=["mcp_watch", "reward_pickup"]]
 script = ExtResource("1_script")
 collision_layer = 0
@@ -34,6 +49,13 @@ scale = Vector3(0.09, 0.09, 0.09)
 [node name="PickupRing" type="MeshInstance3D" parent="."]
 position = Vector3(0, -0.28, 0)
 mesh = SubResource("PickupRingMesh")
+cast_shadow = 0
+
+[node name="MotionTail" type="MeshInstance3D" parent="."]
+visible = false
+position = Vector3(0, -0.04, -0.12)
+scale = Vector3(0.75, 0.75, 1.7)
+mesh = SubResource("TailMesh")
 cast_shadow = 0
 
 [node name="Glow" type="OmniLight3D" parent="."]

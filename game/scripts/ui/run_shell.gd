@@ -10,6 +10,7 @@ const ICONS := {
 	"settings":preload("res://assets/ui/icon_settings.svg"), "credits":preload("res://assets/ui/icon_book.svg"),
 	"quit":preload("res://assets/ui/icon_quit.svg"), "retry":preload("res://assets/ui/icon_restart.svg"),
 	"title":preload("res://assets/ui/icon_title.svg"), "back":preload("res://assets/ui/icon_resume.svg"),
+	"help":preload("res://assets/ui/icon_book.svg"),
 	"master":preload("res://assets/ui/upgrades/health_max.svg"),
 	"music":preload("res://assets/ui/upgrades/lantern_cadence.svg"),
 	"effects":preload("res://assets/ui/upgrades/wisps_orbit.svg"),
@@ -79,7 +80,7 @@ func _ready() -> void:
 	set_mode("title")
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"ui_cancel") and mode in ["settings", "credits"]:
+	if event.is_action_pressed(&"ui_cancel") and mode in ["settings", "help", "credits"]:
 		_record_shell_action(&"back", false)
 		action_requested.emit(&"back")
 		get_viewport().set_input_as_handled()
@@ -169,7 +170,8 @@ func _layout() -> void:
 	subtitle_label.position = Vector2(center.x - 340,page_top + 54)
 	subtitle_label.size = Vector2(680,30)
 	body_label.position = Vector2(center.x - 400,page_top + 86)
-	body_label.size = Vector2(800,190 if mode == "credits" else 66 if mode == "result" else 56)
+	var body_height := 190.0 if mode == "credits" else 154.0 if mode == "help" else 66.0 if mode == "result" else 56.0
+	body_label.size = Vector2(800,body_height)
 	var visible_count := 0
 	for button in buttons:
 		if button.visible:
@@ -181,7 +183,7 @@ func _layout() -> void:
 		_layout_result(center, page_top)
 		return
 	var compact := visible_count >= 5
-	var start_y := page_top + (360 if mode == "credits" else 255 if mode == "result" else 184)
+	var start_y := page_top + (360 if mode == "credits" else 350 if mode == "help" else 255 if mode == "result" else 184)
 	var spacing := 48 if compact else 56
 	var button_height := 42 if compact else 46
 	for index in buttons.size():
@@ -245,7 +247,7 @@ func _layout_result(center: Vector2, page_top: float) -> void:
 			button.size = Vector2(360,42)
 
 func set_mode(next_mode: String, next_summary: Dictionary = {}) -> void:
-	if next_mode == "settings" or next_mode == "credits":
+	if next_mode in ["settings", "help", "credits"]:
 		return_mode = mode if mode in ["title","pause"] else "title"
 	mode = next_mode
 	summary = next_summary.duplicate(true)
@@ -262,7 +264,13 @@ func set_mode(next_mode: String, next_summary: Dictionary = {}) -> void:
 			var bindings: Dictionary = guidance.get("bindings", {})
 			var controls := "MOVE  %s    ·    DASH  %s\nThe lantern attacks automatically; fallen threats release collectible wisps." % [String(bindings.get("move", "MOVE")), String(bindings.get("dash", "DASH"))]
 			_configure("NIGHT HELD","THE WARDEN'S FLAME WAITS","The run is paused; no combat clock is advancing.\n\n" + controls,
-				[["resume","RESUME"],["settings","SETTINGS"],["retry","RESTART RUN"],["title","RETURN TO TITLE"],["quit","QUIT"]])
+				[["resume","RESUME"],["help","CONTROLS & HELP"],["settings","SETTINGS"],["retry","RESTART RUN"],["title","RETURN TO TITLE"],["quit","QUIT"]])
+		"help":
+			var guidance: Dictionary = summary.get("first_run_guidance", {})
+			var bindings: Dictionary = guidance.get("bindings", {})
+			_configure("CONTROLS & HELP","THE KEEPER'S FIELD NOTES",
+				"MOVE  %s\nDASH  %s\nDISMISS / RECALL GUIDANCE  %s\n\nThe Warden Lantern attacks legal threats automatically. Defeated enemies release warm wisps: move into their lantern radius to draw them in. Filling the level bar opens a three-choice upgrade draft; the selected change applies before the night resumes." % [String(bindings.get("move", "UNBOUND")),String(bindings.get("dash", "UNBOUND")),String(bindings.get("help", "UNBOUND"))],
+				[["back","BACK TO PAUSE"]])
 		"settings":
 			_refresh_settings_page()
 		"credits":

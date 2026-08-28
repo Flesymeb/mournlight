@@ -3,6 +3,17 @@ extends Control
 
 var snapshot: Dictionary = {}
 var snapshot_serial := 0
+var _displayed_experience_ratio := 0.0
+var _target_experience_ratio := 0.0
+var _last_level := 1
+var _last_resolved_reward_count := 0
+var _collection_flash := 0.0
+var _guidance_panel: Panel
+var _guidance_image: TextureRect
+var _guidance_title: Label
+var _guidance_action: Label
+var _guidance_prompt: Label
+var _guidance_dismiss: Label
 
 @onready var _vitals_meter: FPSVitalsHUD = $VitalsMeter
 
@@ -16,10 +27,11 @@ const VIOLET := Color("c27cff")
 const STONE := Color(0.025, 0.032, 0.065, 0.78)
 const FONT_BODY := preload("res://assets/fonts/Montserrat-Medium.ttf")
 const FONT_NUMERAL := preload("res://assets/fonts/Montserrat-SemiBold.ttf")
+const GUIDANCE_ART := preload("res://assets/ui/guidance/first_run_gameplay.png")
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	set_process(false)
+	set_process(true)
 	_vitals_meter.set_armor_visible(false)
 	_vitals_meter.custom_minimum_size = Vector2(250.0, 24.0)
 	(_vitals_meter.get_node("Rows") as VBoxContainer).mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -30,6 +42,75 @@ func _ready() -> void:
 	(_vitals_meter.get_node("Rows/HealthRow/HealthValue") as Label).visible = false
 	var health_bar := _vitals_meter.get_node("Rows/HealthRow/HealthBar") as Control
 	health_bar.custom_minimum_size = Vector2(250.0, 18.0)
+	_build_guidance_panel()
+
+func _process(delta: float) -> void:
+	var before := _displayed_experience_ratio
+	_displayed_experience_ratio = move_toward(_displayed_experience_ratio, _target_experience_ratio, delta * 1.65)
+	_collection_flash = maxf(0.0, _collection_flash - delta * 1.8)
+	if not is_equal_approx(before, _displayed_experience_ratio) or _collection_flash > 0.0:
+		queue_redraw()
+
+func _build_guidance_panel() -> void:
+	_guidance_panel = Panel.new()
+	_guidance_panel.name = "FirstRunGuidancePanel"
+	_guidance_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var surface := StyleBoxFlat.new()
+	surface.bg_color = Color(0.012, 0.018, 0.045, 0.96)
+	surface.border_width_left = 2
+	surface.border_width_top = 2
+	surface.border_width_right = 2
+	surface.border_width_bottom = 2
+	surface.border_color = BRASS
+	surface.corner_radius_top_right = 12
+	surface.corner_radius_bottom_left = 12
+	_guidance_panel.add_theme_stylebox_override("panel", surface)
+	add_child(_guidance_panel)
+	_guidance_image = TextureRect.new()
+	_guidance_image.texture = GUIDANCE_ART
+	_guidance_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_guidance_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_guidance_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_guidance_panel.add_child(_guidance_image)
+	var shade := ColorRect.new()
+	shade.position = Vector2(0, 154)
+	shade.size = Vector2(468, 124)
+	shade.color = Color(0.008, 0.012, 0.035, 0.92)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_guidance_panel.add_child(shade)
+	_guidance_title = _guidance_label(11, GOLD)
+	_guidance_action = _guidance_label(19, INK)
+	_guidance_prompt = _guidance_label(11, SILVER)
+	_guidance_prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_guidance_dismiss = _guidance_label(9, Color(BRASS, 0.95))
+	for label in [_guidance_title, _guidance_action, _guidance_prompt, _guidance_dismiss]:
+		_guidance_panel.add_child(label)
+	_guidance_panel.visible = false
+	_layout_guidance_panel()
+
+func _guidance_label(font_size: int, color: Color) -> Label:
+	var label := Label.new()
+	label.add_theme_font_override("font", FONT_BODY)
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return label
+
+func _layout_guidance_panel() -> void:
+	if not is_instance_valid(_guidance_panel):
+		return
+	_guidance_panel.position = Vector2(maxf(28.0, size.x - 500.0), maxf(178.0, size.y - 426.0))
+	_guidance_panel.size = Vector2(468, 278)
+	_guidance_image.position = Vector2(2, 2)
+	_guidance_image.size = Vector2(464, 190)
+	_guidance_title.position = Vector2(18, 160); _guidance_title.size = Vector2(430, 20)
+	_guidance_action.position = Vector2(18, 180); _guidance_action.size = Vector2(430, 28)
+	_guidance_prompt.position = Vector2(18, 210); _guidance_prompt.size = Vector2(430, 38)
+	_guidance_dismiss.position = Vector2(18, 250); _guidance_dismiss.size = Vector2(430, 18)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED:
+		_layout_guidance_panel()
 
 func bind_snapshot(next_snapshot: Dictionary) -> void:
 	snapshot = next_snapshot.duplicate(true)
@@ -40,11 +121,39 @@ func bind_snapshot(next_snapshot: Dictionary) -> void:
 		maxf(1.0, float(snapshot.get("health_maximum", 1.0))),
 		snapshot_serial > 1
 	)
+	var threshold := maxf(1.0, float(snapshot.get("experience_threshold", 1)))
+	_target_experience_ratio = clampf(float(snapshot.get("experience", 0)) / threshold, 0.0, 1.0)
+	var next_level := int(snapshot.get("level", 1))
+	var reward_feedback: Dictionary = snapshot.get("reward_feedback", {})
+	var resolved_count := int(reward_feedback.get("resolved_identity_count", 0))
+	if snapshot_serial == 1:
+		_displayed_experience_ratio = _target_experience_ratio
+	elif next_level > _last_level:
+		_displayed_experience_ratio = 0.0
+		_collection_flash = 1.0
+	elif resolved_count > _last_resolved_reward_count:
+		_collection_flash = 1.0
+	_last_level = next_level
+	_last_resolved_reward_count = resolved_count
+	_bind_guidance_panel(snapshot.get("first_run_guidance", {}))
 	queue_redraw()
+
+func _bind_guidance_panel(guidance_value: Variant) -> void:
+	var guidance: Dictionary = guidance_value if guidance_value is Dictionary else {}
+	_guidance_panel.visible = visible and bool(guidance.get("visible", false))
+	if not _guidance_panel.visible:
+		return
+	_guidance_title.text = "%s   ·   %s" % [String(guidance.get("title", "KEEPER'S FIRST VIGIL")), String(guidance.get("device", "keyboard")).to_upper()]
+	_guidance_action.text = String(guidance.get("action_label", ""))
+	_guidance_prompt.text = String(guidance.get("prompt", ""))
+	var bindings: Dictionary = guidance.get("bindings", {})
+	_guidance_dismiss.text = "%s  DISMISS / RECALL     ·     ESC  PAUSE & HELP" % String(bindings.get("help", "H"))
 
 func clear_snapshot() -> void:
 	snapshot = {}
 	visible = false
+	if is_instance_valid(_guidance_panel):
+		_guidance_panel.visible = false
 	queue_redraw()
 
 func _draw() -> void:
@@ -56,7 +165,6 @@ func _draw() -> void:
 	_draw_encounter_cluster(Vector2(viewport.x - 270, 28))
 	_draw_weapon_cluster(Vector2(viewport.x * 0.5 - 128, viewport.y - 106))
 	_draw_dash_cluster(Vector2(viewport.x - 132, viewport.y - 126))
-	_draw_first_run_guidance(viewport)
 	if bool(snapshot.get("boss_active", false)):
 		_draw_boss_cluster(Vector2(viewport.x * 0.5 - 260, 72))
 
@@ -95,7 +203,9 @@ func _draw_experience_cluster(origin: Vector2) -> void:
 	var level := int(snapshot.get("level", 1))
 	_draw_moon(origin + Vector2(20, 18), 17.0, SILVER)
 	_draw_text("LEVEL %d" % level, origin + Vector2(47, 13), 13, INK)
-	_draw_carved_bar(Rect2(origin + Vector2(118, 6), Vector2(250, 15)), float(experience) / threshold, SILVER, VIOLET)
+	_draw_carved_bar(Rect2(origin + Vector2(118, 6), Vector2(250, 15)), _displayed_experience_ratio, SILVER, VIOLET)
+	if _collection_flash > 0.0:
+		draw_arc(origin + Vector2(20, 18), 22.0 + (1.0 - _collection_flash) * 8.0, 0.0, TAU, 28, Color(GOLD, _collection_flash), 3.0, true)
 	_draw_text("%d / %d WISPS" % [experience, threshold], origin + Vector2(215, 42), 10, SILVER, HORIZONTAL_ALIGNMENT_CENTER, 150)
 
 func _draw_encounter_cluster(origin: Vector2) -> void:
@@ -199,7 +309,10 @@ func _mcp_state() -> Dictionary:
 		"level":snapshot.get("level",1),"wave":snapshot.get("wave",1),"wave_count":snapshot.get("wave_count",5),
 		"elapsed":snapshot.get("elapsed",0.0),"weapon_ranks":_weapon_rank_digest(),"dash_phase":snapshot.get("dash_phase","ready"),
 		"boss_active":snapshot.get("boss_active",false),"boss_health":snapshot.get("boss_health",0.0),"boss_health_maximum":snapshot.get("boss_health_maximum",0.0),
-		"first_run_guidance":snapshot.get("first_run_guidance",{})},
+		"first_run_guidance":snapshot.get("first_run_guidance",{}),
+		"displayed_experience_ratio":_displayed_experience_ratio,
+		"target_experience_ratio":_target_experience_ratio,
+		"collection_flash":_collection_flash},
 		"snapshot_serial": snapshot_serial, "visible": visible}
 
 func _weapon_rank_digest() -> Array[Dictionary]:

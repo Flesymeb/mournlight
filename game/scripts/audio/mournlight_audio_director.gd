@@ -120,12 +120,13 @@ func _bind_events() -> void:
 		)
 	var spawner := controller.get_node_or_null("World/EncounterSpawner")
 	if spawner:
-		spawner.reward_dropped.connect(func(_event: Dictionary) -> void: play_semantic("pickup"))
 		spawner.enemy_lifecycle.connect(func(event: Dictionary) -> void:
 			match String(event.get("phase", "")):
 				"telegraph": play_semantic("enemy_warning")
 				"death": play_semantic("enemy_death")
 		)
+	if controller.has_signal("reward_collected"):
+		controller.reward_collected.connect(func(_event: Dictionary) -> void: play_semantic("pickup"))
 	var draft := controller.get_node_or_null("Interface/UpgradeDraft")
 	if draft and draft.has_signal("choice_requested"):
 		draft.choice_requested.connect(func(_index: int) -> void: play_semantic("upgrade_confirm"))

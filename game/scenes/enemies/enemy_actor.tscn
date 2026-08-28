@@ -1,9 +1,10 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/enemy_actor.gd" id="1_actor"]
 [ext_resource type="Script" path="res://scripts/combat/health_component.gd" id="2_health"]
 [ext_resource type="Script" path="res://scripts/combat/drop_transaction.gd" id="3_drop"]
 [ext_resource type="Script" path="res://scripts/enemies/enemy_semantic_presenter.gd" id="4_presenter"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/enemy_vitality_bar.tscn" id="5_vitality"]
 
 [sub_resource type="CapsuleShape3D" id="Shape"]
 radius = 0.55
@@ -73,3 +74,5 @@ script = ExtResource("2_health")
 
 [node name="DropTransaction" type="Node" parent="."]
 script = ExtResource("3_drop")
+
+[node name="EnemyVitalityBar" parent="." instance=ExtResource("5_vitality")]

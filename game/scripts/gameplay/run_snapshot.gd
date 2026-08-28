@@ -48,6 +48,7 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 		"damage_dealt": int(controller.damage_dealt),
 		"selected_upgrades": controller.selected_upgrades.duplicate(true),
 		"first_run_guidance":controller._first_run_guidance_snapshot(),
+		"reward_feedback":controller._reward_feedback_snapshot(),
 		"warden_animation": warden.animation_binding.get_snapshot() if warden and warden.animation_binding else {},
 		"warden_movement": warden.get_movement_snapshot() if warden else {},
 		"terminal_reset_invariants": controller._terminal_reset_invariants("snapshot"),

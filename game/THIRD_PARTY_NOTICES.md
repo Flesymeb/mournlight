@@ -17,3 +17,4 @@ The machine-inspectable aggregate release inventory is `ASSET_PROVENANCE.json`. 
 - COBRA FPS Feel Kit fantasy recordings: Pixabay Content License as documented by the MIT project; selected source recordings and copied license are in `assets/audio_semantic/mournlight_weapons/`.
 - gd-dialog selected swish and pickup recordings: MIT; copied project license is in `assets/audio_semantic/mournlight_weapons/GD_DIALOG_LICENSE`.
 - GodotX health bar component and Barlow font sources remain covered by the notices in `ui/widgets/vitals/`.
+- First-run gameplay guidance art is candidate-derived generated output. Its HUD-free runtime-frame input, generation prompt, output hash, and live-UI binding are recorded in `assets/ui/guidance/first_run_gameplay.receipt.json`; no frozen visual reference pixels or baked instructional text are shipped.

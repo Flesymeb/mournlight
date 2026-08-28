@@ -67,6 +67,10 @@ var _light_budget_refresh_remaining := 0.0
 var _light_budget_update_count := 0
 var _light_budget_skipped_frames := 0
 var _live_count := 0
+var _vitality_visible_owners: Dictionary = {}
+var _vitality_retired_total := 0
+var _vitality_visibility_transitions := 0
+var _last_vitality_event: Dictionary = {}
 
 const LIGHT_BUDGET_REFRESH_SECONDS := 0.1
 
@@ -88,6 +92,7 @@ func _ready() -> void:
 		actor.drop_committed.connect(_on_reward_dropped)
 		actor.lifecycle_event.connect(_on_lifecycle_event)
 		add_child(actor)
+		actor.vitality_bar.visibility_state_changed.connect(_on_vitality_visibility_changed)
 		_pool.append(actor)
 	set_process(false)
 
@@ -131,6 +136,7 @@ func stop_encounter() -> void:
 	_telegraph_owners.clear()
 	_role_light_owners.clear()
 	_hurt_light_owners.clear()
+	_vitality_visible_owners.clear()
 	neighbor_registry.clear()
 	_emit_snapshot()
 
@@ -169,6 +175,10 @@ func reset_encounter(preserve_pressure: bool = false) -> void:
 	_last_cue_release = {}
 	_role_light_owners.clear()
 	_hurt_light_owners.clear()
+	_vitality_visible_owners.clear()
+	_vitality_retired_total = 0
+	_vitality_visibility_transitions = 0
+	_last_vitality_event.clear()
 	_light_peak_active = 0
 	_light_peak_requested = 0
 	_light_budget_refresh_remaining = 0.0
@@ -549,6 +559,16 @@ func _on_lifecycle_event(event: Dictionary) -> void:
 		_light_budget_refresh_remaining = LIGHT_BUDGET_REFRESH_SECONDS
 	enemy_lifecycle.emit(last_lifecycle_event)
 
+func _on_vitality_visibility_changed(event: Dictionary) -> void:
+	var key := "%s.g%d" % [String(event.get("actor_id", "")), int(event.get("spawn_generation", -1))]
+	if bool(event.get("visible", false)):
+		_vitality_visible_owners[key] = true
+	else:
+		if _vitality_visible_owners.erase(key):
+			_vitality_retired_total += 1
+	_vitality_visibility_transitions += 1
+	_last_vitality_event = event.duplicate(true)
+
 func get_profile_counters() -> Dictionary:
 	var neighbor := neighbor_registry.get_snapshot() if is_instance_valid(neighbor_registry) else {}
 	return {
@@ -568,6 +588,8 @@ func get_profile_counters() -> Dictionary:
 		"total_target_queries":int(neighbor.get("total_target_queries", 0)),
 		"total_target_candidate_visits":int(neighbor.get("total_target_candidate_visits", 0)),
 		"counter_source":"encounter_lifecycle_owners",
+		"vitality_visible":_vitality_visible_owners.size(),
+		"vitality_retired_total":_vitality_retired_total,
 	}
 
 func _emit_snapshot() -> void:
@@ -678,6 +700,15 @@ func get_snapshot() -> Dictionary:
 			"neighbor_query_owner":"EnemyNeighborRegistry",
 			"counter_reset_scope":"ordinary_run",
 		},
+		"vitality_indicators":{
+			"visible":_vitality_visible_owners.size(),
+			"retired_total":_vitality_retired_total,
+			"visibility_transitions":_vitality_visibility_transitions,
+			"owners":_vitality_visible_owners.keys(),
+			"last_event":_last_vitality_event.duplicate(true),
+			"update_policy":"authoritative_health_signals_and_actor_local_proximity",
+			"boss_uses_dedicated_hud":true,
+		},
 	}
 
 func _variant_balance_receipt(role_variants: Dictionary) -> Dictionary:
@@ -726,4 +757,5 @@ func _mcp_state() -> Dictionary:
 		"neighbor_registry":snapshot.get("neighbor_registry", {}),
 		"validation_profile_cohort":snapshot.get("validation_profile_cohort", {}),
 		"last_lifecycle_event":snapshot.get("last_lifecycle_event", {}),
+		"vitality_indicators":snapshot.get("vitality_indicators", {}),
 	}

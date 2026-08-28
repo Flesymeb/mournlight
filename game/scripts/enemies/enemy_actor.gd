@@ -17,6 +17,7 @@ signal drop_committed(event: Dictionary)
 @onready var hurt_light: OmniLight3D = $HurtLight
 @onready var role_glow: OmniLight3D = $RoleGlow
 @onready var collider: CollisionShape3D = $Collider
+@onready var vitality_bar: EnemyVitalityBar = $EnemyVitalityBar
 
 var target: WardenController
 var state := "pooled"
@@ -75,6 +76,7 @@ func activate(next_profile: EnemyProfile, next_target: WardenController, at_posi
 	health.maximum_health = profile.maximum_health
 	health.current_health = profile.maximum_health
 	health.reset_health()
+	vitality_bar.bind_actor(health, stable_id, generation, String(profile.role_id) == "grave_brute")
 	drops.reset_transaction()
 	global_position = at_position
 	velocity = Vector3.ZERO
@@ -103,6 +105,7 @@ func return_to_pool() -> void:
 	state_remaining = 0.0
 	state = "pooled"
 	model_pivot.reset_presenter()
+	vitality_bar.retire("pool_return")
 	visible = false
 	collider.set_deferred("disabled", true)
 	telegraph_ring.visible = false
@@ -137,6 +140,7 @@ func _physics_process(delta: float) -> void:
 		_set_light_budget(_role_light_active, false)
 	if not is_instance_valid(target) or state in ["pooled", "death"]:
 		return
+	vitality_bar.advance(delta, global_position.distance_to(target.global_position), true)
 	state_remaining = maxf(0.0, state_remaining - delta)
 	match state:
 		"spawn":
@@ -243,6 +247,7 @@ func _damage_frame() -> void:
 
 func _on_hurt(event: Dictionary) -> void:
 	hurt_count += 1
+	vitality_bar.reveal_damage()
 	_hurt_light_remaining = 0.24
 	lifecycle_event.emit(_event("hurt", {"health_after": event.get("health_after", health.current_health)}))
 
@@ -262,8 +267,11 @@ func _on_died(event: Dictionary) -> void:
 	collider.set_deferred("disabled", true)
 	telegraph_ring.visible = false
 	lane_cue.visible = false
+	vitality_bar.retire("death")
 	var drop_event := event.duplicate(true)
 	drop_event.position = global_position
+	drop_event.actor_stable_id = String(stable_id)
+	drop_event.spawn_generation = spawn_generation
 	drops.commit_from_death(drop_event)
 	lifecycle_event.emit(_event("death", {"death_id": event.get("death_id", "")}))
 	defeated.emit(self, event)
@@ -362,6 +370,7 @@ func _mcp_state() -> Dictionary:
 		"active_motion_id": model_pivot.active_motion_id if is_instance_valid(model_pivot) else "none",
 		"semantic_bindings": model_pivot.semantic_bindings() if is_instance_valid(model_pivot) else {},
 		"presentation_budget": get_presentation_budget_snapshot(),
+		"vitality":vitality_bar.get_snapshot() if is_instance_valid(vitality_bar) else {},
 	}
 
 func get_presentation_budget_snapshot() -> Dictionary:

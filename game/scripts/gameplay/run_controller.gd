@@ -3,6 +3,7 @@ extends Node
 
 signal state_changed(previous: String, current: String)
 signal snapshot_changed(snapshot: Dictionary)
+signal reward_collected(event: Dictionary)
 
 @onready var world: SurvivalFoundation = $World
 @onready var warden: WardenController = $World/Warden
@@ -30,6 +31,7 @@ const PROFILE_COVERAGE_CELLS := [
 	"enemy_density", "boss", "warden_lantern", "gravespade",
 	"wandering_wisps", "pickups", "hud", "animation", "vfx",
 	"lights", "audio",
+	"vitality_indicators",
 ]
 const CompleteRunLedgerClass := preload("res://scripts/gameplay/complete_run_ledger.gd")
 
@@ -120,6 +122,20 @@ var _profile_coverage: Dictionary = {}
 var _profile_coverage_first_seen: Dictionary = {}
 var _first_run_guidance_completed := false
 var _first_run_guidance_completion: Dictionary = {}
+var _first_run_guidance_dismissed := false
+var _guidance_movement_observed := false
+var _guidance_dash_observed := false
+var _guidance_attack_observed := false
+var _guidance_attack_baseline := 0
+var _guidance_reset_generation := 0
+var _guidance_reset_receipt: Dictionary = {}
+var _known_reward_ids: Dictionary = {}
+var _resolved_reward_ids: Dictionary = {}
+var _reward_spawn_receipt: Dictionary = {}
+var _reward_attraction_receipt: Dictionary = {}
+var _reward_collection_receipt: Dictionary = {}
+var _reward_experience_receipt: Dictionary = {}
+var _reward_duplicate_rejections := 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -146,7 +162,7 @@ func _ready() -> void:
 	input_router.logical_press_edge.connect(_on_logical_press_edge)
 	input_router.context_changed.connect(_on_input_context_changed)
 	if OS.has_feature("editor"):
-		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_draft", &"validation_prepare_result_failure", &"validation_prepare_result_victory", &"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_advance_density", &"validation_reset_density", &"validation_prepare_final_profile", &"validation_advance_final_profile", &"validation_reset_final_profile", &"tester_victory_prepare", &"tester_victory_advance", &"tester_victory_commit", &"tester_final_profile_prepare", &"tester_final_profile_advance", &"tester_final_profile_reset"]:
+		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_draft", &"validation_prepare_result_failure", &"validation_prepare_result_victory", &"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_advance_density", &"validation_reset_density", &"validation_prepare_final_profile", &"validation_advance_final_profile", &"validation_reset_final_profile", &"tester_victory_prepare", &"tester_victory_advance", &"tester_victory_commit", &"tester_final_profile_prepare", &"tester_final_profile_advance", &"tester_final_profile_reset", &"qa_reset_first_run_guidance"]:
 			if not InputMap.has_action(action):
 				InputMap.add_action(action)
 	_enter_title()
@@ -158,12 +174,25 @@ func _process(delta: float) -> void:
 	_advance_profile_sample(delta)
 	if run_state in ["active","boss"] and not get_tree().paused:
 		run_elapsed += delta
+		if not _guidance_movement_observed and warden.planar_velocity.length() > 0.45:
+			_guidance_movement_observed = true
+		if not _guidance_attack_observed and world.attack_runtime.authorized_count > _guidance_attack_baseline:
+			_guidance_attack_observed = true
 	_snapshot_clock -= delta
 	if _snapshot_clock <= 0.0:
 		_snapshot_clock = 0.1
 		_emit_snapshot()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if OS.has_feature("editor") and event.is_action_pressed(&"qa_reset_first_run_guidance"):
+		_qa_reset_first_run_guidance()
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed(&"guidance_help") and run_state in ["active", "boss"]:
+		_first_run_guidance_dismissed = not _first_run_guidance_dismissed
+		_emit_snapshot()
+		get_viewport().set_input_as_handled()
+		return
 	if OS.has_feature("editor") and event.is_action_pressed(&"tester_victory_prepare"):
 		_prepare_tester_victory()
 		get_viewport().set_input_as_handled()
@@ -280,6 +309,19 @@ func _begin_run() -> void:
 	_active_pickups.clear()
 	_active_pickup_count = 0
 	_active_effect_count = 0
+	_known_reward_ids.clear()
+	_resolved_reward_ids.clear()
+	_reward_spawn_receipt.clear()
+	_reward_attraction_receipt.clear()
+	_reward_collection_receipt.clear()
+	_reward_experience_receipt.clear()
+	_reward_duplicate_rejections = 0
+	_guidance_movement_observed = false
+	_guidance_dash_observed = false
+	_guidance_attack_observed = false
+	_guidance_attack_baseline = world.attack_runtime.authorized_count
+	if not _first_run_guidance_completed:
+		_first_run_guidance_dismissed = false
 	_transition("initializing")
 	run_serial += 1
 	complete_run_ledger.begin_run(run_serial, "ordinary", "retry" if _next_baseline_reason == "retry" else "title_play")
@@ -312,6 +354,7 @@ func _begin_run() -> void:
 	draft_controller.reset()
 	audio_director.reset_for_run()
 	world.reset_session(true, "begin_run_%s" % _next_baseline_reason)
+	_guidance_attack_baseline = world.attack_runtime.authorized_count
 	_health_accounting_suspended = true
 	health.maximum_health = 100.0
 	health.reset_warden_health()
@@ -586,19 +629,66 @@ func _on_enemy_defeated(_event: Dictionary) -> void:
 	_emit_snapshot()
 
 func _on_reward_dropped(event: Dictionary) -> void:
+	var drop_id := String(event.get("drop_id", ""))
+	if drop_id.is_empty() or _known_reward_ids.has(drop_id):
+		_reward_duplicate_rejections += 1
+		_reward_spawn_receipt = {"accepted":false,"drop_id":drop_id,"reason":"missing_or_duplicate_identity"}
+		_emit_snapshot()
+		return
+	_known_reward_ids[drop_id] = true
+	_reward_spawn_receipt = {
+		"accepted":true, "phase":"spawned", "drop_id":drop_id,
+		"position":event.get("position", Vector3.ZERO),
+		"reward_value":event.get("reward_value", 1),
+		"run_serial":run_serial,
+	}
 	_spawn_reward_pickup(event)
 	_emit_snapshot()
 
 func _on_reward_pickup_collected(event: Dictionary) -> void:
+	var constituent_ids: Array = event.get("constituent_drop_ids", [String(event.get("drop_id", ""))])
+	var accepted_ids: Array[String] = []
+	for id_value in constituent_ids:
+		var drop_id := String(id_value)
+		if drop_id.is_empty() or _resolved_reward_ids.has(drop_id):
+			continue
+		_resolved_reward_ids[drop_id] = true
+		accepted_ids.append(drop_id)
+	if accepted_ids.is_empty():
+		_reward_duplicate_rejections += 1
+		return
 	pickup_collected_total += 1
 	var base_reward := maxi(1, int(event.get("reward_value", 1)))
 	var resolved_reward := maxi(1, int(round(float(base_reward) * warden.experience_yield_multiplier)))
+	var experience_before := experience
+	var level_before := level
+	var threshold_before := experience_threshold
 	experience += resolved_reward
 	if experience >= experience_threshold:
 		experience -= experience_threshold
 		level += 1
 		experience_threshold = 5 + (level - 1) * 2
 		_open_upgrade_draft()
+	_reward_collection_receipt = event.duplicate(true)
+	_reward_collection_receipt.merge({
+		"accepted":true, "phase":"collected", "resolved_drop_ids":accepted_ids,
+		"resolved_identity_count":accepted_ids.size(), "exactly_once":true,
+		"run_serial":run_serial,
+	}, true)
+	_reward_experience_receipt = {
+		"phase":"experience_applied", "reward_value":resolved_reward,
+		"experience_before":experience_before, "experience_after":experience,
+		"threshold_before":threshold_before, "threshold_after":experience_threshold,
+		"level_before":level_before, "level_after":level,
+		"overflow_preserved":experience == experience_before + resolved_reward - (threshold_before if level > level_before else 0),
+		"hud_interpolation_requested":true,
+	}
+	reward_collected.emit(_reward_collection_receipt.duplicate(true))
+	_emit_snapshot()
+
+func _on_reward_attraction_started(event: Dictionary) -> void:
+	_reward_attraction_receipt = event.duplicate(true)
+	_reward_attraction_receipt["run_serial"] = run_serial
 	_emit_snapshot()
 
 func _on_reward_pickup_retired(event: Dictionary) -> void:
@@ -613,14 +703,14 @@ func _spawn_reward_pickup(event: Dictionary) -> RewardPickup:
 			if is_instance_valid(pickup_value):
 				merge_target = pickup_value as RewardPickup
 				break
-		if is_instance_valid(merge_target):
-			merge_target.merge_reward(event)
+		if is_instance_valid(merge_target) and merge_target.merge_reward(event):
 			pickup_spawned_total += 1
 			return merge_target
 	var pickup := REWARD_PICKUP_SCENE.instantiate() as RewardPickup
 	world.add_child(pickup)
 	pickup.configure(warden, event)
 	pickup.collected.connect(_on_reward_pickup_collected)
+	pickup.attraction_started.connect(_on_reward_attraction_started)
 	pickup.retired.connect(_on_reward_pickup_retired)
 	_active_pickups[pickup.get_instance_id()] = pickup
 	_active_pickup_count = _active_pickups.size()
@@ -638,7 +728,10 @@ func _seed_profile_pickups(count: int) -> int:
 			"position":Vector3(cos(angle) * 4.2, 0.05, sin(angle) * 3.6),
 			"profile_seeded":true,
 		}
-		_spawn_reward_pickup(event)
+		# Diagnostics use the shipped authoritative drop route as well. The
+		# diagnostic route marker still prevents qualification, while identity
+		# accounting and cleanup remain identical to ordinary play.
+		_on_reward_dropped(event)
 		seeded += 1
 	return seeded
 
@@ -650,6 +743,8 @@ func _on_build_changed(_snapshot: Dictionary) -> void:
 	_emit_snapshot()
 
 func _on_dash_changed(_phase: String, _invulnerable: bool) -> void:
+	if _phase == "active":
+		_guidance_dash_observed = true
 	_emit_snapshot()
 
 func _on_logical_press_edge(action: StringName, activation: int, receipt: Dictionary) -> void:
@@ -679,6 +774,7 @@ func _on_shell_action(action: StringName) -> void:
 			else:
 				_begin_shell_title_handoff(shell.mode, "confirm")
 		&"settings": _open_settings_page()
+		&"help": _open_help_page()
 		&"credits": _open_credits_page()
 		&"back": _return_from_shell_page()
 		&"quit":
@@ -703,6 +799,13 @@ func _open_settings_page() -> void:
 		shell.set_mode("settings")
 	_emit_snapshot()
 
+func _open_help_page() -> void:
+	if run_state == "paused":
+		_transition("help")
+		get_tree().paused = true
+		shell.set_mode("help", last_snapshot)
+	_emit_snapshot()
+
 func _open_credits_page() -> void:
 	if run_state == "title":
 		_set_title_surface(false)
@@ -711,11 +814,11 @@ func _open_credits_page() -> void:
 	_emit_snapshot()
 
 func _return_from_shell_page() -> void:
-	if shell.return_mode == "pause" and run_state == "settings":
+	if shell.return_mode == "pause" and run_state in ["settings", "help"]:
 		get_tree().paused = true
 		_transition("paused")
-		shell.set_mode("hidden")
-		_begin_context_handoff("settings", "pause", "back")
+		shell.set_mode("pause", last_snapshot)
+		_begin_context_handoff(shell.mode, "pause", "back")
 		_emit_snapshot()
 	else:
 		var source := shell.mode
@@ -767,6 +870,7 @@ func _on_draft_choice(index: int) -> void:
 	selected_upgrades.append(choice)
 	if bool(choice.get("natural_choice", false)) and not _first_run_guidance_completed:
 		_first_run_guidance_completed = true
+		_first_run_guidance_dismissed = true
 		_first_run_guidance_completion = {
 			"completed":true,
 			"run_serial":run_serial,
@@ -1278,6 +1382,7 @@ func _profile_cached_system_observation(live_density: int) -> Dictionary:
 		"vfx":vfx_active,
 		"lights":int(counts.get("lights", 0)) > 0,
 		"audio":int(counts.get("audio_voices", 0)) > 0,
+		"vitality_indicators":int(counts.get("vitality_visible", 0)) > 0,
 	}
 
 func _accumulate_profile_coverage(observation: Dictionary) -> void:
@@ -1685,7 +1790,7 @@ func _contract_ordinary_profile_sample(renderer_classification: String, viewport
 			"enemy_density":true, "boss":true, "warden_lantern":true,
 			"gravespade":true, "wandering_wisps":true, "pickups":true,
 			"hud":true, "animation":true, "vfx":true, "lights":true,
-			"audio":true,
+			"audio":true, "vitality_indicators":true,
 		},
 		"missing_coverage":[],
 		"boss_presence":true,
@@ -1935,6 +2040,7 @@ func _counts_are_isolated(counts: Dictionary) -> bool:
 		and int(counts.get("bosses", -1)) == 0
 		and int(counts.get("projectiles", -1)) == 0
 		and int(counts.get("pickups", -1)) == 0
+		and int(counts.get("vitality_visible", -1)) == 0
 		and int(counts.get("effects", -1)) == 0
 		and int(counts.get("wisp_handles", -1)) == 0
 		and int(counts.get("wisp_interval_targets", -1)) == 0
@@ -1966,6 +2072,8 @@ func _profile_counts() -> Dictionary:
 		"bosses":1 if is_instance_valid(boss) else 0,
 		"projectiles":projectile_count,
 		"pickups":_active_pickup_count,
+		"vitality_visible":int(encounter.get("vitality_visible", 0)),
+		"vitality_retired_total":int(encounter.get("vitality_retired_total", 0)),
 		"pickup_production_ready":spawner.reward_dropped.is_connected(_on_reward_dropped),
 		"effects":_active_effect_count,
 		"lights":lights, "audio_voices":audio_voices,
@@ -2094,7 +2202,8 @@ func _validation_controls_receipt() -> Dictionary:
 		controls.append({"action":String(action), "registered":InputMap.has_action(action), "physical_binding_count":InputMap.action_get_events(action).size() if InputMap.has_action(action) else 0})
 	for action in [&"tester_victory_prepare", &"tester_victory_advance", &"tester_victory_commit", &"tester_final_profile_prepare", &"tester_final_profile_advance", &"tester_final_profile_reset"]:
 		controls.append({"action":String(action), "registered":InputMap.has_action(action), "physical_binding_count":InputMap.action_get_events(action).size() if InputMap.has_action(action) else 0})
-	return {"editor_only":OS.has_feature("editor"), "release_export_available":false, "controls":controls, "prepare_and_advance_separate":true, "density_checkpoints":[3,5,10,18,32]}
+	controls.append({"action":"qa_reset_first_run_guidance", "registered":InputMap.has_action(&"qa_reset_first_run_guidance"), "physical_binding_count":InputMap.action_get_events(&"qa_reset_first_run_guidance").size() if InputMap.has_action(&"qa_reset_first_run_guidance") else 0})
+	return {"editor_only":OS.has_feature("editor"), "release_export_available":false, "controls":controls, "prepare_and_advance_separate":true, "density_checkpoints":[3,5,10,18,32], "guidance_reset":_guidance_reset_receipt.duplicate(true)}
 
 func _dense_work_caps(encounter: Dictionary) -> Dictionary:
 	var neighbor_state: Dictionary = encounter.get("neighbor_registry", {})
@@ -2105,6 +2214,7 @@ func _dense_work_caps(encounter: Dictionary) -> Dictionary:
 		"neighbor_candidates_per_query":int(neighbor_state.get("candidate_budget", 12)),
 		"telegraph_cues":spawner.telegraph_cue_cap,
 		"reward_pickups":MAX_ACTIVE_PICKUPS,
+		"vitality_indicators":spawner.pool_size,
 		"ordinary_role_lights":spawner.role_light_cap,
 		"hurt_lights":spawner.hurt_light_cap,
 		"audio_effect_voices":int(audio_state.get("voice_limit", 0)),
@@ -2125,6 +2235,7 @@ func _profile_workload_receipt(encounter: Dictionary) -> Dictionary:
 		"attacks":{"authorized":attack_state.get("authorized_count", 0),"hits":attack_state.get("hit_count", 0),"active_ledgers":attack_state.get("active_ledgers", 0)},
 		"projectiles":counts.get("projectiles", 0),
 		"pickups":counts.get("pickups", 0),
+		"vitality":{"visible":counts.get("vitality_visible", 0),"retired_total":counts.get("vitality_retired_total", 0),"policy":"authoritative_health_signals_and_actor_local_proximity"},
 		"effects":counts.get("effects", 0),
 		"audio":{"active_voices":audio_state.get("active_effect_voices", 0),"active_by_owner":(audio_state.get("active_by_owner", {}) as Dictionary).duplicate(true),"voice_limit":audio_state.get("voice_limit", 0)},
 		"neighbor_work":neighbor_work.duplicate(true),
@@ -2159,31 +2270,91 @@ func _profile_workload_window(start: Dictionary, finish: Dictionary) -> Dictiona
 
 func _first_run_guidance_snapshot() -> Dictionary:
 	var bindings := {
-		"move":_input_binding_summary([&"move_forward", &"move_left", &"move_back", &"move_right"], 5),
-		"dash":_input_binding_summary([&"context_confirm"], 2),
-		"confirm":_input_binding_summary([&"ui_accept"], 2),
+		"move":input_router.binding_label([&"move_forward", &"move_left", &"move_back", &"move_right"], 4),
+		"dash":input_router.binding_label([&"context_confirm"], 2),
+		"confirm":input_router.binding_label([&"context_confirm"], 2),
+		"help":input_router.binding_label([&"guidance_help"], 2),
 	}
 	if _first_run_guidance_completed:
-		return {"visible":false,"stage":"complete","completed":true,"completion":_first_run_guidance_completion.duplicate(true),"bindings":bindings,"help_surface":"pause"}
+		return {"visible":false,"stage":"complete","completed":true,"completion":_first_run_guidance_completion.duplicate(true),"bindings":bindings,"help_surface":"pause_controls_and_help","device":input_router.active_device,"reset":_guidance_reset_receipt.duplicate(true)}
 	if run_route_kind != "ordinary" or run_state not in ["active", "draft"]:
-		return {"visible":false,"stage":"inactive","completed":false,"bindings":bindings,"help_surface":"pause"}
-	var stage := "movement_and_automatic_attack"
+		return {"visible":false,"stage":"inactive","completed":false,"bindings":bindings,"help_surface":"pause_controls_and_help","device":input_router.active_device,"reset":_guidance_reset_receipt.duplicate(true)}
+	var stage := "movement"
 	var title := "KEEPER'S FIRST VIGIL"
-	var prompt := "MOVE  %s    ·    THE WARDEN LANTERN ATTACKS AUTOMATICALLY" % String(bindings.move)
-	var icon := "lantern"
+	var prompt := "MOVE TO KEEP AN ESCAPE LANE"
+	var action_label := String(bindings.move)
+	var icon := "move"
 	if draft_controller.active:
 		stage = "natural_upgrade_draft"
-		prompt = "CHOOSE ONE TRUE UPGRADE  %s    ·    COMBAT RESUMES AFTER IT APPLIES" % String(bindings.confirm)
+		prompt = "CHOOSE ONE UPGRADE; IT APPLIES BEFORE COMBAT RESUMES"
+		action_label = String(bindings.confirm)
 		icon = "upgrade"
 	elif pickup_collected_total > 0:
 		stage = "collection_progress"
-		prompt = "COLLECT WISPS TO FILL THE MOON-SILVER LEVEL RING"
+		prompt = "COLLECT WISPS TO FILL THE MOON-SILVER LEVEL BAR"
+		action_label = "MOVE THROUGH THE WISP"
 		icon = "wisp"
 	elif pickup_spawned_total > 0:
 		stage = "world_drop_and_attraction"
-		prompt = "FALLEN THREATS RELEASE WISPS    ·    MOVE CLOSE TO DRAW THEM IN"
+		prompt = "MOVE CLOSE; FALLEN WISPS ACCELERATE TOWARD YOUR LANTERN"
+		action_label = String(bindings.move)
 		icon = "wisp"
-	return {"visible":true,"stage":stage,"title":title,"prompt":prompt,"icon":icon,"completed":false,"bindings":bindings,"inputmap_bound":true,"dismissal":"complete_first_natural_draft","persists_across_retry_after_completion":true,"help_surface":"pause"}
+	elif not _guidance_movement_observed:
+		stage = "movement"
+	elif not _guidance_dash_observed:
+		stage = "dash"
+		prompt = "DASH THROUGH PRESSURE; THE BRIEF FLASH MARKS SAFETY"
+		action_label = String(bindings.dash)
+		icon = "dash"
+	elif not _guidance_attack_observed:
+		stage = "automatic_attack"
+		prompt = "FACE THE THREAT; THE WARDEN LANTERN ATTACKS AUTOMATICALLY"
+		action_label = "NO FIRE BUTTON"
+		icon = "lantern"
+	return {"visible":not _first_run_guidance_dismissed,"stage":stage,"title":title,"prompt":prompt,"action_label":action_label,"icon":icon,"completed":false,"bindings":bindings,"inputmap_bound":true,"device":input_router.active_device,"device_generation":input_router.device_generation,"dismissal":"toggle_guidance_help_action","dismissed":_first_run_guidance_dismissed,"persists_across_retry_after_completion":true,"help_surface":"pause_controls_and_help","illustration":"res://assets/ui/guidance/first_run_gameplay.png","reset":_guidance_reset_receipt.duplicate(true)}
+
+func _qa_reset_first_run_guidance() -> void:
+	if not OS.has_feature("editor"):
+		return
+	_guidance_reset_generation += 1
+	_first_run_guidance_completed = false
+	_first_run_guidance_dismissed = false
+	_first_run_guidance_completion.clear()
+	_guidance_movement_observed = false
+	_guidance_dash_observed = false
+	_guidance_attack_observed = false
+	_guidance_attack_baseline = world.attack_runtime.authorized_count
+	_guidance_reset_receipt = {
+		"requested":true, "resolved":true,
+		"generation":_guidance_reset_generation,
+		"editor_only":true, "physical_binding_count":0,
+		"release_action_exposed":false,
+		"run_serial":run_serial, "reset_isolated_to_guidance":true,
+	}
+	_emit_snapshot()
+
+func _reward_feedback_snapshot() -> Dictionary:
+	var states := {"settle":0,"attracting":0,"collection_fx":0}
+	for pickup_value in _active_pickups.values():
+		if not is_instance_valid(pickup_value):
+			continue
+		var pickup := pickup_value as RewardPickup
+		states[pickup.state] = int(states.get(pickup.state, 0)) + 1
+	return {
+		"spawned_total":pickup_spawned_total,
+		"collected_total":pickup_collected_total,
+		"live":_active_pickup_count,
+		"states":states,
+		"known_identity_count":_known_reward_ids.size(),
+		"resolved_identity_count":_resolved_reward_ids.size(),
+		"duplicate_rejections":_reward_duplicate_rejections,
+		"last_spawn":_reward_spawn_receipt.duplicate(true),
+		"last_attraction":_reward_attraction_receipt.duplicate(true),
+		"last_collection":_reward_collection_receipt.duplicate(true),
+		"last_experience":_reward_experience_receipt.duplicate(true),
+		"exactly_once":_reward_duplicate_rejections == 0,
+		"update_policy":"lifecycle_signals_and_active_owner_map",
+	}
 
 func _input_binding_summary(actions: Array, maximum_labels: int) -> String:
 	var keyboard_labels: Array[String] = []
@@ -2707,6 +2878,8 @@ func _mcp_state() -> Dictionary:
 		"validation_profile_matrix":_profile_matrix_snapshot(),
 		"tester_victory_fixture":tester_victory_fixture_receipt,
 		"reward_pickups":{"spawned_total":pickup_spawned_total,"collected_total":pickup_collected_total,"live":_active_pickup_count},
+		"reward_feedback":_reward_feedback_snapshot(),
+		"vitality_indicators":spawner._mcp_state().get("vitality_indicators", {}),
 		"first_run_guidance":_first_run_guidance_snapshot(),
 		"shell_focus": String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none",
 	}

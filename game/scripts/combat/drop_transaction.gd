@@ -16,7 +16,14 @@ func commit_from_death(death_event: Dictionary) -> Dictionary:
 		return {"accepted": false, "rejection_reason": "duplicate_death_transaction"}
 	_death_ids[death_id] = true
 	drop_count += 1
-	last_drop_id = "%s.drop.%d" % [drop_type, drop_count]
+	var source_identity := String(death_event.get("actor_stable_id", death_event.get("target_id", death_id)))
+	var spawn_generation := int(death_event.get("spawn_generation", -1))
+	last_drop_id = "%s.%s%s.drop.%d" % [
+		drop_type,
+		source_identity,
+		".g%d" % spawn_generation if spawn_generation >= 0 else "",
+		drop_count,
+	]
 	var event := death_event.duplicate(true)
 	event.drop_id = last_drop_id
 	event.drop_type = String(drop_type)

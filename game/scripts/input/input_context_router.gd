@@ -3,6 +3,7 @@ extends Node
 
 signal logical_press_edge(action: StringName, activation_generation: int, receipt: Dictionary)
 signal context_changed(previous: String, current: String, context_generation: int)
+signal device_changed(previous: String, current: String, device_generation: int)
 
 const CONFIRM_PHYSICAL := &"context_confirm"
 const BACK_PHYSICAL := &"context_back"
@@ -19,6 +20,9 @@ var last_press_receipt: Dictionary = {}
 var last_release_receipt: Dictionary = {}
 var active_transactions: Dictionary = {}
 var completed_transactions: Array[Dictionary] = []
+var active_device := "keyboard"
+var device_generation := 0
+var last_device_receipt: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -30,6 +34,7 @@ func _process(_delta: float) -> void:
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.echo:
 		return
+	_observe_device(event)
 	if event.is_action_pressed(CONFIRM_PHYSICAL):
 		_dispatch_press("confirm", _confirm_action())
 		get_viewport().set_input_as_handled()
@@ -42,6 +47,62 @@ func _input(event: InputEvent) -> void:
 	elif event.is_action_released(BACK_PHYSICAL):
 		_dispatch_release("back")
 		get_viewport().set_input_as_handled()
+
+func _observe_device(event: InputEvent) -> void:
+	var next_device := active_device
+	if event is InputEventJoypadButton:
+		next_device = "gamepad"
+	elif event is InputEventJoypadMotion and absf((event as InputEventJoypadMotion).axis_value) >= 0.35:
+		next_device = "gamepad"
+	elif event is InputEventKey or event is InputEventMouseButton or event is InputEventMouseMotion:
+		next_device = "keyboard"
+	else:
+		return
+	if next_device == active_device:
+		return
+	var previous := active_device
+	active_device = next_device
+	device_generation += 1
+	last_device_receipt = {
+		"previous":previous, "current":active_device,
+		"generation":device_generation, "event_type":event.get_class(),
+		"process_frame":Engine.get_process_frames(),
+	}
+	device_changed.emit(previous, active_device, device_generation)
+
+func binding_label(actions: Array, maximum_labels: int = 4) -> String:
+	var labels: Array[String] = []
+	for action_value in actions:
+		var action := StringName(action_value)
+		if not InputMap.has_action(action):
+			continue
+		for event in InputMap.action_get_events(action):
+			var is_gamepad := event is InputEventJoypadButton or event is InputEventJoypadMotion
+			if (active_device == "gamepad") != is_gamepad:
+				continue
+			var label := _event_label(event)
+			if not label.is_empty() and not labels.has(label):
+				labels.append(label)
+			if labels.size() >= maximum_labels:
+				return " / ".join(labels)
+	return " / ".join(labels) if not labels.is_empty() else "UNBOUND"
+
+func _event_label(event: InputEvent) -> String:
+	if event is InputEventKey:
+		var key_event := event as InputEventKey
+		var keycode := key_event.physical_keycode if key_event.physical_keycode != KEY_NONE else key_event.keycode
+		return OS.get_keycode_string(keycode).to_upper()
+	if event is InputEventJoypadMotion:
+		var motion := event as InputEventJoypadMotion
+		return "LEFT STICK" if motion.axis in [JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y] else "RIGHT STICK"
+	if event is InputEventJoypadButton:
+		match (event as InputEventJoypadButton).button_index:
+			JOY_BUTTON_A: return "SOUTH BUTTON"
+			JOY_BUTTON_B: return "EAST BUTTON"
+			JOY_BUTTON_BACK: return "VIEW / BACK"
+			JOY_BUTTON_START: return "MENU"
+			_: return "BUTTON %d" % ((event as InputEventJoypadButton).button_index + 1)
+	return event.as_text().strip_edges().to_upper()
 
 func _sync_context() -> void:
 	var next_context := _resolve_context()
@@ -75,14 +136,14 @@ func _resolve_context() -> String:
 func _confirm_action() -> StringName:
 	if context in ["active", "boss"]:
 		return &"dash"
-	if context in ["title", "pause", "paused", "settings", "credits", "draft", "result"]:
+	if context in ["title", "pause", "paused", "settings", "help", "credits", "draft", "result"]:
 		return &"ui_accept"
 	return &""
 
 func _back_action() -> StringName:
 	if context in ["active", "boss", "pause", "paused"]:
 		return &"pause"
-	if context in ["title", "settings", "credits"]:
+	if context in ["title", "settings", "help", "credits"]:
 		return &"ui_cancel"
 	return &""
 
@@ -220,4 +281,7 @@ func _mcp_state() -> Dictionary:
 		"last_release_receipt":last_release_receipt,
 		"active_transactions":active_transactions,
 		"completed_transactions":completed_transactions,
+		"active_device":active_device,
+		"device_generation":device_generation,
+		"last_device_receipt":last_device_receipt,
 	}
