@@ -72,6 +72,8 @@ var validation_profile_receipt: Dictionary = {}
 var validation_profile_sample: Dictionary = {}
 var validation_retry_baselines: Array[Dictionary] = []
 var validation_profile_cycles: Array[Dictionary] = []
+var ordinary_profile_cycles: Array[Dictionary] = []
+var ordinary_profile_contract_checks: Dictionary = {}
 var ordinary_victory_receipt: Dictionary = {}
 var ordinary_victory_transactions: Array[Dictionary] = []
 var tester_victory_fixture_receipt: Dictionary = {}
@@ -113,6 +115,7 @@ var _profile_gate_counter_reads := 0
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	complete_run_ledger = CompleteRunLedgerClass.new()
+	ordinary_profile_contract_checks = _ordinary_profile_contract_checks()
 	_profile_static_light_count = _bounded_static_light_snapshot()
 	shell.action_requested.connect(_on_shell_action)
 	title_menu.game_started.connect(start_run)
@@ -318,13 +321,21 @@ func _begin_run() -> void:
 	_emit_snapshot()
 
 func retry_run() -> void:
+	var source_run_serial := run_serial
 	var victory_transaction := ordinary_victory_receipt.duplicate(true)
 	var victory_fixture := tester_victory_fixture_receipt.duplicate(true)
 	_next_baseline_reason = "retry"
 	complete_run_ledger.record_exit(run_serial, "retry", run_elapsed)
+	_update_ordinary_profile_cycle(source_run_serial, "retry", {
+		"player_caused":true,
+		"source_state":run_state,
+		"elapsed":run_elapsed,
+		"process_frame":Engine.get_process_frames(),
+	})
 	_teardown_run("retry", "player_retry")
 	_transition("retrying")
 	_begin_run()
+	_record_ordinary_retry_baseline(source_run_serial)
 	if not victory_fixture.is_empty():
 		tester_victory_fixture_receipt = victory_fixture
 	if not victory_transaction.is_empty():
@@ -491,6 +502,12 @@ func _present_result(_event: Dictionary) -> void:
 	complete_run_ledger.record_result_presented(run_serial, outcome)
 	hud.visible = false
 	shell.set_mode("result", terminal_snapshot)
+	_update_ordinary_profile_cycle(run_serial, "result", {
+		"presented":shell.mode == "result",
+		"outcome":outcome,
+		"displayed_fields":shell._displayed_result_fields(),
+		"process_frame":Engine.get_process_frames(),
+	})
 	if outcome == "victory" and int(ordinary_victory_receipt.get("source_run_serial", -1)) == run_serial:
 		var result_animation := warden.animation_binding.get_snapshot() if warden.animation_binding else {}
 		var result_handoff := {
@@ -928,6 +945,16 @@ func _commit_terminal_snapshot(terminal_outcome: String) -> void:
 		and _boss_two_phase_history_truthful()
 	)
 	complete_run_ledger.record_terminal(terminal_snapshot, wave_state)
+	_update_ordinary_profile_cycle(run_serial, "terminal", {
+		"run_serial":run_serial,
+		"outcome":terminal_outcome,
+		"route_kind":run_route_kind,
+		"commit_count":terminal_commit_count,
+		"real_terminal":terminal_outcome in ["failure", "victory"] and result_committed,
+		"elapsed":run_elapsed,
+		"snapshot":_terminal_snapshot_digest(),
+		"lifecycle":_lifecycle_counters(),
+	})
 	terminal_snapshot = terminal_snapshot.duplicate(true)
 
 func _teardown_run(route: String, reason: String) -> Dictionary:
@@ -1263,6 +1290,7 @@ func _try_begin_passive_ordinary_profile() -> void:
 		"density_threshold_crossing":{"process_frame":Engine.get_process_frames(),"elapsed_seconds":run_elapsed,"live_enemies":live_density,"required_minimum":PROFILE_DENSITY_MIN,"required_maximum":PROFILE_DENSITY_MAX},
 		"representative_systems":systems.duplicate(true),
 		"work_caps":_dense_work_caps(spawner.get_snapshot()),
+		"workload_start":_profile_workload_receipt(spawner.get_snapshot()),
 	}
 	_emit_snapshot()
 
@@ -1290,6 +1318,7 @@ func _advance_profile_sample(delta: float) -> void:
 	sorted_physics.sort()
 	var sample_branch := String(validation_profile_sample.get("branch_id", ""))
 	var sample_setup_generation := int(validation_profile_sample.get("setup_generation", _validation_setup_generation))
+	var sample_start := validation_profile_sample.duplicate(true)
 	var cohort := spawner.end_validation_profile_cohort("sample_complete") if _profile_origin.begins_with("diagnostic_") else {}
 	var end_counts := _profile_counts()
 	validation_profile_sample = {
@@ -1303,6 +1332,8 @@ func _advance_profile_sample(delta: float) -> void:
 		"resolved_density":validation_profile_sample.get("resolved_density", _profile_start_counts.get("enemies", 0)),
 		"boss_presence":validation_profile_sample.get("boss_presence", is_instance_valid(boss)),
 		"weapon_ranks":validation_profile_sample.get("weapon_ranks", _profile_weapon_ranks()),
+		"representative_systems":sample_start.get("representative_systems", {}),
+		"density_threshold_crossing":sample_start.get("density_threshold_crossing", {}),
 		"sample_count":sorted.size(), "window_seconds":_profile_elapsed,
 		"frame_ms":{"p50":_percentile(sorted,0.50),"p95":_percentile(sorted,0.95),"p99":_percentile(sorted,0.99),"worst":sorted.back() if not sorted.is_empty() else 0.0},
 		"physics_ms":{"p50":_percentile(sorted_physics,0.50),"p95":_percentile(sorted_physics,0.95),"p99":_percentile(sorted_physics,0.99),"worst":sorted_physics.back() if not sorted_physics.is_empty() else 0.0},
@@ -1321,12 +1352,16 @@ func _advance_profile_sample(delta: float) -> void:
 		"renderer":_profile_renderer_receipt(),
 		"wave_end":wave_director.get_snapshot().duplicate(true),
 		"work_caps":_dense_work_caps(spawner.get_snapshot()),
+		"workload_start":sample_start.get("workload_start", _profile_workload_receipt(spawner.get_snapshot())),
 		"workload_end":_profile_workload_receipt(spawner.get_snapshot()),
 		"observation_work":_profile_observation_work_receipt(),
+		"route_qualification":_route_qualification(wave_director.get_snapshot()),
 	}
 	validation_profile_sample["qualification"] = _profile_qualification(validation_profile_sample)
 	_record_profile_matrix_sample(validation_profile_sample)
 	_record_profile_cycle("advance", validation_profile_sample)
+	if _profile_origin == "ordinary_final_wave_passive":
+		_record_ordinary_profile_sample(validation_profile_sample)
 	if _profile_origin.begins_with("diagnostic_"):
 		get_tree().paused = true
 	elif not bool((validation_profile_sample.get("qualification", {}) as Dictionary).get("density_qualified", false)) and run_state == "boss" and not result_committed:
@@ -1465,6 +1500,149 @@ func _record_profile_cycle(phase: String, receipt: Dictionary) -> void:
 		validation_profile_cycles.pop_front()
 
 func _profile_cycle_comparison() -> Dictionary:
+	return _evaluate_ordinary_profile_cycles(ordinary_profile_cycles, true)
+
+func _evaluate_ordinary_profile_cycles(records: Array, include_diagnostic_audit: bool = false) -> Dictionary:
+	var qualified: Array[Dictionary] = []
+	var audited: Array[Dictionary] = []
+	var seen_serials: Dictionary = {}
+	for value in records:
+		var cycle: Dictionary = value
+		var reasons: Array[String] = []
+		var sample: Dictionary = cycle.get("sample", {})
+		var sample_qualification: Dictionary = sample.get("qualification", {})
+		var terminal: Dictionary = cycle.get("terminal", {})
+		var result: Dictionary = cycle.get("result", {})
+		var retry: Dictionary = cycle.get("retry", {})
+		var baseline: Dictionary = cycle.get("next_baseline", {})
+		var serial := int(cycle.get("run_serial", -1))
+		if seen_serials.has(serial): reasons.append("repeated_run_serial")
+		seen_serials[serial] = true
+		if not bool(sample_qualification.get("ordinary_route_qualified", false)): reasons.append("ordinary_native_sample_not_qualified")
+		if int(sample.get("run_serial", -2)) != serial: reasons.append("sample_run_serial_mismatch")
+		if not bool(terminal.get("real_terminal", false)): reasons.append("real_terminal_missing")
+		if int(terminal.get("commit_count", 0)) != 1: reasons.append("terminal_commit_count_not_one")
+		if int(terminal.get("run_serial", -2)) != serial: reasons.append("terminal_run_serial_mismatch")
+		if not bool(result.get("presented", false)): reasons.append("result_not_presented")
+		if String(result.get("outcome", "")) != String(terminal.get("outcome", "")): reasons.append("result_outcome_mismatch")
+		if not bool(retry.get("player_caused", false)) or String(retry.get("source_state", "")) != "result": reasons.append("player_result_retry_missing")
+		if not bool(baseline.get("complete", false)): reasons.append("next_ordinary_baseline_missing")
+		if int(baseline.get("source_run_serial", -2)) != serial or int(baseline.get("run_serial", -1)) <= serial: reasons.append("next_baseline_serial_mismatch")
+		if String(baseline.get("route_kind", "")) != "ordinary" or String(baseline.get("run_state", "")) != "active": reasons.append("next_baseline_not_ordinary_active")
+		if String(baseline.get("immediate_input_context", "")) != "active" or String(baseline.get("next_frame_input_context", "")) != "active": reasons.append("next_baseline_context_stale")
+		if not bool(baseline.get("isolated", false)): reasons.append("next_baseline_not_isolated")
+		var audit := cycle.duplicate(true)
+		audit["qualified_complete_cycle"] = reasons.is_empty()
+		audit["rejection_reasons"] = reasons
+		audited.append(audit)
+		if reasons.is_empty(): qualified.append(audit)
+	var aggregate_cycles := qualified.slice(maxi(0, qualified.size() - 3), qualified.size())
+	var growth := _profile_cycle_growth(aggregate_cycles)
+	var diagnostic := _diagnostic_profile_cycle_comparison() if include_diagnostic_audit else {}
+	return {
+		"identity":"mournlight.ordinary_native_retry_cycles.v1",
+		"required_cycle_count":3,
+		"completed_cycle_count":qualified.size(),
+		"cycles":aggregate_cycles,
+		"session_records":audited,
+		"three_cycle_ready":qualified.size() >= 3,
+		"stale_reset_context_cycle_count":_count_stale_ordinary_cycle_contexts(aggregate_cycles),
+		"three_cycle_context_truthful":qualified.size() >= 3 and _count_stale_ordinary_cycle_contexts(aggregate_cycles) == 0,
+		"growth":growth,
+		"three_cycle_no_growth":qualified.size() >= 3 and bool(growth.get("no_structural_growth", false)),
+		"diagnostic_reset_audit":diagnostic,
+		"diagnostic_cycles_excluded":true,
+	}
+
+func _ordinary_profile_contract_checks() -> Dictionary:
+	var live_records_before := ordinary_profile_cycles.duplicate(true)
+	var hardware_sample := _contract_ordinary_profile_sample("hardware", 1920, 1080)
+	var software_sample := _contract_ordinary_profile_sample("software", 1920, 1080)
+	var low_resolution_sample := _contract_ordinary_profile_sample("hardware", 1280, 720)
+	var diagnostic_sample := hardware_sample.duplicate(true)
+	diagnostic_sample["passive"] = false
+	diagnostic_sample["diagnostic_mutation"] = true
+	diagnostic_sample["qualification"] = _profile_qualification(diagnostic_sample)
+	var complete_records := [
+		_contract_ordinary_profile_cycle(101, hardware_sample),
+		_contract_ordinary_profile_cycle(102, hardware_sample),
+		_contract_ordinary_profile_cycle(103, hardware_sample),
+	]
+	var complete := _evaluate_ordinary_profile_cycles(complete_records)
+	var missing_retry := _contract_ordinary_profile_cycle(104, hardware_sample)
+	missing_retry.erase("retry")
+	var missing_retry_result := _evaluate_ordinary_profile_cycles([missing_retry])
+	var repeated := _evaluate_ordinary_profile_cycles([
+		_contract_ordinary_profile_cycle(105, hardware_sample),
+		_contract_ordinary_profile_cycle(105, hardware_sample),
+	])
+	var live_unchanged := ordinary_profile_cycles == live_records_before
+	var all_checks := (
+		bool(complete.get("three_cycle_ready", false))
+		and bool(complete.get("three_cycle_context_truthful", false))
+		and bool(complete.get("three_cycle_no_growth", false))
+		and not bool((software_sample.get("qualification", {}) as Dictionary).get("ordinary_route_qualified", false))
+		and not bool((low_resolution_sample.get("qualification", {}) as Dictionary).get("ordinary_route_qualified", false))
+		and not bool((diagnostic_sample.get("qualification", {}) as Dictionary).get("ordinary_route_qualified", false))
+		and int(missing_retry_result.get("completed_cycle_count", -1)) == 0
+		and int(repeated.get("completed_cycle_count", -1)) == 1
+		and live_unchanged
+	)
+	return {
+		"identity":"mournlight.ordinary_native_retry_predicate_checks.v1",
+		"three_distinct_complete_cycles_accepted":bool(complete.get("three_cycle_ready", false)),
+		"software_renderer_rejected":not bool((software_sample.get("qualification", {}) as Dictionary).get("ordinary_route_qualified", false)),
+		"sub_1920x1080_rejected":not bool((low_resolution_sample.get("qualification", {}) as Dictionary).get("ordinary_route_qualified", false)),
+		"diagnostic_sample_rejected":not bool((diagnostic_sample.get("qualification", {}) as Dictionary).get("ordinary_route_qualified", false)),
+		"missing_player_retry_rejected":int(missing_retry_result.get("completed_cycle_count", -1)) == 0,
+		"repeated_run_serial_rejected":int(repeated.get("completed_cycle_count", -1)) == 1,
+		"live_records_mutated":not live_unchanged,
+		"all_checks_pass":all_checks,
+	}
+
+func _contract_ordinary_profile_sample(renderer_classification: String, viewport_width: int, viewport_height: int) -> Dictionary:
+	var hardware := renderer_classification == "hardware"
+	var sample := {
+		"passive":true,
+		"diagnostic_mutation":false,
+		"route_kind":"ordinary",
+		"run_serial":1,
+		"wave_start":{"wave":5,"diagnostic_jump_count":0},
+		"representative_systems":{"all_ready":true},
+		"boss_presence":true,
+		"weapon_ranks":[{"weapon_id":"warden_lantern","rank":4},{"weapon_id":"gravespade","rank":3},{"weapon_id":"wandering_wisps","rank":2}],
+		"requested_enemy_workload":32,
+		"start_enemy_workload":32,
+		"minimum_enemy_workload":30,
+		"maximum_enemy_workload":34,
+		"end_enemy_workload":31,
+		"frame_ms":{"p95":12.0},
+		"viewport":{"width":viewport_width,"height":viewport_height,"resolution_qualified":viewport_width >= 1920 and viewport_height >= 1080},
+		"renderer":{"classification":renderer_classification,"identity_complete":true,"hardware_backed":hardware,"hardware_qualification_eligible":hardware},
+	}
+	sample["qualification"] = _profile_qualification(sample)
+	return sample
+
+func _contract_ordinary_profile_cycle(serial: int, source_sample: Dictionary) -> Dictionary:
+	var sample := source_sample.duplicate(true)
+	sample["run_serial"] = serial
+	var lifecycle := {
+		"scene_tree_nodes":100,"object_count":200,"orphan_nodes":0,"static_memory_bytes":1000000,
+		"input_action_count":40,"owned_signal_bindings":5,"enemy_active":0,"enemy_pooled":40,
+		"projectiles":0,"pickups":0,"effects":0,"light_count":12,"audio_voices":0,
+		"active_attack_ledgers":0,
+	}
+	return {
+		"run_serial":serial,
+		"sample":sample,
+		"sample_attempts":[sample.duplicate(true)],
+		"terminal":{"run_serial":serial,"outcome":"victory","route_kind":"ordinary","commit_count":1,"real_terminal":true},
+		"result":{"presented":true,"outcome":"victory"},
+		"retry":{"player_caused":true,"source_state":"result"},
+		"next_baseline":{"complete":true,"source_run_serial":serial,"run_serial":serial + 1,"route_kind":"ordinary","run_state":"active","immediate_input_context":"active","next_frame_input_context":"active","isolated":true,"next_frame_lifecycle":lifecycle},
+	}
+
+func _diagnostic_profile_cycle_comparison() -> Dictionary:
 	var completed: Array[Dictionary] = []
 	var current: Dictionary = {}
 	for entry in validation_profile_cycles:
@@ -1535,8 +1713,8 @@ func _profile_cycle_comparison() -> Dictionary:
 func _profile_cycle_growth(completed: Array[Dictionary]) -> Dictionary:
 	if completed.is_empty():
 		return {"ready":false}
-	var first_reset: Dictionary = (completed.front().get("reset", {}) as Dictionary).get("next_frame_lifecycle", {})
-	var last_reset: Dictionary = (completed.back().get("reset", {}) as Dictionary).get("next_frame_lifecycle", {})
+	var first_reset: Dictionary = _cycle_baseline_lifecycle(completed.front())
+	var last_reset: Dictionary = _cycle_baseline_lifecycle(completed.back())
 	if first_reset.is_empty() or last_reset.is_empty():
 		return {"ready":false}
 	var node_growth := int(last_reset.get("scene_tree_nodes", 0)) - int(first_reset.get("scene_tree_nodes", 0))
@@ -1545,6 +1723,14 @@ func _profile_cycle_growth(completed: Array[Dictionary]) -> Dictionary:
 	var memory_growth := int(last_reset.get("static_memory_bytes", 0)) - int(first_reset.get("static_memory_bytes", 0))
 	var input_growth := int(last_reset.get("input_action_count", 0)) - int(first_reset.get("input_action_count", 0))
 	var signal_growth := int(last_reset.get("owned_signal_bindings", 0)) - int(first_reset.get("owned_signal_bindings", 0))
+	var enemy_active_growth := int(last_reset.get("enemy_active", 0)) - int(first_reset.get("enemy_active", 0))
+	var enemy_pooled_growth := int(last_reset.get("enemy_pooled", 0)) - int(first_reset.get("enemy_pooled", 0))
+	var projectile_growth := int(last_reset.get("projectiles", 0)) - int(first_reset.get("projectiles", 0))
+	var pickup_growth := int(last_reset.get("pickups", 0)) - int(first_reset.get("pickups", 0))
+	var effect_growth := int(last_reset.get("effects", 0)) - int(first_reset.get("effects", 0))
+	var light_growth := int(last_reset.get("light_count", 0)) - int(first_reset.get("light_count", 0))
+	var audio_growth := int(last_reset.get("audio_voices", 0)) - int(first_reset.get("audio_voices", 0))
+	var active_attack_growth := int(last_reset.get("active_attack_ledgers", 0)) - int(first_reset.get("active_attack_ledgers", 0))
 	return {
 		"ready":completed.size() == 3,
 		"node_growth":node_growth,
@@ -1553,9 +1739,88 @@ func _profile_cycle_growth(completed: Array[Dictionary]) -> Dictionary:
 		"static_memory_growth_bytes":memory_growth,
 		"input_action_growth":input_growth,
 		"owned_signal_binding_growth":signal_growth,
-		"no_structural_growth":node_growth <= 0 and orphan_growth <= 0 and input_growth == 0 and signal_growth == 0,
+		"enemy_active_growth":enemy_active_growth,
+		"enemy_pooled_growth":enemy_pooled_growth,
+		"projectile_growth":projectile_growth,
+		"pickup_growth":pickup_growth,
+		"effect_growth":effect_growth,
+		"light_growth":light_growth,
+		"audio_voice_growth":audio_growth,
+		"active_attack_ledger_growth":active_attack_growth,
+		"no_structural_growth":node_growth <= 0 and orphan_growth <= 0 and input_growth == 0 and signal_growth == 0 and enemy_active_growth <= 0 and enemy_pooled_growth <= 0 and projectile_growth <= 0 and pickup_growth <= 0 and effect_growth <= 0 and light_growth <= 0 and audio_growth <= 0 and active_attack_growth <= 0,
 		"memory_observational_only":true,
 	}
+
+func _cycle_baseline_lifecycle(cycle: Dictionary) -> Dictionary:
+	var ordinary_baseline: Dictionary = cycle.get("next_baseline", {})
+	if not ordinary_baseline.is_empty():
+		return ordinary_baseline.get("next_frame_lifecycle", {})
+	return (cycle.get("reset", {}) as Dictionary).get("next_frame_lifecycle", {})
+
+func _count_stale_ordinary_cycle_contexts(cycles: Array[Dictionary]) -> int:
+	var stale := 0
+	for cycle in cycles:
+		var baseline: Dictionary = cycle.get("next_baseline", {})
+		if String(baseline.get("immediate_input_context", "")) != "active" or String(baseline.get("next_frame_input_context", "")) != "active":
+			stale += 1
+	return stale
+
+func _record_ordinary_profile_sample(sample: Dictionary) -> void:
+	var serial := int(sample.get("run_serial", -1))
+	var index := _ordinary_profile_cycle_index(serial)
+	if index < 0:
+		ordinary_profile_cycles.append({"run_serial":serial,"sample_attempts":[]})
+		index = ordinary_profile_cycles.size() - 1
+	var attempts: Array = ordinary_profile_cycles[index].get("sample_attempts", [])
+	attempts.append(sample.duplicate(true))
+	while attempts.size() > 3:
+		attempts.pop_front()
+	ordinary_profile_cycles[index]["sample_attempts"] = attempts
+	if bool((sample.get("qualification", {}) as Dictionary).get("ordinary_route_qualified", false)):
+		ordinary_profile_cycles[index]["sample"] = sample.duplicate(true)
+	while ordinary_profile_cycles.size() > 8:
+		ordinary_profile_cycles.pop_front()
+
+func _update_ordinary_profile_cycle(source_run_serial: int, phase: String, payload: Dictionary) -> void:
+	var index := _ordinary_profile_cycle_index(source_run_serial)
+	if index < 0:
+		return
+	ordinary_profile_cycles[index][phase] = payload.duplicate(true)
+
+func _ordinary_profile_cycle_index(source_run_serial: int) -> int:
+	for index in range(ordinary_profile_cycles.size() - 1, -1, -1):
+		if int(ordinary_profile_cycles[index].get("run_serial", -1)) == source_run_serial:
+			return index
+	return -1
+
+func _record_ordinary_retry_baseline(source_run_serial: int) -> void:
+	input_router._sync_context()
+	var baseline: Dictionary = validation_retry_baselines.back().duplicate(true) if not validation_retry_baselines.is_empty() else {}
+	baseline["source_run_serial"] = source_run_serial
+	baseline["route_kind"] = run_route_kind
+	baseline["immediate_input_context"] = input_router.context
+	baseline["immediate_lifecycle"] = _lifecycle_counters()
+	baseline["complete"] = false
+	_update_ordinary_profile_cycle(source_run_serial, "next_baseline", baseline)
+	call_deferred("_capture_ordinary_retry_next_frame_baseline", source_run_serial, run_serial, _retry_baseline_generation)
+
+func _capture_ordinary_retry_next_frame_baseline(source_run_serial: int, expected_run_serial: int, expected_generation: int) -> void:
+	await get_tree().process_frame
+	if run_serial != expected_run_serial or _retry_baseline_generation != expected_generation:
+		return
+	input_router._sync_context()
+	var index := _ordinary_profile_cycle_index(source_run_serial)
+	if index < 0:
+		return
+	var baseline: Dictionary = ordinary_profile_cycles[index].get("next_baseline", {})
+	var counts := _profile_counts()
+	baseline["next_frame_input_context"] = input_router.context
+	baseline["next_frame_lifecycle"] = _lifecycle_counters()
+	baseline["next_frame_counts"] = counts
+	baseline["isolated"] = _counts_are_isolated(counts) and bool((_terminal_reset_invariants("retry") as Dictionary).get("complete", false))
+	baseline["complete"] = true
+	ordinary_profile_cycles[index]["next_baseline"] = baseline
+	_emit_snapshot()
 
 func _record_profile_matrix_sample(sample: Dictionary) -> void:
 	var entry := sample.duplicate(true)
@@ -1707,6 +1972,14 @@ func _profile_qualification(sample: Dictionary) -> Dictionary:
 	var end_workload := int(sample.get("end_enemy_workload", -1))
 	var passive_ordinary := bool(sample.get("passive", false)) and not bool(sample.get("diagnostic_mutation", true))
 	if passive_ordinary:
+		var representative_systems: Dictionary = sample.get("representative_systems", {})
+		var wave_start: Dictionary = sample.get("wave_start", {})
+		if String(sample.get("route_kind", "")) != "ordinary" or int(wave_start.get("wave", 0)) != 5 or int(wave_start.get("diagnostic_jump_count", -1)) != 0:
+			reasons.append("ordinary_zero_jump_fifth_wave_missing")
+		if not bool(representative_systems.get("all_ready", false)):
+			reasons.append("representative_systems_not_simultaneously_active")
+		if not bool(sample.get("boss_presence", false)) or (sample.get("weapon_ranks", []) as Array).size() != 3:
+			reasons.append("boss_or_three_weapon_families_missing")
 		if start_workload < PROFILE_DENSITY_MIN or start_workload > PROFILE_DENSITY_MAX or end_workload < PROFILE_DENSITY_MIN or end_workload > PROFILE_DENSITY_MAX:
 			reasons.append("ordinary_enemy_boundary_outside_25_40")
 	else:
@@ -1790,6 +2063,7 @@ func _lifecycle_counters() -> Dictionary:
 		"light_count":int(counts.get("lights", 0)),
 		"wisp_hit_ledgers":int(counts.get("wisp_interval_targets", 0)),
 		"active_attack_ledgers":int(counts.get("active_attack_ledgers", 0)),
+		"effects":int(counts.get("effects", 0)),
 		"input_owner_count":input_router.active_transactions.size(),
 		"input_context":input_router.context,
 		"terminal_commit_count":terminal_commit_count,
@@ -2240,6 +2514,8 @@ func _mcp_state() -> Dictionary:
 		"validation_profile":validation_profile_receipt,
 		"validation_profile_sample":validation_profile_sample,
 		"validation_profile_cycles":validation_profile_cycles,
+		"ordinary_profile_cycles":ordinary_profile_cycles,
+		"ordinary_profile_contract_checks":ordinary_profile_contract_checks,
 		"validation_profile_cycle_comparison":cycle_comparison,
 		"validation_controls":_validation_controls_receipt(),
 		"validation_retry_baselines":validation_retry_baselines,

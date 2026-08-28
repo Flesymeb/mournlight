@@ -21,12 +21,13 @@ func _init() -> void:
 func begin_run(run_serial: int, route_kind: String, started_from: String) -> void:
 	_mark_prior_replay_if_applicable(run_serial, started_from)
 	session_generation += 1
+	var origin_event := "retry_replay" if started_from == "retry" else "title_play"
 	current_run = {
 		"session_generation":session_generation,
 		"run_serial":run_serial,
 		"route_kind":route_kind,
 		"started_from":started_from,
-		"milestones":[_milestone("title_play", 0.0, {"player_caused":true})],
+		"milestones":[_milestone(origin_event, 0.0, {"player_caused":true,"started_from":started_from})],
 		"wave_ids":[],
 		"drafts":[],
 		"boss_events":[],
@@ -99,12 +100,15 @@ func record_terminal(terminal: Dictionary, wave_snapshot: Dictionary) -> void:
 func record_result_presented(run_serial: int, outcome: String) -> void:
 	_update_row(run_serial, "result_presented", true)
 	_update_row(run_serial, "result_outcome", outcome)
+	var terminal: Dictionary = current_run.get("terminal", {})
+	_append_row_milestone(run_serial, _milestone("result_presented", float(terminal.get("elapsed", 0.0)), {"outcome":outcome}))
 
 func record_exit(run_serial: int, exit_kind: String, elapsed: float) -> void:
 	if exit_kind == "retry":
 		_update_row(run_serial, "retry_observed", true)
 	elif exit_kind == "title":
 		_update_row(run_serial, "title_return_observed", true)
+	_append_row_milestone(run_serial, _milestone(exit_kind, elapsed, {"player_caused":true}))
 	if int(current_run.get("run_serial", -1)) == run_serial:
 		current_run["%s_observed" % exit_kind] = true
 		(current_run["milestones"] as Array).append(_milestone(exit_kind, elapsed, {"player_caused":true}))
@@ -252,17 +256,32 @@ func _update_row(run_serial: int, key: String, value: Variant) -> void:
 			completed_rows[index][key] = value
 			return
 
-func _mark_prior_replay_if_applicable(next_run_serial: int, started_from: String) -> void:
-	if started_from not in ["title_play", "retry"]:
-		return
+func _append_row_milestone(run_serial: int, milestone: Dictionary) -> void:
 	for index in range(completed_rows.size() - 1, -1, -1):
+		if int(completed_rows[index].get("run_serial", -1)) != run_serial:
+			continue
+		var milestones: Array = completed_rows[index].get("milestones", [])
+		milestones.append(milestone.duplicate(true))
+		completed_rows[index]["milestones"] = milestones
+		return
+
+func _mark_prior_replay_if_applicable(next_run_serial: int, started_from: String) -> void:
+	# A new title Play is a new route, not proof that the prior victory's Result
+	# Replay control was traversed. Only the player-caused Result Retry route may
+	# fill the replay cell.
+	if started_from != "retry":
+		return
+	var replay_source_serial := next_run_serial - 1
+	for index in range(completed_rows.size() - 1, -1, -1):
+		if int(completed_rows[index].get("run_serial", -1)) != replay_source_serial:
+			continue
 		var terminal: Dictionary = completed_rows[index].get("terminal", {})
 		var result_matches := bool(completed_rows[index].get("result_presented", false)) and String(completed_rows[index].get("result_outcome", "")) == String(terminal.get("outcome", ""))
-		if _ordinary_victory_eligible(terminal) and result_matches and not bool(completed_rows[index].get("replay_observed", false)) and int(completed_rows[index].get("run_serial", -1)) < next_run_serial:
+		if _ordinary_victory_eligible(terminal) and result_matches and not bool(completed_rows[index].get("replay_observed", false)):
 			completed_rows[index]["replay_observed"] = true
 			completed_rows[index]["replay_run_serial"] = next_run_serial
 			completed_rows[index]["replay_observed_count"] = 1
-			return
+		return
 
 func _accepts_ordinary(route_kind: String, snapshot: Dictionary) -> bool:
 	return route_kind == "ordinary" and int(snapshot.get("diagnostic_jump_count", 0)) == 0
