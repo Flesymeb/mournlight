@@ -44,7 +44,11 @@ var _dash_phase_id := DashPhase.READY
 var _phase_remaining := 0.0
 var _dash_direction := Vector3.FORWARD
 var _last_move_direction := Vector3.FORWARD
-var _dash_was_pressed := false
+var _pending_dash_generation := -1
+var _consumed_dash_generation := -1
+var dash_activation_generation := -1
+var dash_cycle_count := 0
+var dash_command_receipt: Dictionary = {}
 var _base_model_position := Vector3.ZERO
 var _base_lantern_position := Vector3.ZERO
 var _base_presentation_scale := Vector3.ONE
@@ -105,7 +109,6 @@ func _physics_process(delta: float) -> void:
 	var camera := get_viewport().get_camera_3d()
 	if camera and camera.has_method("set_movement_velocity"):
 		camera.set_movement_velocity(planar_velocity)
-	_dash_was_pressed = Input.is_action_pressed("dash")
 
 func _camera_relative_direction(input_vector: Vector2) -> Vector3:
 	if input_vector.length_squared() <= 0.001:
@@ -127,9 +130,18 @@ func _update_dash_state(delta: float, desired_direction: Vector3) -> void:
 	if dash_cooldown_remaining > 0.0:
 		dash_cooldown_remaining = maxf(0.0, dash_cooldown_remaining - delta)
 		dash_readiness_changed.emit(false, dash_cooldown_remaining)
-	var dash_pressed_now := Input.is_action_pressed("dash")
-	if _dash_phase_id == DashPhase.READY and dash_pressed_now and not _dash_was_pressed:
+	if _dash_phase_id == DashPhase.READY and _pending_dash_generation > _consumed_dash_generation:
+		_consumed_dash_generation = _pending_dash_generation
+		dash_activation_generation = _consumed_dash_generation
+		_pending_dash_generation = -1
+		dash_cycle_count += 1
 		_dash_direction = desired_direction if desired_direction.length_squared() > 0.001 else _last_move_direction
+		dash_command_receipt["status"] = "consumed"
+		dash_command_receipt["activation_generation"] = dash_activation_generation
+		dash_command_receipt["cycle_count"] = dash_cycle_count
+		dash_command_receipt["consumed_physics_frame"] = Engine.get_physics_frames()
+		dash_command_receipt["direction"] = _dash_direction
+		dash_command_receipt["phases"] = []
 		_set_dash_phase(DashPhase.ANTICIPATION, anticipation_duration)
 	elif _dash_phase_id == DashPhase.ANTICIPATION and _phase_remaining <= 0.0:
 		_set_dash_phase(DashPhase.ACTIVE, active_duration)
@@ -168,8 +180,77 @@ func _set_dash_phase(next_phase: DashPhase, duration: float) -> void:
 	dash_aura.visible = next_phase == DashPhase.ANTICIPATION or next_phase == DashPhase.RECOVERY
 	active_ring.visible = next_phase == DashPhase.ACTIVE
 	dash_phase_changed.emit(dash_phase, dash_invulnerable)
+	if dash_activation_generation >= 0 and not dash_command_receipt.is_empty():
+		var phases: Array = dash_command_receipt.get("phases", [])
+		phases.append({
+			"phase":dash_phase,
+			"physics_frame":Engine.get_physics_frames(),
+			"invulnerable":dash_invulnerable,
+			"duration":duration,
+		})
+		dash_command_receipt["phases"] = phases
+		dash_command_receipt["current_phase"] = dash_phase
+		dash_command_receipt["invulnerable"] = dash_invulnerable
+		if next_phase == DashPhase.READY and dash_cycle_count > 0:
+			dash_command_receipt["status"] = "complete"
+			dash_command_receipt["completed_physics_frame"] = Engine.get_physics_frames()
 	if next_phase == DashPhase.READY:
 		dash_readiness_changed.emit(true, 0.0)
+
+func queue_routed_dash(activation: int, router_receipt: Dictionary) -> bool:
+	if activation <= _consumed_dash_generation or activation == _pending_dash_generation:
+		dash_command_receipt = {
+			"status":"duplicate_rejected",
+			"activation_generation":activation,
+			"consumed_activation_generation":_consumed_dash_generation,
+			"router_receipt":router_receipt.duplicate(true),
+		}
+		return false
+	if _dash_phase_id != DashPhase.READY or _pending_dash_generation >= 0:
+		dash_command_receipt = {
+			"status":"not_ready_rejected",
+			"activation_generation":activation,
+			"current_phase":dash_phase,
+			"cooldown_remaining":dash_cooldown_remaining,
+			"router_receipt":router_receipt.duplicate(true),
+		}
+		return false
+	_pending_dash_generation = activation
+	dash_command_receipt = {
+		"status":"queued",
+		"activation_generation":activation,
+		"router_context_generation":int(router_receipt.get("context_generation", -1)),
+		"router_originating_context":String(router_receipt.get("originating_context", "")),
+		"queued_process_frame":Engine.get_process_frames(),
+		"router_receipt":router_receipt.duplicate(true),
+	}
+	return true
+
+func clear_dash_ownership(reason: String) -> void:
+	var cleared_generation := _pending_dash_generation
+	var interrupted_cycle := _dash_phase_id != DashPhase.READY
+	_pending_dash_generation = -1
+	dash_cooldown_remaining = 0.0
+	_phase_remaining = 0.0
+	_dash_invulnerability_off()
+	_set_dash_phase(DashPhase.READY, 0.0)
+	if interrupted_cycle:
+		velocity = Vector3.ZERO
+		planar_velocity = Vector3.ZERO
+		locomotion_state = "idle"
+	if cleared_generation >= 0:
+		dash_command_receipt = {
+			"status":"cleared_before_consumption",
+			"activation_generation":cleared_generation,
+			"reason":reason,
+			"process_frame":Engine.get_process_frames(),
+		}
+	elif not dash_command_receipt.is_empty():
+		dash_command_receipt["last_reset_reason"] = reason
+		dash_command_receipt["last_reset_process_frame"] = Engine.get_process_frames()
+
+func _dash_invulnerability_off() -> void:
+	dash_invulnerable = false
 
 func _update_facing_and_animation(delta: float) -> void:
 	var planar_speed := planar_velocity.length()
@@ -246,6 +327,11 @@ func reset_for_run(spawn_position: Vector3, reset_owner := "run_reset") -> void:
 	movement_input = Vector2.ZERO
 	_dash_direction = Vector3.FORWARD
 	_last_move_direction = Vector3.FORWARD
+	_pending_dash_generation = -1
+	_consumed_dash_generation = -1
+	dash_activation_generation = -1
+	dash_cycle_count = 0
+	dash_command_receipt.clear()
 	dash_cooldown_remaining = 0.0
 	pickup_collection_radius = 1.75
 	experience_yield_multiplier = 1.0
@@ -273,8 +359,8 @@ func _find_animation_player(root: Node) -> AnimationPlayer:
 			return found
 	return null
 
-func reset_input_latch() -> void:
-	_dash_was_pressed = Input.is_action_pressed("dash")
+func reset_input_latch(reason := "input_latch_reset") -> void:
+	clear_dash_ownership(reason)
 	movement_input = Vector2.ZERO
 
 func get_movement_snapshot() -> Dictionary:
@@ -296,6 +382,11 @@ func _mcp_state() -> Dictionary:
 		"dash_phase": dash_phase,
 		"dash_cooldown_remaining": dash_cooldown_remaining,
 		"dash_invulnerable": dash_invulnerable,
+		"dash_activation_generation":dash_activation_generation,
+		"pending_dash_generation":_pending_dash_generation,
+		"consumed_dash_generation":_consumed_dash_generation,
+		"dash_cycle_count":dash_cycle_count,
+		"dash_command_receipt":dash_command_receipt,
 		"movement_speed": movement_speed,
 		"dash_speed": dash_speed,
 		"pickup_collection_radius":pickup_collection_radius,

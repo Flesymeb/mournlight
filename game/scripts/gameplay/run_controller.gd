@@ -105,6 +105,8 @@ func _ready() -> void:
 	draft_view.choice_requested.connect(_on_draft_choice)
 	world.attack_runtime.hit_resolved.connect(_on_player_hit_resolved)
 	warden.dash_phase_changed.connect(_on_dash_changed)
+	input_router.logical_press_edge.connect(_on_logical_press_edge)
+	input_router.context_changed.connect(_on_input_context_changed)
 	if OS.has_feature("editor"):
 		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_draft", &"validation_prepare_result_failure", &"validation_prepare_result_victory", &"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_reset_density", &"validation_prepare_final_profile", &"validation_advance_final_profile", &"validation_reset_final_profile", &"tester_victory_prepare", &"tester_victory_advance", &"tester_final_profile_prepare", &"tester_final_profile_advance", &"tester_final_profile_reset"]:
 			if not InputMap.has_action(action):
@@ -403,7 +405,7 @@ func _complete_context_handoff(destination: String, immediate: bool) -> void:
 	_emit_snapshot()
 
 func _pause_run() -> void:
-	warden.reset_input_latch()
+	warden.reset_input_latch("pause")
 	_resume_state = run_state
 	_transition("paused")
 	get_tree().paused = true
@@ -412,7 +414,7 @@ func _pause_run() -> void:
 
 func _resume_run() -> void:
 	get_tree().paused = false
-	warden.reset_input_latch()
+	warden.reset_input_latch("resume")
 	shell.set_mode("hidden")
 	_transition(_resume_state)
 	_emit_snapshot()
@@ -554,6 +556,22 @@ func _on_build_changed(_snapshot: Dictionary) -> void:
 func _on_dash_changed(_phase: String, _invulnerable: bool) -> void:
 	_emit_snapshot()
 
+func _on_logical_press_edge(action: StringName, activation: int, receipt: Dictionary) -> void:
+	if action != &"dash":
+		return
+	var accepted := false
+	if run_state in ["active", "boss"] and not get_tree().paused:
+		accepted = warden.queue_routed_dash(activation, receipt)
+	input_router.bind_destination(
+		"confirm",
+		"warden_dash" if accepted else "warden_dash_rejected",
+		1 if accepted else 0
+	)
+
+func _on_input_context_changed(_previous: String, current: String, _generation: int) -> void:
+	if current not in ["active", "boss"]:
+		warden.clear_dash_ownership("context_%s" % current)
+
 func _on_shell_action(action: StringName) -> void:
 	match action:
 		&"play": start_run()
@@ -626,7 +644,7 @@ func _set_title_surface(exposed: bool) -> void:
 func _open_upgrade_draft() -> void:
 	if run_state != "active" or draft_controller.active:
 		return
-	warden.reset_input_latch()
+	warden.reset_input_latch("draft")
 	_transition("draft")
 	get_tree().paused = true
 	draft_controller.open_draft(inventory, health, warden)
@@ -838,6 +856,7 @@ func _teardown_run(route: String, reason: String) -> Dictionary:
 	_teardown_active = true
 	_teardown_generation += 1
 	get_tree().paused = false
+	warden.reset_input_latch("teardown_%s_%s" % [route, reason])
 	draft_controller.reset()
 	draft_view.close()
 	if route == "result":

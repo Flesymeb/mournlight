@@ -1,6 +1,9 @@
 class_name InputContextRouter
 extends Node
 
+signal logical_press_edge(action: StringName, activation_generation: int, receipt: Dictionary)
+signal context_changed(previous: String, current: String, context_generation: int)
+
 const CONFIRM_PHYSICAL := &"context_confirm"
 const BACK_PHYSICAL := &"context_back"
 
@@ -49,6 +52,7 @@ func _sync_context() -> void:
 	# until the matching physical release is observed.
 	_release_transaction_action("confirm", "context_changed")
 	_release_transaction_action("back", "context_changed")
+	var previous_context := context
 	context = next_context
 	context_generation += 1
 	last_context_receipt = {
@@ -56,6 +60,7 @@ func _sync_context() -> void:
 		"context_generation":context_generation,
 	}
 	last_receipt = last_context_receipt.duplicate(true)
+	context_changed.emit(previous_context, context, context_generation)
 
 func _resolve_context() -> String:
 	var controller := get_parent()
@@ -114,6 +119,11 @@ func _dispatch_press(physical: String, action: StringName) -> void:
 	# Publish ownership before synthesizing the logical press. Input parsing may
 	# synchronously invoke page code, which must be able to bind this transaction.
 	if action != &"":
+		# Motor actions consume this transaction-scoped edge directly. The
+		# synthetic action remains for non-motor observers and UI compatibility,
+		# but authoritative gameplay never has to rediscover a transient global
+		# Input edge during a later physics tick.
+		logical_press_edge.emit(action, activation_generation, transaction.duplicate(true))
 		_parse_action(action, true)
 
 func _dispatch_release(physical: String) -> void:
