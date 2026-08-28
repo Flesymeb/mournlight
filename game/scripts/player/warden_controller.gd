@@ -19,7 +19,7 @@ enum DashPhase { READY, ANTICIPATION, ACTIVE, RECOVERY, COOLDOWN }
 @export var recovery_duration := 0.22
 @export var cooldown_duration := 0.72
 @export_category("Run modifiers")
-@export var pickup_collection_radius := 1.15
+@export var pickup_collection_radius := 1.75
 @export var experience_yield_multiplier := 1.0
 
 @export_category("Runtime state (read-only)")
@@ -247,7 +247,7 @@ func reset_for_run(spawn_position: Vector3, reset_owner := "run_reset") -> void:
 	_dash_direction = Vector3.FORWARD
 	_last_move_direction = Vector3.FORWARD
 	dash_cooldown_remaining = 0.0
-	pickup_collection_radius = 1.15
+	pickup_collection_radius = 1.75
 	experience_yield_multiplier = 1.0
 	model_pivot.position = _base_model_position
 	model_pivot.rotation = Vector3.ZERO

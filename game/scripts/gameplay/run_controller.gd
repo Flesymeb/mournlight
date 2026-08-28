@@ -251,7 +251,7 @@ func _begin_run() -> void:
 	health.maximum_health = 100.0
 	health.reset_warden_health()
 	warden.cooldown_duration = 0.72
-	warden.pickup_collection_radius = 1.15
+	warden.pickup_collection_radius = 1.75
 	warden.experience_yield_multiplier = 1.0
 	_last_health = health.current_health
 	_health_accounting_suspended = false
