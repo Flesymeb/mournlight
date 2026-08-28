@@ -28,9 +28,11 @@ var _state_nodes: Array[Label] = []
 var _stat_bodies: Array[VBoxContainer] = []
 var _presentation_serial := 0
 @onready var buttons: Array[Button] = [$Cards/CardA, $Cards/CardB, $Cards/CardC]
+@onready var cards_container: HBoxContainer = $Cards
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	cards_container.pivot_offset = Vector2(510, 261)
 	for index in buttons.size():
 		_build_card_content(buttons[index])
 		buttons[index].pressed.connect(_choose.bind(index))
@@ -41,6 +43,24 @@ func _ready() -> void:
 		buttons[index].button_down.connect(_set_pressed.bind(index, true))
 		buttons[index].button_up.connect(_set_pressed.bind(index, false))
 	visible = false
+	_layout_cards()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED and is_instance_valid(cards_container):
+		_layout_cards()
+
+func _layout_cards() -> void:
+	if not is_instance_valid(cards_container):
+		return
+	# Keep the authored three-card hierarchy intact while fitting the full
+	# choice family inside narrow windowed modes and high UI scales.
+	var width_ratio := (size.x - 48.0) / 1056.0
+	var height_ratio := (size.y - 190.0) / 522.0
+	var fit := clampf(minf(width_ratio, height_ratio), 0.58, 1.0)
+	cards_container.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	cards_container.position = size * 0.5 - cards_container.pivot_offset * fit
+	cards_container.size = Vector2(1020, 522)
+	cards_container.scale = Vector2.ONE * fit
 
 func present(next_cards: Array[Dictionary]) -> void:
 	_presentation_serial += 1

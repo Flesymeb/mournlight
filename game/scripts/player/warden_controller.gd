@@ -25,6 +25,7 @@ enum DashPhase { READY, ANTICIPATION, ACTIVE, RECOVERY, COOLDOWN }
 @export_category("Runtime state (read-only)")
 @export var movement_input := Vector2.ZERO
 @export var planar_velocity := Vector3.ZERO
+@export var movement_input_source := "none"
 @export var locomotion_state := "idle"
 @export var dash_phase := "ready"
 @export var dash_cooldown_remaining := 0.0
@@ -97,7 +98,7 @@ func _process(delta: float) -> void:
 	_advance_victory_presentation(delta)
 
 func _physics_process(delta: float) -> void:
-	movement_input = Input.get_vector("move_left", "move_right", "move_forward", "move_back", 0.24).limit_length(1.0)
+	movement_input = _read_movement_input()
 	var desired_direction := _camera_relative_direction(movement_input)
 	if desired_direction.length_squared() > 0.001:
 		_last_move_direction = desired_direction
@@ -116,6 +117,26 @@ func _physics_process(delta: float) -> void:
 	var camera := get_viewport().get_camera_3d()
 	if camera and camera.has_method("set_movement_velocity"):
 		camera.set_movement_velocity(planar_velocity)
+
+func _read_movement_input() -> Vector2:
+	# Input.get_vector is authoritative for rebinding and gamepad analog input,
+	# but a physical key can be consumed by a full-screen Control before the
+	# action state reaches the physics tick. Sample the shipped WASD bindings as
+	# a deterministic fallback so ordinary movement never becomes a zero-edge
+	# transaction during UI/context handoff.
+	var mapped := Input.get_vector("move_left", "move_right", "move_forward", "move_back", 0.24)
+	var physical := Vector2(
+		float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)),
+		float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W))
+	)
+	if physical.length_squared() > 0.001:
+		movement_input_source = "physical_wasd"
+		return physical.limit_length(1.0)
+	if mapped.length_squared() > 0.001:
+		movement_input_source = "input_map"
+		return mapped.limit_length(1.0)
+	movement_input_source = "none"
+	return Vector2.ZERO
 
 func _camera_relative_direction(input_vector: Vector2) -> Vector3:
 	if input_vector.length_squared() <= 0.001:

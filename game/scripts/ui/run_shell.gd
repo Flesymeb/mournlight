@@ -147,6 +147,8 @@ func _build_result_presentation() -> void:
 	result_upgrade_panel.add_child(result_upgrade_icon)
 	result_upgrade_label = _result_label("UpgradeSummary", 12, Color("e7ecff"))
 	result_upgrade_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	result_upgrade_label.max_lines_visible = 3
+	result_upgrade_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	result_upgrade_panel.add_child(result_upgrade_label)
 	add_child(result_upgrade_panel)
 
@@ -156,6 +158,8 @@ func _result_label(label_name: String, font_size: int, color: Color) -> Label:
 	label.add_theme_font_override("font", FONT_MEDIUM)
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
+	label.clip_text = true
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	return label
 
 func _notification(what: int) -> void:
@@ -223,6 +227,8 @@ func _layout_result(center: Vector2, page_top: float) -> void:
 	var visible_cards := result_cards.filter(func(card: Panel) -> bool: return card.visible)
 	var card_width := 214.0
 	var gap := 16.0
+	if not visible_cards.is_empty():
+		card_width = minf(card_width, maxf(132.0, (size.x - 64.0 - gap * float(visible_cards.size() - 1)) / float(visible_cards.size())))
 	var total_width := visible_cards.size() * card_width + maxi(0,visible_cards.size()-1) * gap
 	for index in visible_cards.size():
 		var card: Panel = visible_cards[index]
@@ -236,15 +242,17 @@ func _layout_result(center: Vector2, page_top: float) -> void:
 		rank_label.position = Vector2(82,47); rank_label.size = Vector2(124,20)
 		var value_label := card.get_node("WeaponValue") as Label
 		value_label.position = Vector2(82,68); value_label.size = Vector2(124,28)
-	result_upgrade_panel.position = Vector2(center.x-338,page_top+278)
-	result_upgrade_panel.size = Vector2(676,92)
+	var panel_width := minf(676.0, maxf(280.0, size.x - 64.0))
+	result_upgrade_panel.position = Vector2(center.x-panel_width*0.5,page_top+278)
+	result_upgrade_panel.size = Vector2(panel_width,92)
 	result_upgrade_icon.position = Vector2(18,13); result_upgrade_icon.size = Vector2(46,44)
-	result_upgrade_label.position = Vector2(78,8); result_upgrade_label.size = Vector2(578,76)
+	result_upgrade_label.position = Vector2(78,8); result_upgrade_label.size = Vector2(maxf(120.0,panel_width-96.0),76)
 	for index in buttons.size():
 		var button := buttons[index]
 		if button.visible:
-			button.position = Vector2(center.x-180,page_top+392+index*52)
-			button.size = Vector2(360,42)
+			var button_width := minf(360.0, maxf(220.0, size.x - 64.0))
+			button.position = Vector2(center.x-button_width*0.5,page_top+392+index*52)
+			button.size = Vector2(button_width,42)
 
 func set_mode(next_mode: String, next_summary: Dictionary = {}) -> void:
 	if next_mode in ["settings", "help", "credits"]:
