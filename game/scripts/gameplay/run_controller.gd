@@ -1193,7 +1193,7 @@ func _teardown_run(route: String, reason: String) -> Dictionary:
 	world.reset_session(false)
 	var presentation_reset: Dictionary = {}
 	if route == "title":
-		warden.reset_for_run(Vector3(0, 0.05, 6.0), "title")
+		warden.reset_for_run(world.arena_contract.get_player_spawn(), "title")
 		presentation_reset = warden.animation_binding.get_snapshot() if warden.animation_binding else {}
 	var encounter := spawner.get_snapshot()
 	var post_counts := _profile_counts()
@@ -2774,7 +2774,7 @@ func _prepare_tester_victory() -> void:
 	health.maximum_health = 5000.0
 	health.reset_warden_health()
 	_last_health = health.current_health
-	warden.global_position = Vector3(0.0, 0.05, 6.0)
+	warden.global_position = world.arena_contract.get_player_spawn()
 	warden.velocity = Vector3.ZERO
 	warden.planar_velocity = Vector3.ZERO
 	warden.reset_input_latch("tester_victory_prepare")

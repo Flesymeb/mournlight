@@ -125,6 +125,12 @@ func _read_movement_input() -> Vector2:
 	# a deterministic fallback so ordinary movement never becomes a zero-edge
 	# transaction during UI/context handoff.
 	var mapped := Input.get_vector("move_left", "move_right", "move_forward", "move_back", 0.24)
+	var router := get_node_or_null("../../InputContextRouter")
+	if router and router.has_method("get_movement_vector"):
+		var routed := router.get_movement_vector() as Vector2
+		if routed.length_squared() > 0.001:
+			movement_input_source = "input_router"
+			return routed
 	var physical := Vector2(
 		float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)),
 		float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W))
@@ -438,6 +444,9 @@ func _restore_and_reapply_hat_isolation(reason: String) -> void:
 func reset_input_latch(reason := "input_latch_reset") -> void:
 	clear_dash_ownership(reason)
 	movement_input = Vector2.ZERO
+	var router := get_node_or_null("../../InputContextRouter")
+	if router and router.has_method("clear_movement_latch"):
+		router.clear_movement_latch(reason)
 
 func get_movement_snapshot() -> Dictionary:
 	return {

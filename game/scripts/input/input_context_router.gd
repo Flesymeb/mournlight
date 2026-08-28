@@ -23,6 +23,11 @@ var completed_transactions: Array[Dictionary] = []
 var active_device := "keyboard"
 var device_generation := 0
 var last_device_receipt: Dictionary = {}
+var movement_vector := Vector2.ZERO
+var _movement_actions := {
+	&"move_left": false, &"move_right": false,
+	&"move_forward": false, &"move_back": false,
+}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -35,6 +40,22 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.echo:
 		return
 	_observe_device(event)
+	# Keep an authoritative edge-backed movement state. Some embedded runners
+	# synthesize InputEventAction edges without updating Input's polling cache;
+	# Warden can consume this state during its physics tick just like a native
+	# keyboard/gamepad action.
+	for action in _movement_actions.keys():
+		var action_name := StringName(action)
+		if event.is_action_pressed(action_name):
+			_movement_actions[action_name] = true
+			_recompute_movement_vector()
+		elif event.is_action_released(action_name):
+			_movement_actions[action_name] = false
+			_recompute_movement_vector()
+	if event.is_action_pressed(&"dash") and context in ["active", "boss"]:
+		_dispatch_press("confirm", &"dash")
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed(CONFIRM_PHYSICAL):
 		_dispatch_press("confirm", _confirm_action())
 		get_viewport().set_input_as_handled()
@@ -47,6 +68,21 @@ func _input(event: InputEvent) -> void:
 	elif event.is_action_released(BACK_PHYSICAL):
 		_dispatch_release("back")
 		get_viewport().set_input_as_handled()
+
+func _recompute_movement_vector() -> void:
+	movement_vector = Vector2(
+		float(_movement_actions[&"move_right"]) - float(_movement_actions[&"move_left"]),
+		float(_movement_actions[&"move_back"]) - float(_movement_actions[&"move_forward"])
+	).limit_length(1.0)
+
+func get_movement_vector() -> Vector2:
+	return movement_vector
+
+func clear_movement_latch(reason := "reset") -> void:
+	for action in _movement_actions.keys():
+		_movement_actions[action] = false
+	movement_vector = Vector2.ZERO
+	last_receipt = {"phase":"movement_reset", "reason":reason, "process_frame":Engine.get_process_frames()}
 
 func _observe_device(event: InputEvent) -> void:
 	var next_device := active_device
@@ -115,6 +151,8 @@ func _sync_context() -> void:
 	_release_transaction_action("back", "context_changed")
 	var previous_context := context
 	context = next_context
+	if context not in ["active", "boss"]:
+		clear_movement_latch("context_%s" % context)
 	context_generation += 1
 	last_context_receipt = {
 		"phase":"context_changed", "context":context,
@@ -284,4 +322,6 @@ func _mcp_state() -> Dictionary:
 		"active_device":active_device,
 		"device_generation":device_generation,
 		"last_device_receipt":last_device_receipt,
+		"movement_vector":movement_vector,
+		"movement_actions":_movement_actions,
 	}
