@@ -13,8 +13,8 @@
 
 [sub_resource type="Environment" id="Environment_moonlit"]
 background_mode = 1
-background_color = Color(0.003, 0.005, 0.018, 1)
-background_energy_multiplier = 0.22
+background_color = Color(0.0015, 0.0025, 0.009, 1)
+background_energy_multiplier = 0.14
 ambient_light_source = 3
 ambient_light_color = Color(0.28, 0.34, 0.62, 1)
 ambient_light_energy = 1.12
@@ -24,9 +24,9 @@ glow_enabled = true
 glow_intensity = 0.58
 bloom = 0.08
 fog_enabled = true
-fog_light_color = Color(0.15, 0.19, 0.38, 1)
-fog_light_energy = 0.38
-fog_density = 0.0035
+fog_light_color = Color(0.055, 0.07, 0.15, 1)
+fog_light_energy = 0.28
+fog_density = 0.0065
 fog_height = 0.0
 fog_height_density = 0.045
 
@@ -69,9 +69,14 @@ script = ExtResource("3_camera")
 target = NodePath("../Warden")
 near = 0.15
 far = 90.0
-arena_limit = Vector2(8.4, 6.8)
+arena_limit = Vector2(9.2, 9.0)
+arena_fill_limit = Vector2(10.2, 9.2)
+normal_fov = 50.0
+follow_height = 11.3
+follow_distance = 9.0
+coverage_max_correction = 3.5
 presentation_body = NodePath("../Warden/PresentationRoot/ModelPivot/AssetTransform/AuthoredWardenMage")
 presentation_lantern = NodePath("../Warden/PresentationRoot/LanternPivot/AuthoredLantern")
 presentation_effects = Array[NodePath]([NodePath("../Warden/DashAura"), NodePath("../Warden/ActiveRing"), NodePath("../Warden/WardenHalo")])
-tall_occluders = Array[NodePath]([NodePath("../CemeteryGarden/OuterDatum/MausoleumCollision"), NodePath("../CemeteryGarden/OuterDatum/NortheastTreeCollision"), NodePath("../CemeteryGarden/OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision")])
+tall_occluders = Array[NodePath]([NodePath("../CemeteryGarden/OuterDatum/MausoleumCollision"), NodePath("../CemeteryGarden/OuterDatum/NortheastTreeCollision"), NodePath("../CemeteryGarden/OuterDatum/NorthwestTreeCollision"), NodePath("../CemeteryGarden/OuterDatum/SoutheastTreeCollision"), NodePath("../CemeteryGarden/OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision")])
 coverage_occluder_visuals = Array[NodePath]([NodePath("../CemeteryGarden/PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/Crypt"), NodePath("../CemeteryGarden/PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/DeadTree"), NodePath("../CemeteryGarden/PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/DeadTree3"), NodePath("../CemeteryGarden/OuterDatum/CrackedMoonBellAnchor/CrackedBellAsset")])

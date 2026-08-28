@@ -13,6 +13,8 @@ signal reward_dropped(event: Dictionary)
 @export var live_cap := 10
 @export var minimum_player_safe_radius := 7.0
 @export var playable_half_extents := Vector2(10.7, 9.2)
+@export var playable_min := Vector2(-9.25, -9.25)
+@export var playable_max := Vector2(10.4, 9.65)
 @export var protected_camera_half_extents := Vector2(5.8, 4.2)
 @export_range(1, 12, 1) var telegraph_cue_cap := 4
 @export_range(0, 16, 1) var role_light_cap := 8
@@ -76,10 +78,10 @@ var _vitality_stale_generation_rejections := 0
 const LIGHT_BUDGET_REFRESH_SECONDS := 0.1
 
 const LANES := [
-	Vector3(-10.2, 0.05, -7.8), Vector3(-4.2, 0.05, -8.8),
-	Vector3(4.6, 0.05, -8.7), Vector3(10.2, 0.05, -3.6),
-	Vector3(10.2, 0.05, 7.2), Vector3(4.8, 0.05, 8.8),
-	Vector3(-5.4, 0.05, 8.7), Vector3(-10.2, 0.05, 5.0),
+	Vector3(-8.8, 0.05, -8.5), Vector3(-4.2, 0.05, -8.8),
+	Vector3(4.6, 0.05, -8.7), Vector3(9.5, 0.05, -3.6),
+	Vector3(9.5, 0.05, 7.2), Vector3(4.8, 0.05, 9.0),
+	Vector3(-5.4, 0.05, 9.0), Vector3(-8.8, 0.05, 5.0),
 ]
 
 func _ready() -> void:
@@ -392,7 +394,7 @@ func _reconcile_to_cap(target_cap: int, reason: String) -> void:
 	_emit_snapshot()
 
 func validate_spawn_position(position: Vector3) -> Dictionary:
-	if absf(position.x) > playable_half_extents.x or absf(position.z) > playable_half_extents.y:
+	if position.x < playable_min.x or position.x > playable_max.x or position.z < playable_min.y or position.z > playable_max.y:
 		return {"valid": false, "reason": "outside_playable_datum"}
 	if not is_instance_valid(player):
 		return {"valid": false, "reason": "missing_player"}
@@ -408,9 +410,27 @@ func validate_spawn_position(position: Vector3) -> Dictionary:
 	return {"valid": true, "reason": "validated_lane", "safe_distance": delta.length()}
 
 func _inside_authored_collision(position: Vector3) -> bool:
-	var in_mausoleum := absf(position.x - 0.1) < 2.6 and absf(position.z + 1.1) < 2.0
-	var in_tree := Vector2(position.x - 5.2, position.z + 2.8).length() < 1.35
-	return in_mausoleum or in_tree
+	var point := Vector2(position.x, position.z)
+	if _inside_box(point, Vector2(0.53, -2.52), Vector2(3.65, 5.7)):
+		return true
+	for tree_center in [Vector2(6.85, -5.46), Vector2(-6.9, -6.42), Vector2(9.28, 8.94)]:
+		if point.distance_to(tree_center) < 1.35:
+			return true
+	if point.distance_to(Vector2(-4.8, 1.8)) < 0.45 or point.distance_to(Vector2(-6.5, -1.5)) < 1.2:
+		return true
+	for obstacle in [
+		{"center":Vector2(9.83, -8.72), "half":Vector2(1.0, 1.0)},
+		{"center":Vector2(-4.12, 6.3), "half":Vector2(0.8, 1.55)},
+		{"center":Vector2(7.43, 5.11), "half":Vector2(1.55, 0.95)},
+		{"center":Vector2(7.38, -3.14), "half":Vector2(2.05, 1.1)},
+		{"center":Vector2(7.38, 2.46), "half":Vector2(2.05, 1.1)},
+	]:
+		if _inside_box(point, obstacle.center, obstacle.half):
+			return true
+	return false
+
+func _inside_box(point: Vector2, center: Vector2, half_extents: Vector2) -> bool:
+	return absf(point.x - center.x) < half_extents.x and absf(point.y - center.y) < half_extents.y
 
 func _has_valid_approach(position: Vector3) -> bool:
 	var midpoint := position.lerp(player.global_position, 0.5)
@@ -667,6 +687,14 @@ func get_snapshot() -> Dictionary:
 		"validation_roster_active":not _validation_role_sequence.is_empty(),
 		"validation_roster_size":_validation_role_sequence.size(),
 		"validation_profile_cohort":get_validation_profile_cohort_snapshot() if _validation_cohort_active else _validation_cohort_last_receipt.duplicate(true),
+		"spawn_datum":{
+			"minimum":playable_min,
+			"maximum":playable_max,
+			"protected_camera_half_extents":protected_camera_half_extents,
+			"player_safe_radius":minimum_player_safe_radius,
+			"landmark_collision_predicate":"crypt + 3 trees + keeper post + cracked bell + 3 coffins + 2 grave clusters",
+			"ordinary_lane_count":LANES.size(),
+		},
 		"rejected_spawns": rejected_spawn_count, "last_spawn_receipt": last_spawn_receipt,
 		"last_lifecycle_event": last_lifecycle_event,
 		"wave_id": _wave_id, "wave_spawned": _wave_spawned, "spawn_budget": _spawn_budget,

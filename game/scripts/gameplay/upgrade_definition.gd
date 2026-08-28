@@ -38,6 +38,9 @@ func project(current_upgrade_rank: int, inventory: WeaponInventory, health: Ward
 		"risk_reward": _project_risk_reward(projection, inventory, health)
 	projection["effect_lines"] = _effect_lines(projection.changes)
 	projection["concrete_change"] = " | ".join(projection.effect_lines)
+	projection["consequence"] = _consequence_line(projection)
+	projection["available"] = true
+	projection["newly_unlocked"] = action == "weapon_rank" and int((projection.get("current", {}) as Dictionary).get("rank", 0)) == 0
 	return projection
 
 func apply_projection(projection: Dictionary, inventory: WeaponInventory, health: WardenHealth, warden: WardenController) -> Dictionary:
@@ -147,6 +150,22 @@ func _effect_lines(changes: Array) -> Array[String]:
 	for change in changes:
 		lines.append("%s  %s  →  %s" % [change.label, _format_value(change.current, String(change.field)), _format_value(change.result, String(change.field))])
 	return lines
+
+func _consequence_line(projection: Dictionary) -> String:
+	match action:
+		"weapon_rank":
+			if int((projection.get("current", {}) as Dictionary).get("rank", 0)) == 0:
+				return "Add a new attack pattern to the vigil."
+			match weapon_id:
+				&"warden_lantern": return "Make each focused bolt more decisive."
+				&"gravespade": return "Carve a safer lane at close range."
+				&"wandering_wisps": return "Strengthen the orbiting control ring."
+		"health_max": return "Hold the line through one more heavy hit."
+		"dash_cooldown": return "Recover Moonstep sooner between threats."
+		"recovery": return "Restore strength without changing the build."
+		"pickup_economy": return "Gather more wisps from a safer distance."
+		"risk_reward": return "Trade endurance for sharper weapon damage."
+	return "Shape the next exchange."
 
 func _format_value(value, field: String) -> String:
 	if value == null:
