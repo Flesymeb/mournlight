@@ -35,6 +35,9 @@ var telegraph_admitted := false
 var _hurt_light_remaining := 0.0
 var _role_light_active := false
 var _hurt_light_active := false
+var _facing_bucket := 0
+var _facing_updates := 0
+var _facing_skips := 0
 
 func _ready() -> void:
 	add_to_group("combat_targets")
@@ -63,6 +66,9 @@ func activate(next_profile: EnemyProfile, next_target: WardenController, at_posi
 	death_count = 0
 	_pool_return_pending = false
 	_flank_sign = -1.0 if (String(stable_id).hash() + generation) % 2 == 0 else 1.0
+	_facing_bucket = posmod(String(stable_id).hash() + generation, EnemySemanticPresenter.DENSE_APPROACH_ANIMATION_BUCKETS)
+	_facing_updates = 0
+	_facing_skips = 0
 	health.actor_id = stable_id
 	health.maximum_health = profile.maximum_health
 	health.current_health = profile.maximum_health
@@ -160,21 +166,27 @@ func _physics_process(delta: float) -> void:
 	global_position.y = 0.05
 	model_pivot.advance(delta, velocity, state_remaining, _state_duration(state))
 	if velocity.length_squared() > 0.04 and state == "approach":
-		presentation_root.look_at(global_position + velocity, Vector3.UP)
+		if posmod(Engine.get_physics_frames(), EnemySemanticPresenter.DENSE_APPROACH_ANIMATION_BUCKETS) == _facing_bucket:
+			presentation_root.look_at(global_position + velocity, Vector3.UP)
+			_facing_updates += 1
+		else:
+			_facing_skips += 1
 
 func _steer_approach(delta: float) -> void:
 	var to_target := target.global_position - global_position
 	to_target.y = 0.0
 	var desired := to_target.normalized()
-	if profile.attack_kind == "flank" and to_target.length() > 2.4:
+	var target_distance_squared := to_target.length_squared()
+	if profile.attack_kind == "flank" and target_distance_squared > 5.76:
 		desired = (desired + Vector3(-desired.z, 0.0, desired.x) * _flank_sign * 0.62).normalized()
 	var separation := Vector3.ZERO
 	var neighbors: Array[EnemyActor] = neighbor_registry.query_neighbors(self, profile.separation_radius) if is_instance_valid(neighbor_registry) else []
 	for other in neighbors:
 		var away: Vector3 = global_position - other.global_position
 		away.y = 0.0
-		var distance := away.length()
-		if distance > 0.01 and distance < profile.separation_radius:
+		var distance_squared := away.length_squared()
+		if distance_squared > 0.0001 and distance_squared < profile.separation_radius * profile.separation_radius:
+			var distance := sqrt(distance_squared)
 			separation += away.normalized() * (profile.separation_radius - distance) / profile.separation_radius
 	var target_velocity := (desired + separation * 0.72).normalized() * profile.movement_speed
 	velocity = velocity.move_toward(target_velocity, 9.0 * delta)
@@ -336,5 +348,13 @@ func _mcp_state() -> Dictionary:
 		"semantic_state": model_pivot.semantic_state if is_instance_valid(model_pivot) else state,
 		"active_motion_id": model_pivot.active_motion_id if is_instance_valid(model_pivot) else "none",
 		"semantic_bindings": model_pivot.semantic_bindings() if is_instance_valid(model_pivot) else {},
-		"presentation_budget": model_pivot.presentation_budget_snapshot() if is_instance_valid(model_pivot) else {},
+		"presentation_budget": get_presentation_budget_snapshot(),
 	}
+
+func get_presentation_budget_snapshot() -> Dictionary:
+	var receipt := model_pivot.presentation_budget_snapshot() if is_instance_valid(model_pivot) else {}
+	receipt["facing_bucket"] = _facing_bucket
+	receipt["facing_updates"] = _facing_updates
+	receipt["facing_skips"] = _facing_skips
+	receipt["non_priority_facing_staggered"] = true
+	return receipt

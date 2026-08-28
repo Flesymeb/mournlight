@@ -63,6 +63,11 @@ var _validation_cohort_replenished := 0
 var _validation_cohort_deaths := 0
 var _validation_cohort_maintenance_ticks := 0
 var _validation_cohort_last_receipt: Dictionary = {}
+var _light_budget_refresh_remaining := 0.0
+var _light_budget_update_count := 0
+var _light_budget_skipped_frames := 0
+
+const LIGHT_BUDGET_REFRESH_SECONDS := 0.1
 
 const LANES := [
 	Vector3(-10.2, 0.05, -7.8), Vector3(-4.2, 0.05, -8.8),
@@ -161,6 +166,9 @@ func reset_encounter(preserve_pressure: bool = false) -> void:
 	_hurt_light_owners.clear()
 	_light_peak_active = 0
 	_light_peak_requested = 0
+	_light_budget_refresh_remaining = 0.0
+	_light_budget_update_count = 0
+	_light_budget_skipped_frames = 0
 	for actor in _pool:
 		actor.remove_from_group("active_enemies")
 		actor.return_to_pool()
@@ -170,7 +178,12 @@ func _process(delta: float) -> void:
 	if not active:
 		return
 	_resolve_telegraph_admissions()
-	_update_light_budget()
+	_light_budget_refresh_remaining = maxf(0.0, _light_budget_refresh_remaining - delta)
+	if _light_budget_refresh_remaining <= 0.0:
+		_update_light_budget()
+		_light_budget_refresh_remaining = LIGHT_BUDGET_REFRESH_SECONDS
+	else:
+		_light_budget_skipped_frames += 1
 	_spawn_cooldown = maxf(0.0, _spawn_cooldown - delta)
 	if _spawn_cooldown <= 0.0 and _active_count() < live_cap and _wave_spawned < _spawn_budget:
 		_spawn_one(_spawn_cursor)
@@ -438,6 +451,7 @@ func _resolve_telegraph_admissions() -> void:
 	_cue_peak_admitted = maxi(_cue_peak_admitted, _telegraph_owners.size())
 
 func _update_light_budget() -> void:
+	_light_budget_update_count += 1
 	var active_actors: Array[EnemyActor] = []
 	var hurt_requested := 0
 	for actor in _pool:
@@ -524,6 +538,9 @@ func _on_reward_dropped(event: Dictionary) -> void:
 
 func _on_lifecycle_event(event: Dictionary) -> void:
 	last_lifecycle_event = event.duplicate(true)
+	if active and String(event.get("phase", "")) in ["spawn", "telegraph", "damage", "hurt", "death", "pool_return", "retired"]:
+		_update_light_budget()
+		_light_budget_refresh_remaining = LIGHT_BUDGET_REFRESH_SECONDS
 	enemy_lifecycle.emit(last_lifecycle_event)
 
 func _emit_snapshot() -> void:
@@ -540,6 +557,8 @@ func get_snapshot() -> Dictionary:
 	var presentation_updates := 0
 	var presentation_skips := 0
 	var presentation_priority_updates := 0
+	var facing_updates := 0
+	var facing_skips := 0
 	var manual_animation_players := 0
 	for actor in _pool:
 		if actor.state == "pooled" or not actor.profile:
@@ -558,10 +577,12 @@ func get_snapshot() -> Dictionary:
 		if actor.is_hurt_light_active():
 			hurt_active += 1
 			hurt_owner_keys.append(_actor_key(actor))
-		var presentation_budget := actor.model_pivot.presentation_budget_snapshot()
+		var presentation_budget := actor.get_presentation_budget_snapshot()
 		presentation_updates += int(presentation_budget.get("updates", 0))
 		presentation_skips += int(presentation_budget.get("skips", 0))
 		presentation_priority_updates += int(presentation_budget.get("priority_updates", 0))
+		facing_updates += int(presentation_budget.get("facing_updates", 0))
+		facing_skips += int(presentation_budget.get("facing_skips", 0))
 		if bool(presentation_budget.get("manual_animation", false)):
 			manual_animation_players += 1
 	var role_requested := _active_count()
@@ -606,7 +627,12 @@ func get_snapshot() -> Dictionary:
 			"updates":presentation_updates,
 			"skips":presentation_skips,
 			"priority_updates":presentation_priority_updates,
+			"facing_updates":facing_updates,
+			"facing_skips":facing_skips,
 			"danger_states_unstaggered":true,
+			"light_budget_refresh_seconds":LIGHT_BUDGET_REFRESH_SECONDS,
+			"light_budget_updates":_light_budget_update_count,
+			"light_budget_skipped_frames":_light_budget_skipped_frames,
 		},
 	}
 
@@ -627,9 +653,22 @@ func _variant_balance_receipt(role_variants: Dictionary) -> Dictionary:
 
 func _mcp_state() -> Dictionary:
 	var snapshot := get_snapshot()
+	var presentation: Dictionary = snapshot.get("dense_presentation_budget", {})
+	var neighbors: Dictionary = snapshot.get("neighbor_registry", {})
 	return {
 		"active":snapshot.get("active", false), "live":snapshot.get("live", 0),
 		"pooled":snapshot.get("pooled", 0), "cap":snapshot.get("cap", 0),
+		"presentation_updates":presentation.get("updates", 0),
+		"presentation_skips":presentation.get("skips", 0),
+		"presentation_priority_updates":presentation.get("priority_updates", 0),
+		"facing_updates":presentation.get("facing_updates", 0),
+		"facing_skips":presentation.get("facing_skips", 0),
+		"light_budget_updates":presentation.get("light_budget_updates", 0),
+		"light_budget_skipped_frames":presentation.get("light_budget_skipped_frames", 0),
+		"neighbor_queries":neighbors.get("query_count", 0),
+		"neighbor_candidate_visits":neighbors.get("candidate_visits", 0),
+		"neighbor_candidate_budget":neighbors.get("candidate_budget", 0),
+		"neighbor_stable_order_cache_size":neighbors.get("stable_order_cache_size", 0),
 		"roles":snapshot.get("roles", {}),
 		"role_variants":snapshot.get("role_variants", {}),
 		"variant_balance":snapshot.get("variant_balance", {}),

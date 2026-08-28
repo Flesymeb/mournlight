@@ -6,6 +6,7 @@ const MAX_CANDIDATES := 12
 var cell_size := 2.5
 var _entries: Dictionary = {}
 var _cells: Dictionary = {}
+var _sorted_ids: Array[String] = []
 var _built_physics_frame := -1
 var _telemetry_frame := -1
 var _frame_rebuilds := 0
@@ -31,7 +32,11 @@ func _ready() -> void:
 func register_actor(actor: EnemyActor) -> void:
 	if not is_instance_valid(actor):
 		return
-	_entries[String(actor.stable_id)] = {"actor": actor, "generation": actor.spawn_generation}
+	var key := String(actor.stable_id)
+	_entries[key] = {"actor": actor, "generation": actor.spawn_generation}
+	if not _sorted_ids.has(key):
+		_sorted_ids.append(key)
+		_sorted_ids.sort()
 	_built_physics_frame = -1
 	set_physics_process(true)
 
@@ -44,6 +49,7 @@ func unregister_actor(stable_id: StringName, generation: int) -> void:
 		_stale_rejections += 1
 		return
 	_entries.erase(key)
+	_sorted_ids.erase(key)
 	_built_physics_frame = -1
 	if _entries.is_empty():
 		set_physics_process(false)
@@ -51,6 +57,7 @@ func unregister_actor(stable_id: StringName, generation: int) -> void:
 func clear() -> void:
 	_entries.clear()
 	_cells.clear()
+	_sorted_ids.clear()
 	_built_physics_frame = -1
 	set_physics_process(false)
 	_begin_frame(Engine.get_physics_frames())
@@ -118,9 +125,7 @@ func _rebuild_if_needed(frame: int) -> void:
 	if _built_physics_frame == frame:
 		return
 	_cells.clear()
-	var stable_ids: Array = _entries.keys()
-	stable_ids.sort()
-	for stable_id in stable_ids:
+	for stable_id in _sorted_ids:
 		var entry: Dictionary = _entries.get(stable_id, {})
 		var actor: EnemyActor = entry.get("actor") as EnemyActor
 		if not is_instance_valid(actor) or actor.state in ["pooled", "death"] or int(entry.get("generation", -1)) != actor.spawn_generation:
@@ -147,6 +152,7 @@ func get_snapshot() -> Dictionary:
 		"maximum_query_size": _last_frame_max_query_size,
 		"current_frame": {"physics_frame":_telemetry_frame, "rebuild_count":_frame_rebuilds, "query_count":_frame_queries, "candidate_visits":_frame_candidate_visits, "maximum_query_size":_frame_max_query_size},
 		"candidate_budget": MAX_CANDIDATES,
+		"stable_order_cache_size":_sorted_ids.size(),
 		"total_rebuilds": _total_rebuilds,
 		"total_queries": _total_queries,
 		"total_candidate_visits": _total_candidate_visits,

@@ -176,6 +176,9 @@ func _acquire_terminal_audio(semantic: String, owner: String) -> bool:
 		"source_started":terminal_victory_voice.playing if semantic == "victory" and terminal_victory_voice else true,
 		"playback_position_seconds":terminal_victory_voice.get_playback_position() if semantic == "victory" and terminal_victory_voice else 0.0,
 		"retirement_reason":terminal_voice_retirement_reason if semantic == "victory" else "dynamic_window",
+		"effects_route":_bus_route_receipt(&"Effects"),
+		"master_route":_bus_route_receipt(&"Master"),
+		"persisted_settings":_persisted_audio_settings_receipt(),
 	}
 	return true
 
@@ -558,7 +561,44 @@ func _mcp_state() -> Dictionary:
 	if terminal_victory_voice and terminal_victory_voice.playing:
 		playing += 1
 		active_by_owner["critical_terminal"] = 1
+	var effects_route := _bus_route_receipt(&"Effects")
+	var master_route := _bus_route_receipt(&"Master")
+	var route_valid := (
+		bool(effects_route.get("present", false))
+		and String(effects_route.get("send", "")) == "Master"
+		and not bool(effects_route.get("mute", true))
+		and not bool(effects_route.get("bypass_effects", true))
+		and float(effects_route.get("volume_linear", 0.0)) > 0.0
+		and bool(master_route.get("present", false))
+		and not bool(master_route.get("mute", true))
+		and float(master_route.get("volume_linear", 0.0)) > 0.0
+	)
 	return {"music_state":music_state,"music_playing":music.playing,
+		"effects_bus_index":effects_route.get("index", -1),
+		"effects_bus_send":effects_route.get("send", ""),
+		"effects_bus_volume_db":effects_route.get("volume_db", -INF),
+		"effects_bus_volume_linear":effects_route.get("volume_linear", 0.0),
+		"effects_bus_muted":effects_route.get("mute", true),
+		"effects_bus_bypass":effects_route.get("bypass_effects", true),
+		"master_bus_index":master_route.get("index", -1),
+		"master_bus_volume_db":master_route.get("volume_db", -INF),
+		"master_bus_volume_linear":master_route.get("volume_linear", 0.0),
+		"master_bus_muted":master_route.get("mute", true),
+		"persisted_effects_setting":((_persisted_audio_settings_receipt().get("configured_linear", {}) as Dictionary).get("Effects", -1.0)),
+		"settings_apply_generation":_persisted_audio_settings_receipt().get("apply_generation", 0),
+		"audio_route_valid":route_valid,
+		"victory_authorization_count":int(semantic_counts.get("victory", 0)),
+		"victory_source_start_count":terminal_source_start_count,
+		"victory_source_finished_msec":terminal_voice_finished_msec,
+		"victory_retirement_reason":terminal_voice_retirement_reason,
+		"terminal_active_voice_count":1 if terminal_victory_voice and terminal_victory_voice.playing else 0,
+		"effect_active_voice_count":playing,
+		"audio_driver":AudioServer.get_driver_name(),
+		"audio_bus_count":AudioServer.bus_count,
+		"same_bus_control":"ordinary_physical_dash_on_Effects",
+		"dash_semantic_count":int(semantic_counts.get("dash", 0)),
+		"footstep_semantic_count":int(semantic_counts.get("footstep", 0)),
+		"collector_localization_rule":"same_bus_control_silent_with_valid_route_requires_host_collector_or_driver_diagnosis",
 		"terminal_voice_bound":terminal_victory_voice != null,
 		"terminal_voice_playing":terminal_victory_voice.playing if terminal_victory_voice else false,
 		"terminal_voice_start_pending":terminal_voice_start_pending,
@@ -584,3 +624,23 @@ func _mcp_state() -> Dictionary:
 		"footstep_source_starts":footstep_source_starts,"footstep_source_retirements":footstep_source_retirements,"last_footstep_rejection":last_footstep_rejection,
 		"footstep_window_seconds":float((library.get_meta("playback_windows", {}) as Dictionary).get("footstep", 0.0)) if library else 0.0,
 		"source_revision":String(library.get_meta("source_revision", "")) if library else ""}
+
+func _bus_route_receipt(bus_name: StringName) -> Dictionary:
+	var index := AudioServer.get_bus_index(bus_name)
+	if index < 0:
+		return {"name":String(bus_name), "index":-1, "present":false}
+	return {
+		"name":AudioServer.get_bus_name(index), "index":index, "present":true,
+		"send":String(AudioServer.get_bus_send(index)),
+		"volume_db":AudioServer.get_bus_volume_db(index),
+		"volume_linear":AudioServer.get_bus_volume_linear(index),
+		"mute":AudioServer.is_bus_mute(index),
+		"bypass_effects":AudioServer.is_bus_bypassing_effects(index),
+		"solo":AudioServer.is_bus_solo(index),
+	}
+
+func _persisted_audio_settings_receipt() -> Dictionary:
+	var tree := get_tree()
+	if tree and tree.root.has_meta("mournlight_audio_settings_receipt"):
+		return (tree.root.get_meta("mournlight_audio_settings_receipt", {}) as Dictionary).duplicate(true)
+	return {"apply_generation":0, "missing":true}

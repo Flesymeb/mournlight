@@ -10,6 +10,8 @@ const DEFAULTS := {
 }
 
 var values: Dictionary = DEFAULTS.duplicate(true)
+var apply_generation := 0
+var last_apply_receipt: Dictionary = {}
 
 func load_settings() -> Dictionary:
 	var config := ConfigFile.new()
@@ -33,6 +35,7 @@ func apply() -> void:
 	_set_bus("Master", float(values.master_volume))
 	_set_bus("Music", float(values.music_volume))
 	_set_bus("Effects", float(values.effects_volume))
+	apply_generation += 1
 	var mode := int(values.window_mode)
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if mode == 1 else DisplayServer.WINDOW_MODE_WINDOWED)
 	var tree := Engine.get_main_loop() as SceneTree
@@ -42,9 +45,36 @@ func apply() -> void:
 		tree.root.set_meta("mournlight_hit_flash", bool(values.hit_flash))
 		tree.root.set_meta("mournlight_damage_numbers", bool(values.damage_numbers))
 		tree.root.set_meta("mournlight_danger_contrast", bool(values.danger_contrast))
+		last_apply_receipt = {
+			"apply_generation":apply_generation,
+			"configured_linear":{
+				"Master":float(values.master_volume),
+				"Music":float(values.music_volume),
+				"Effects":float(values.effects_volume),
+			},
+			"resolved_buses":{
+				"Master":_bus_receipt(&"Master"),
+				"Music":_bus_receipt(&"Music"),
+				"Effects":_bus_receipt(&"Effects"),
+			},
+		}
+		tree.root.set_meta("mournlight_audio_settings_receipt", last_apply_receipt.duplicate(true))
 	TargetSelector.configure_bias(int(values.target_bias))
 
 func _set_bus(bus_name: String, linear: float) -> void:
 	var index := AudioServer.get_bus_index(bus_name)
 	if index >= 0:
 		AudioServer.set_bus_volume_db(index, linear_to_db(clampf(linear, 0.001, 1.0)))
+
+func _bus_receipt(bus_name: StringName) -> Dictionary:
+	var index := AudioServer.get_bus_index(bus_name)
+	if index < 0:
+		return {"name":String(bus_name), "index":-1, "present":false}
+	return {
+		"name":AudioServer.get_bus_name(index), "index":index, "present":true,
+		"send":String(AudioServer.get_bus_send(index)),
+		"volume_db":AudioServer.get_bus_volume_db(index),
+		"volume_linear":AudioServer.get_bus_volume_linear(index),
+		"mute":AudioServer.is_bus_mute(index),
+		"bypass_effects":AudioServer.is_bus_bypassing_effects(index),
+	}

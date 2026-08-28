@@ -682,8 +682,15 @@ func _spawn_bellkeeper() -> void:
 	boss.phase_shifted.connect(_on_boss_phase_shifted)
 	boss_snapshot = boss.get_snapshot()
 
-func _on_boss_phase_shifted(_phase: int) -> void:
+func _on_boss_phase_shifted(next_phase: int) -> void:
 	audio_director.play_semantic("boss_phase")
+	var wave_state := wave_director.get_snapshot()
+	boss_transition_history.append({
+		"event":"bellkeeper_phase_shifted", "phase":next_phase, "elapsed":run_elapsed,
+		"wave_id":String((wave_state.get("definition", {}) as Dictionary).get("id", "")),
+		"route_kind":run_route_kind,
+		"natural_transition":run_route_kind == "ordinary" and int(wave_state.get("diagnostic_jump_count", 0)) == 0,
+	})
 
 func _on_boss_changed(snapshot: Dictionary) -> void:
 	boss_snapshot = snapshot.duplicate(true)
@@ -820,7 +827,8 @@ func _commit_terminal_snapshot(terminal_outcome: String) -> void:
 		and int(wave_state.get("diagnostic_jump_count", 0)) == 0
 		and not boss_transition_history.is_empty()
 		and bool(boss_transition_history[-1].get("natural_transition", false))
-		and _natural_build_history_truthful()
+		and _ordinary_progression_truthful()
+		and _boss_two_phase_history_truthful()
 	)
 	terminal_snapshot = terminal_snapshot.duplicate(true)
 
@@ -1425,13 +1433,31 @@ func _route_qualification(wave_state: Dictionary) -> Dictionary:
 		"boss_transition_history":boss_transition_history.duplicate(true),
 		"natural_build_history":selected_upgrades.duplicate(true),
 		"natural_build_history_truthful":_natural_build_history_truthful(),
+		"natural_collection_transactions":pickup_collected_total,
+		"natural_progression_truthful":_ordinary_progression_truthful(),
+		"boss_two_phase_history_truthful":_boss_two_phase_history_truthful(),
 	}
 
 func _natural_build_history_truthful() -> bool:
+	if selected_upgrades.is_empty():
+		return false
 	for choice in selected_upgrades:
 		if not bool(choice.get("natural_choice", false)) or not bool(choice.get("truthful_transaction", false)):
 			return false
 	return true
+
+func _ordinary_progression_truthful() -> bool:
+	return (
+		_natural_build_history_truthful()
+		and pickup_collected_total >= selected_upgrades.size()
+		and defeated_enemies > 0
+	)
+
+func _boss_two_phase_history_truthful() -> bool:
+	for transition in boss_transition_history:
+		if String(transition.get("event", "")) == "bellkeeper_phase_shifted" and int(transition.get("phase", 0)) >= 2 and bool(transition.get("natural_transition", false)):
+			return true
+	return false
 
 func _record_retry_baseline(reason: String) -> void:
 	_retry_baseline_generation += 1
@@ -1609,9 +1635,36 @@ func _emit_snapshot() -> void:
 
 func _mcp_state() -> Dictionary:
 	var wave_state := wave_director.get_snapshot()
+	var profile_renderer: Dictionary = validation_profile_sample.get("renderer", {})
+	var profile_viewport: Dictionary = validation_profile_sample.get("viewport", {})
+	var profile_frame_ms: Dictionary = validation_profile_sample.get("frame_ms", {})
+	var profile_cohort: Dictionary = validation_profile_sample.get("cohort", {})
+	var profile_qualification: Dictionary = validation_profile_sample.get("qualification", {})
+	var cycle_comparison := _profile_cycle_comparison()
 	return {
+		"run_state":run_state, "run_serial":run_serial, "run_elapsed":run_elapsed,
+		"profile_status":validation_profile_sample.get("status", "idle"),
+		"profile_sample_kind":validation_profile_sample.get("sample_kind", ""),
+		"profile_p50_ms":profile_frame_ms.get("p50", 0.0),
+		"profile_p95_ms":profile_frame_ms.get("p95", 0.0),
+		"profile_p99_ms":profile_frame_ms.get("p99", 0.0),
+		"profile_worst_ms":profile_frame_ms.get("worst", 0.0),
+		"profile_renderer_classification":profile_renderer.get("classification", "unknown"),
+		"profile_hardware_eligible":profile_renderer.get("hardware_qualification_eligible", false),
+		"profile_viewport_width":profile_viewport.get("width", 0),
+		"profile_viewport_height":profile_viewport.get("height", 0),
+		"profile_requested_enemies":profile_cohort.get("requested", validation_profile_sample.get("requested_enemy_workload", 0)),
+		"profile_start_enemies":profile_cohort.get("start", validation_profile_sample.get("start_enemy_workload", 0)),
+		"profile_minimum_enemies":profile_cohort.get("minimum", validation_profile_sample.get("minimum_enemy_workload", 0)),
+		"profile_end_enemies":profile_cohort.get("end_live", validation_profile_sample.get("end_enemy_workload", 0)),
+		"profile_qualified":profile_qualification.get("qualified", false),
+		"profile_completed_cycles":cycle_comparison.get("completed_cycle_count", 0),
+		"profile_three_cycle_no_growth":cycle_comparison.get("three_cycle_no_growth", false),
+		"ordinary_wave_ids":wave_state.get("ordinary_route_wave_ids", []),
+		"ordinary_diagnostic_jumps":wave_state.get("diagnostic_jump_count", 0),
+		"ordinary_natural_progression_truthful":_ordinary_progression_truthful(),
+		"ordinary_boss_two_phase_truthful":_boss_two_phase_history_truthful(),
 		"authoritative_teardown":teardown_receipt,
-		"run_state": run_state, "run_serial": run_serial, "run_elapsed": run_elapsed,
 		"experience": experience, "experience_threshold": experience_threshold, "level": level,
 		"defeated_enemies": defeated_enemies, "damage_taken": damage_taken,
 		"damage_dealt":damage_dealt,"outcome":outcome,"selected_upgrade_count":selected_upgrades.size(),
@@ -1640,7 +1693,7 @@ func _mcp_state() -> Dictionary:
 		"validation_profile":validation_profile_receipt,
 		"validation_profile_sample":validation_profile_sample,
 		"validation_profile_cycles":validation_profile_cycles,
-		"validation_profile_cycle_comparison":_profile_cycle_comparison(),
+		"validation_profile_cycle_comparison":cycle_comparison,
 		"validation_controls":_validation_controls_receipt(),
 		"validation_retry_baselines":validation_retry_baselines,
 		"ordinary_victory_receipt":ordinary_victory_receipt,
