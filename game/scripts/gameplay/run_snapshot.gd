@@ -6,6 +6,8 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 	var health_maximum := float(health.maximum_health) if health else 0.0
 	var wave_snapshot: Dictionary = controller.wave_director.get_snapshot()
 	var wave_definition: Dictionary = wave_snapshot.get("definition", {})
+	var ledger_snapshot: Dictionary = controller.complete_run_ledger.get_snapshot() if controller.complete_run_ledger else {}
+	var ledger_matrix: Dictionary = ledger_snapshot.get("matrix", {})
 	return {
 		"serial": int(controller.run_serial),
 		"state": String(controller.run_state),
@@ -69,7 +71,10 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 		"ordinary_victory_receipt":controller.ordinary_victory_receipt.duplicate(true),
 		"tester_victory_fixture":controller.tester_victory_fixture_receipt.duplicate(true),
 		"warden_hat_isolation":warden.hat_isolation_receipt.duplicate(true) if warden else {},
-		"complete_run_ledger":controller.complete_run_ledger.get_snapshot() if controller.complete_run_ledger else {},
+		"complete_run_ledger":ledger_snapshot,
+		"complete_run_row_qualifications":(ledger_matrix.get("row_qualifications", []) as Array).duplicate(true),
+		"complete_run_build_shape_rows":(ledger_matrix.get("ordinary_build_shape_rows", {}) as Dictionary).duplicate(true),
+		"complete_run_remaining_matrix_cells":(ledger_matrix.get("remaining_matrix_cells", []) as Array).duplicate(),
 		"validation_profile_matrix":controller._profile_matrix_snapshot(),
 		"world_active": world.session_active if world else false,
 	}

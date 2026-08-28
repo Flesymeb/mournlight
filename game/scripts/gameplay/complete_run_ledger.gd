@@ -6,6 +6,7 @@ const PROVENANCE_MANIFEST := "res://ASSET_PROVENANCE.json"
 const PROVENANCE_SHA256 := "52bc131684c5d02a8541962e9a983fc7d39062a3db906a7465dc41af99b7babc"
 const MAX_SESSION_ROWS := 10
 const MAX_DIAGNOSTIC_EVENTS := 24
+const BUILD_SHAPES := ["focused_lantern", "close_gravespade", "orbiting_wisps"]
 
 var current_run: Dictionary = {}
 var completed_rows: Array[Dictionary] = []
@@ -35,6 +36,7 @@ func begin_run(run_serial: int, route_kind: String, started_from: String) -> voi
 		"retry_observed":false,
 		"title_return_observed":false,
 		"replay_observed":false,
+		"replay_observed_count":0,
 	}
 
 func record_wave(snapshot: Dictionary, elapsed: float, route_kind: String) -> void:
@@ -143,6 +145,8 @@ func get_snapshot() -> Dictionary:
 func _evaluate_matrix(rows: Array, credits: Array) -> Dictionary:
 	var shapes: Array[String] = []
 	var shape_rows: Dictionary = {}
+	var row_qualifications: Array[Dictionary] = []
+	var seen_run_serials: Dictionary = {}
 	var failure_retry := false
 	var failure_row_serial := -1
 	var victory_replay := false
@@ -151,17 +155,30 @@ func _evaluate_matrix(rows: Array, credits: Array) -> Dictionary:
 		var row: Dictionary = row_value
 		var terminal: Dictionary = row.get("terminal", {})
 		var run_serial := int(row.get("run_serial", -1))
+		var repeated_run_serial := seen_run_serials.has(run_serial)
+		seen_run_serials[run_serial] = true
 		var result_matches := bool(row.get("result_presented", false)) and String(row.get("result_outcome", "")) == String(terminal.get("outcome", ""))
-		if not failure_retry and bool(terminal.get("ordinary_failure_eligible", false)) and result_matches and bool(row.get("retry_observed", false)):
+		var qualification := _row_qualification(row, repeated_run_serial)
+		var shape := String(qualification.get("build_shape", ""))
+		var matrix_accepted := false
+		var matrix_rejection_reason := String(qualification.get("rejection_reason", ""))
+		if bool(qualification.get("success_qualified", false)):
+			if shape_rows.has(shape):
+				matrix_rejection_reason = "build_shape_already_filled"
+			else:
+				shapes.append(shape)
+				shape_rows[shape] = run_serial
+				matrix_accepted = true
+		qualification["matrix_accepted"] = matrix_accepted
+		qualification["matrix_rejection_reason"] = matrix_rejection_reason
+		row_qualifications.append(qualification)
+		if not repeated_run_serial and not failure_retry and _ordinary_failure_eligible(terminal) and result_matches and bool(row.get("retry_observed", false)):
 			failure_retry = true
 			failure_row_serial = run_serial
-		if not victory_replay and bool(terminal.get("ordinary_victory_eligible", false)) and result_matches and bool(row.get("replay_observed", false)):
+		var replay_count := int(row.get("replay_observed_count", 1 if bool(row.get("replay_observed", false)) else 0))
+		if not repeated_run_serial and not victory_replay and _ordinary_victory_eligible(terminal) and result_matches and replay_count == 1:
 			victory_replay = true
 			victory_row_serial = run_serial
-		var shape := String(terminal.get("build_shape", ""))
-		if bool(terminal.get("ordinary_build_eligible", false)) and shape in ["focused_lantern", "close_gravespade", "orbiting_wisps"] and not shape_rows.has(shape):
-			shapes.append(shape)
-			shape_rows[shape] = run_serial
 	var credits_traversed := false
 	for credit_value in credits:
 		var credit: Dictionary = credit_value
@@ -182,9 +199,42 @@ func _evaluate_matrix(rows: Array, credits: Array) -> Dictionary:
 		"ordinary_build_shapes":shapes,
 		"ordinary_build_shape_rows":shape_rows,
 		"distinct_build_row_count":shape_rows.size(),
+		"row_qualifications":row_qualifications,
 		"credits_traversed":credits_traversed,
 		"missing_rows":missing,
+		"remaining_matrix_cells":missing.duplicate(),
 		"complete":missing.is_empty(),
+	}
+
+func _row_qualification(row: Dictionary, repeated_run_serial: bool) -> Dictionary:
+	var terminal: Dictionary = row.get("terminal", {})
+	var result_presented := bool(row.get("result_presented", false))
+	var terminal_outcome := String(terminal.get("outcome", ""))
+	var result_outcome := String(row.get("result_outcome", ""))
+	var result_matches := result_presented and result_outcome == terminal_outcome
+	var rejection_reasons := _victory_rejection_reasons(terminal)
+	var build_shape := String(terminal.get("build_shape", "unclassified"))
+	if build_shape not in BUILD_SHAPES:
+		rejection_reasons.append("build_shape_%s" % build_shape)
+	if (terminal.get("weapon_ranks", []) as Array).is_empty():
+		rejection_reasons.append("no_equipped_weapon_ranks")
+	if not result_presented:
+		rejection_reasons.append("result_not_presented")
+	elif not result_matches:
+		rejection_reasons.append("result_outcome_mismatch")
+	if repeated_run_serial:
+		rejection_reasons.append("repeated_run_serial")
+	return {
+		"run_serial":int(row.get("run_serial", -1)),
+		"outcome":terminal_outcome,
+		"route_kind":String(terminal.get("route_kind", "")),
+		"route_eligible":_ordinary_victory_eligible(terminal),
+		"build_shape":build_shape,
+		"success_qualified":rejection_reasons.is_empty(),
+		"result_presented":result_presented,
+		"result_matches_terminal":result_matches,
+		"rejection_reason":"qualified" if rejection_reasons.is_empty() else String(rejection_reasons[0]),
+		"rejection_reasons":rejection_reasons,
 	}
 
 func _append_completed_row() -> void:
@@ -207,9 +257,11 @@ func _mark_prior_replay_if_applicable(next_run_serial: int, started_from: String
 		return
 	for index in range(completed_rows.size() - 1, -1, -1):
 		var terminal: Dictionary = completed_rows[index].get("terminal", {})
-		if bool(terminal.get("ordinary_victory_eligible", false)) and int(completed_rows[index].get("run_serial", -1)) < next_run_serial:
+		var result_matches := bool(completed_rows[index].get("result_presented", false)) and String(completed_rows[index].get("result_outcome", "")) == String(terminal.get("outcome", ""))
+		if _ordinary_victory_eligible(terminal) and result_matches and not bool(completed_rows[index].get("replay_observed", false)) and int(completed_rows[index].get("run_serial", -1)) < next_run_serial:
 			completed_rows[index]["replay_observed"] = true
 			completed_rows[index]["replay_run_serial"] = next_run_serial
+			completed_rows[index]["replay_observed_count"] = 1
 			return
 
 func _accepts_ordinary(route_kind: String, snapshot: Dictionary) -> bool:
@@ -221,18 +273,21 @@ func _record_diagnostic(event: String, elapsed: float, payload: Dictionary) -> v
 		diagnostic_events.pop_front()
 
 func _ordinary_victory_eligible(terminal: Dictionary) -> bool:
-	return (
-		String(terminal.get("outcome", "")) == "victory"
-		and String(terminal.get("route_kind", "")) == "ordinary"
-		and int(terminal.get("diagnostic_jump_count", -1)) == 0
-		and Array(terminal.get("ordered_wave_ids", [])) == EXPECTED_WAVES
-		and float(terminal.get("elapsed", 0.0)) >= 420.0
-		and float(terminal.get("elapsed", 0.0)) <= 600.0
-		and int(terminal.get("commit_count", 0)) == 1
-		and bool(terminal.get("ordinary_route_eligible", false))
-		and bool(terminal.get("truthful_result_fields", false))
-		and _terminal_has_two_phase_bellkeeper_defeat(terminal)
-	)
+	return _victory_rejection_reasons(terminal).is_empty()
+
+func _victory_rejection_reasons(terminal: Dictionary) -> Array[String]:
+	var reasons: Array[String] = []
+	if String(terminal.get("outcome", "")) != "victory": reasons.append("outcome_not_victory")
+	if String(terminal.get("route_kind", "")) != "ordinary": reasons.append("route_not_ordinary")
+	if int(terminal.get("diagnostic_jump_count", -1)) != 0: reasons.append("diagnostic_route")
+	if Array(terminal.get("ordered_wave_ids", [])) != EXPECTED_WAVES: reasons.append("ordered_five_wave_route_incomplete")
+	var elapsed := float(terminal.get("elapsed", 0.0))
+	if elapsed < 420.0 or elapsed > 600.0: reasons.append("elapsed_outside_420_600")
+	if int(terminal.get("commit_count", 0)) != 1: reasons.append("terminal_commit_count_not_one")
+	if not bool(terminal.get("ordinary_route_eligible", false)): reasons.append("ordinary_route_not_eligible")
+	if not bool(terminal.get("truthful_result_fields", false)): reasons.append("truthful_result_fields_missing")
+	if not _terminal_has_two_phase_bellkeeper_defeat(terminal): reasons.append("natural_two_phase_bellkeeper_defeat_missing")
+	return reasons
 
 func _ordinary_failure_eligible(terminal: Dictionary) -> bool:
 	return (
@@ -245,11 +300,8 @@ func _ordinary_failure_eligible(terminal: Dictionary) -> bool:
 
 func _ordinary_build_eligible(terminal: Dictionary) -> bool:
 	return (
-		String(terminal.get("route_kind", "")) == "ordinary"
-		and int(terminal.get("diagnostic_jump_count", -1)) == 0
-		and int(terminal.get("commit_count", 0)) == 1
-		and bool(terminal.get("truthful_result_fields", false))
-		and String(terminal.get("build_shape", "")) in ["focused_lantern", "close_gravespade", "orbiting_wisps"]
+		_ordinary_victory_eligible(terminal)
+		and String(terminal.get("build_shape", "")) in BUILD_SHAPES
 		and not (terminal.get("weapon_ranks", []) as Array).is_empty()
 	)
 
@@ -268,40 +320,98 @@ func _terminal_has_two_phase_bellkeeper_defeat(terminal: Dictionary) -> bool:
 	return phase_two and defeated
 
 func _run_contract_checks() -> Dictionary:
-	var failure_terminal := {"outcome":"failure","ordinary_failure_eligible":true,"ordinary_victory_eligible":false,"ordinary_build_eligible":false,"build_shape":"unclassified"}
-	var victory_terminal := {"outcome":"victory","ordinary_failure_eligible":false,"ordinary_victory_eligible":true,"ordinary_build_eligible":true,"build_shape":"focused_lantern"}
-	var repeated_shape_terminal := victory_terminal.duplicate(true)
-	repeated_shape_terminal["ordinary_victory_eligible"] = false
-	var build_gravespade := {"outcome":"failure","ordinary_failure_eligible":false,"ordinary_victory_eligible":false,"ordinary_build_eligible":true,"build_shape":"close_gravespade"}
-	var build_wisps := {"outcome":"failure","ordinary_failure_eligible":false,"ordinary_victory_eligible":false,"ordinary_build_eligible":true,"build_shape":"orbiting_wisps"}
-	var diagnostic_terminal := {"outcome":"victory","ordinary_failure_eligible":false,"ordinary_victory_eligible":false,"ordinary_build_eligible":false,"build_shape":"focused_lantern"}
+	var live_rows_before := completed_rows.duplicate(true)
+	var failure_terminal := _contract_terminal("failure", "close_gravespade")
+	var lantern_victory := _contract_terminal("victory", "focused_lantern")
+	var gravespade_victory := _contract_terminal("victory", "close_gravespade")
+	var wisps_victory := _contract_terminal("victory", "orbiting_wisps")
+	var diagnostic_terminal := _contract_terminal("victory", "focused_lantern")
+	diagnostic_terminal["diagnostic_jump_count"] = 1
+	diagnostic_terminal["ordinary_route_eligible"] = false
+	var tied_terminal := _contract_terminal("victory", "mixed")
+	var unclassified_terminal := _contract_terminal("victory", "unclassified")
+	var incomplete_terminal := _contract_terminal("victory", "focused_lantern")
+	incomplete_terminal["ordered_wave_ids"] = EXPECTED_WAVES.slice(0, 4)
+	incomplete_terminal["ordinary_route_eligible"] = false
 	var credit := {"shell_mode":"credits","visible_surface_observed":true,"provenance_bound":true}
 	var failure_matrix := _evaluate_matrix([{"run_serial":1,"terminal":failure_terminal,"result_presented":true,"result_outcome":"failure","retry_observed":true}], [])
-	var repeated_replay_matrix := _evaluate_matrix([
-		{"run_serial":2,"terminal":repeated_shape_terminal,"result_presented":true,"result_outcome":"victory","replay_observed":false},
-		{"run_serial":3,"terminal":victory_terminal,"result_presented":true,"result_outcome":"victory","replay_observed":true},
+	var failed_build_matrix := _evaluate_matrix([{"run_serial":2,"terminal":failure_terminal,"result_presented":true,"result_outcome":"failure","retry_observed":true}], [])
+	var repeated_serial_matrix := _evaluate_matrix([
+		{"run_serial":3,"terminal":lantern_victory,"result_presented":true,"result_outcome":"victory"},
+		{"run_serial":3,"terminal":gravespade_victory,"result_presented":true,"result_outcome":"victory"},
 	], [])
+	var diagnostic_matrix := _evaluate_matrix([{"run_serial":6,"terminal":diagnostic_terminal,"result_presented":true,"result_outcome":"victory"}], [])
+	var tied_matrix := _evaluate_matrix([{"run_serial":7,"terminal":tied_terminal,"result_presented":true,"result_outcome":"victory"}], [])
+	var mismatch_matrix := _evaluate_matrix([{"run_serial":8,"terminal":wisps_victory,"result_presented":true,"result_outcome":"failure"}], [])
+	var unclassified_matrix := _evaluate_matrix([{"run_serial":9,"terminal":unclassified_terminal,"result_presented":true,"result_outcome":"victory"}], [])
+	var incomplete_matrix := _evaluate_matrix([{"run_serial":10,"terminal":incomplete_terminal,"result_presented":true,"result_outcome":"victory"}], [])
 	var complete_matrix := _evaluate_matrix([
 		{"run_serial":1,"terminal":failure_terminal,"result_presented":true,"result_outcome":"failure","retry_observed":true},
-		{"run_serial":3,"terminal":victory_terminal,"result_presented":true,"result_outcome":"victory","replay_observed":true},
-		{"run_serial":4,"terminal":build_gravespade,"result_presented":true,"result_outcome":"failure"},
-		{"run_serial":5,"terminal":build_wisps,"result_presented":true,"result_outcome":"failure"},
-		{"run_serial":6,"terminal":diagnostic_terminal,"result_presented":true,"result_outcome":"victory","retry_observed":true,"replay_observed":true},
+		{"run_serial":3,"terminal":lantern_victory,"result_presented":true,"result_outcome":"victory","replay_observed":true,"replay_observed_count":1},
+		{"run_serial":4,"terminal":gravespade_victory,"result_presented":true,"result_outcome":"victory"},
+		{"run_serial":5,"terminal":wisps_victory,"result_presented":true,"result_outcome":"victory"},
 	], [credit])
 	var missing_matrix := _evaluate_matrix([], [])
+	var live_rows_unchanged := completed_rows == live_rows_before
+	var all_checks := (
+		bool(failure_matrix.get("failure_result_retry", false))
+		and int(failed_build_matrix.get("distinct_build_row_count", -1)) == 0
+		and int(repeated_serial_matrix.get("distinct_build_row_count", -1)) == 1
+		and int(diagnostic_matrix.get("distinct_build_row_count", -1)) == 0
+		and int(tied_matrix.get("distinct_build_row_count", -1)) == 0
+		and int(mismatch_matrix.get("distinct_build_row_count", -1)) == 0
+		and int(unclassified_matrix.get("distinct_build_row_count", -1)) == 0
+		and int(incomplete_matrix.get("distinct_build_row_count", -1)) == 0
+		and int(complete_matrix.get("distinct_build_row_count", 0)) == 3
+		and bool(complete_matrix.get("complete", false))
+		and (missing_matrix.get("missing_rows", []) as Array).size() == 6
+		and live_rows_unchanged
+	)
 	return {
-		"identity":"mournlight.complete_run_predicate_checks.v1",
+		"identity":"mournlight.complete_run_predicate_checks.v2",
 		"failure_then_retry_independent":bool(failure_matrix.get("failure_result_retry", false)) and not bool(failure_matrix.get("victory_result_replay", false)),
-		"repeated_shape_does_not_suppress_replay":bool(repeated_replay_matrix.get("victory_result_replay", false)),
+		"failure_shaped_build_rejected":int(failed_build_matrix.get("distinct_build_row_count", -1)) == 0,
+		"repeated_run_serial_rejected":int(repeated_serial_matrix.get("distinct_build_row_count", -1)) == 1,
+		"tied_build_rejected":int(tied_matrix.get("distinct_build_row_count", -1)) == 0,
+		"unclassified_build_rejected":int(unclassified_matrix.get("distinct_build_row_count", -1)) == 0,
+		"incomplete_route_rejected":int(incomplete_matrix.get("distinct_build_row_count", -1)) == 0,
+		"mismatched_result_rejected":int(mismatch_matrix.get("distinct_build_row_count", -1)) == 0,
 		"three_distinct_build_rows":int(complete_matrix.get("distinct_build_row_count", 0)) == 3,
-		"diagnostic_row_excluded":int((complete_matrix.get("ordinary_build_shape_rows", {}) as Dictionary).get("focused_lantern", -1)) == 3,
+		"three_distinct_successful_victory_rows":int(complete_matrix.get("distinct_build_row_count", 0)) == 3 and bool(complete_matrix.get("victory_result_replay", false)),
+		"diagnostic_row_excluded":int(diagnostic_matrix.get("distinct_build_row_count", -1)) == 0,
 		"credits_independent_and_bound":bool(complete_matrix.get("credits_traversed", false)),
 		"explicit_missing_rows":(missing_matrix.get("missing_rows", []) as Array).size() == 6,
-		"all_checks_pass":bool(failure_matrix.get("failure_result_retry", false)) and bool(repeated_replay_matrix.get("victory_result_replay", false)) and bool(complete_matrix.get("complete", false)) and (missing_matrix.get("missing_rows", []) as Array).size() == 6,
-		"session_mutated":false,
+		"all_checks_pass":all_checks,
+		"session_mutated":not live_rows_unchanged,
 		"rows_injected":0,
 		"ordinary_completion_substitute":false,
 	}
+
+func _contract_terminal(outcome: String, build_shape: String) -> Dictionary:
+	var weapon_id := "warden_lantern"
+	if build_shape == "close_gravespade": weapon_id = "gravespade"
+	elif build_shape == "orbiting_wisps": weapon_id = "wandering_wisps"
+	var terminal := {
+		"outcome":outcome,
+		"route_kind":"ordinary",
+		"diagnostic_jump_count":0,
+		"ordered_wave_ids":EXPECTED_WAVES.duplicate(),
+		"elapsed":480.0,
+		"commit_count":1,
+		"ordinary_route_eligible":outcome == "victory",
+		"level":12,
+		"defeated":140,
+		"damage_dealt":2400,
+		"damage_taken":48,
+		"selected_upgrades":[],
+		"weapons":{},
+		"weapon_ranks":[{"weapon_id":weapon_id,"rank":5}],
+		"build_shape":build_shape,
+		"boss_transition_history":[{"event":"bellkeeper_phase_shifted","phase":2,"natural_transition":true}],
+		"ledger_boss_events":[{"event":"bellkeeper_defeated","defeat_committed":true}],
+	}
+	terminal["truthful_result_fields"] = _truthful_result_fields(terminal)
+	return terminal
 
 func _truthful_result_fields(terminal: Dictionary) -> bool:
 	return terminal.has_all(["elapsed","level","defeated","damage_dealt","damage_taken","selected_upgrades","outcome","commit_count"])

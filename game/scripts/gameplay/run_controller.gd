@@ -1345,16 +1345,27 @@ func _advance_profile_sample(delta: float) -> void:
 func _reset_final_profile() -> void:
 	if not OS.has_feature("editor"):
 		return
+	var source_run_serial := run_serial
+	var source_sample := validation_profile_sample.duplicate(true)
+	_validation_setup_generation += 1
+	var setup_generation := _validation_setup_generation
 	_profile_active = false
+	# Retire the public record immediately beside the active-owner flag. Any
+	# teardown callback or snapshot emitted below therefore sees one state.
+	validation_profile_sample = _profile_reset_sample(
+		source_sample,
+		source_run_serial,
+		run_serial + 1,
+		setup_generation,
+		"tester_final_profile_reset"
+	)
 	_profile_origin = ""
 	_profile_samples_ms.clear()
+	_profile_physics_samples_ms.clear()
 	_profile_elapsed = 0.0
 	spawner.end_validation_profile_cohort("profile_reset")
 	get_tree().paused = false
-	var source_run_serial := run_serial
 	var requested_counts := _profile_counts()
-	_validation_setup_generation += 1
-	var setup_generation := _validation_setup_generation
 	var retirement := _teardown_run("validation_profile_reset", "validation_profile_reset")
 	_next_baseline_reason = "validation_profile_reset"
 	_begin_run()
@@ -1365,6 +1376,11 @@ func _reset_final_profile() -> void:
 	input_router._sync_context()
 	var immediate_input_context := input_router.context
 	var counts := _profile_counts()
+	validation_profile_sample["run_serial"] = run_serial
+	validation_profile_sample["ordinary_run_counts"] = counts.duplicate(true)
+	validation_profile_sample["ordinary_run_state"] = run_state
+	validation_profile_sample["ordinary_input_context"] = immediate_input_context
+	validation_profile_sample["reset_phase"] = "ordinary_run_ready"
 	validation_profile_receipt = {
 		"accepted":true, "reset":true, "branch_id":"final_wave_bellkeeper_profile",
 		"source_run_serial":source_run_serial, "run_serial":run_serial, "setup_generation":setup_generation,
@@ -1385,6 +1401,42 @@ func _reset_final_profile() -> void:
 	_record_profile_cycle("reset_immediate", validation_profile_receipt)
 	_emit_snapshot()
 	call_deferred("_capture_profile_next_frame_isolation", setup_generation, run_serial)
+
+func _profile_reset_sample(source_sample: Dictionary, source_run_serial: int, next_run_serial: int, setup_generation: int, reason: String) -> Dictionary:
+	var source_status := String(source_sample.get("status", "idle"))
+	var source_branch := String(source_sample.get("branch_id", validation_profile_receipt.get("branch_id", "final_wave_bellkeeper_profile")))
+	return {
+		"status":"reset",
+		"retired":true,
+		"reset_reason":reason,
+		"reset_phase":"retired_before_ordinary_run",
+		"interrupted":source_status == "sampling",
+		"completed_before_reset":source_status == "complete",
+		"source_status":source_status,
+		"source_branch_id":source_branch,
+		"source_run_serial":source_run_serial,
+		"branch_id":source_branch,
+		"sample_kind":"reset",
+		"route_kind":"ordinary",
+		"run_serial":next_run_serial,
+		"setup_generation":setup_generation,
+		"active_workload_owner":false,
+		"requested_density":0,
+		"resolved_density":0,
+		"requested_enemy_workload":0,
+		"start_enemy_workload":0,
+		"minimum_enemy_workload":0,
+		"maximum_enemy_workload":0,
+		"end_enemy_workload":0,
+		"sample_count":0,
+		"window_seconds":0.0,
+		"cohort":{"requested":0,"start":0,"minimum":0,"maximum":0,"end_live":0,"replenished":0,"active":false},
+		"frame_ms":{"p50":0.0,"p95":0.0,"p99":0.0,"worst":0.0},
+		"physics_ms":{"p50":0.0,"p95":0.0,"p99":0.0,"worst":0.0},
+		"observation_work":{"sampled_frame_scene_scans":0,"sampled_frame_group_inventories":0,"sampled_frame_counter_read_count":0},
+		"qualification":{"qualified":false,"ordinary_route_qualified":false,"density_qualified":false,"reasons":["retired_by_profile_reset"]},
+		"reset_process_frame":Engine.get_process_frames(),
+	}
 
 func _capture_profile_next_frame_isolation(setup_generation: int, expected_run_serial: int) -> void:
 	await get_tree().process_frame
@@ -2155,8 +2207,10 @@ func _mcp_state() -> Dictionary:
 		"ledger_failure_result_retry":ledger_matrix.get("failure_result_retry", false),
 		"ledger_victory_result_replay":ledger_matrix.get("victory_result_replay", false),
 		"ledger_distinct_build_row_count":ledger_matrix.get("distinct_build_row_count", 0),
+		"ledger_build_shape_rows":ledger_matrix.get("ordinary_build_shape_rows", {}),
+		"ledger_row_qualifications":ledger_matrix.get("row_qualifications", []),
 		"ledger_credits_traversed":ledger_matrix.get("credits_traversed", false),
-		"ledger_missing_rows":ledger_matrix.get("missing_rows", []),
+		"ledger_missing_rows":ledger_matrix.get("remaining_matrix_cells", ledger_matrix.get("missing_rows", [])),
 		"authoritative_teardown":teardown_receipt,
 		"experience": experience, "experience_threshold": experience_threshold, "level": level,
 		"defeated_enemies": defeated_enemies, "damage_taken": damage_taken,
