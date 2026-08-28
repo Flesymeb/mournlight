@@ -66,6 +66,7 @@ var _validation_cohort_last_receipt: Dictionary = {}
 var _light_budget_refresh_remaining := 0.0
 var _light_budget_update_count := 0
 var _light_budget_skipped_frames := 0
+var _live_count := 0
 
 const LIGHT_BUDGET_REFRESH_SECONDS := 0.1
 
@@ -125,6 +126,7 @@ func stop_encounter() -> void:
 		if actor.state != "pooled":
 			actor.remove_from_group("active_enemies")
 			actor.return_to_pool()
+	_live_count = 0
 	_telegraph_waiting.clear()
 	_telegraph_owners.clear()
 	_role_light_owners.clear()
@@ -175,6 +177,7 @@ func reset_encounter(preserve_pressure: bool = false) -> void:
 	for actor in _pool:
 		actor.remove_from_group("active_enemies")
 		actor.return_to_pool()
+	_live_count = 0
 	neighbor_registry.clear()
 
 func _process(delta: float) -> void:
@@ -407,11 +410,7 @@ func _next_pooled_actor() -> EnemyActor:
 	return null
 
 func _active_count() -> int:
-	var count := 0
-	for actor in _pool:
-		if actor.state != "pooled":
-			count += 1
-	return count
+	return _live_count
 
 func request_telegraph_admission(actor: EnemyActor) -> bool:
 	if not active or not is_instance_valid(actor) or actor.state in ["pooled", "death"]:
@@ -541,10 +540,28 @@ func _on_reward_dropped(event: Dictionary) -> void:
 
 func _on_lifecycle_event(event: Dictionary) -> void:
 	last_lifecycle_event = event.duplicate(true)
+	match String(event.get("phase", "")):
+		"spawn": _live_count = mini(pool_size, _live_count + 1)
+		"pool_return": _live_count = maxi(0, _live_count - 1)
 	if active and String(event.get("phase", "")) in ["spawn", "telegraph", "damage", "hurt", "death", "pool_return", "retired"]:
 		_update_light_budget()
 		_light_budget_refresh_remaining = LIGHT_BUDGET_REFRESH_SECONDS
 	enemy_lifecycle.emit(last_lifecycle_event)
+
+func get_profile_counters() -> Dictionary:
+	var neighbor := neighbor_registry.get_snapshot() if is_instance_valid(neighbor_registry) else {}
+	return {
+		"live":_live_count,
+		"pooled":pool_size - _live_count,
+		"telegraph_active":_telegraph_owners.size(),
+		"telegraph_waiting":_telegraph_waiting.size(),
+		"role_lights":_role_light_owners.size(),
+		"hurt_lights":_hurt_light_owners.size(),
+		"active_lights":_role_light_owners.size() + _hurt_light_owners.size(),
+		"neighbor_candidate_visits":int(neighbor.get("candidate_visits", 0)),
+		"registered_neighbors":int(neighbor.get("registered_count", 0)),
+		"counter_source":"encounter_lifecycle_owners",
+	}
 
 func _emit_snapshot() -> void:
 	encounter_changed.emit(get_snapshot())

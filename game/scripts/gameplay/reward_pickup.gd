@@ -2,6 +2,7 @@ class_name RewardPickup
 extends Node3D
 
 signal collected(event: Dictionary)
+signal retired(event: Dictionary)
 
 @export var collection_radius := 1.15
 @export var lifetime_seconds := 20.0
@@ -13,8 +14,10 @@ var pickup_event: Dictionary = {}
 var target: Node3D
 var age := 0.0
 var _base_y := 0.0
+var _retired := false
 
 func configure(next_target: Node3D, event: Dictionary) -> void:
+	_retired = false
 	target = next_target
 	pickup_event = event.duplicate(true)
 	pickup_event["reward_value"] = maxi(1, int(pickup_event.get("reward_value", 1)))
@@ -50,12 +53,23 @@ func _process(delta: float) -> void:
 			pickup_event.collection_distance = planar.length()
 			pickup_event.collection_radius = resolved_collection_radius
 			collected.emit(pickup_event.duplicate(true))
+			_retire("collected")
 			remove_from_group(&"reward_pickup")
 			queue_free()
 			return
 	if age >= lifetime_seconds:
+		_retire("lifetime_expired")
 		remove_from_group(&"reward_pickup")
 		queue_free()
+
+func _exit_tree() -> void:
+	_retire("exit_tree")
+
+func _retire(reason: String) -> void:
+	if _retired:
+		return
+	_retired = true
+	retired.emit({"instance_id":get_instance_id(),"drop_id":pickup_event.get("drop_id", ""),"reason":reason})
 
 func _mcp_state() -> Dictionary:
 	var warden := target as WardenController

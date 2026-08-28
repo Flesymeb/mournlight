@@ -17,6 +17,9 @@ signal snapshot_changed(snapshot: Dictionary)
 @onready var draft_view: UpgradeDraftView = $Interface/UpgradeDraft
 @onready var audio_director: MournlightAudioDirector = $MournlightAudio
 @onready var input_router: InputContextRouter = $InputContextRouter
+@onready var lantern_runtime: WardenLanternRuntime = $World/Warden/Weapons/WardenLanternRuntime
+@onready var gravespade_runtime: GravespadeRuntime = $World/Warden/Weapons/GravespadeRuntime
+@onready var wisps_runtime: WanderingWispsRuntime = $World/Warden/Weapons/WanderingWispsRuntime
 const BELLKEEPER_SCENE := preload("res://scenes/enemies/bellkeeper.tscn")
 const REWARD_PICKUP_SCENE := preload("res://scenes/gameplay/reward_pickup.tscn")
 const MAX_ACTIVE_PICKUPS := 16
@@ -99,10 +102,18 @@ var complete_run_ledger: CompleteRunLedger
 var _profile_physics_samples_ms: Array[float] = []
 var _profile_advance_generation := 0
 var validation_profile_matrix_samples: Array[Dictionary] = []
+var _active_pickups: Dictionary = {}
+var _active_pickup_count := 0
+var _active_effect_count := 0
+var _profile_static_light_count := 0
+var _profile_setup_scene_scans := 0
+var _profile_sample_counter_reads := 0
+var _profile_gate_counter_reads := 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	complete_run_ledger = CompleteRunLedgerClass.new()
+	_profile_static_light_count = _bounded_static_light_snapshot()
 	shell.action_requested.connect(_on_shell_action)
 	title_menu.game_started.connect(start_run)
 	title_menu.game_exited.connect(_on_title_exit_requested)
@@ -249,6 +260,11 @@ func _begin_run() -> void:
 	_profile_arm_receipt.clear()
 	_profile_minimum_enemy_workload = 0
 	_profile_maximum_enemy_workload = 0
+	_profile_sample_counter_reads = 0
+	_profile_gate_counter_reads = 0
+	_active_pickups.clear()
+	_active_pickup_count = 0
+	_active_effect_count = 0
 	_transition("initializing")
 	run_serial += 1
 	complete_run_ledger.begin_run(run_serial, "ordinary", "retry" if _next_baseline_reason == "retry" else "title_play")
@@ -556,10 +572,18 @@ func _on_reward_pickup_collected(event: Dictionary) -> void:
 		_open_upgrade_draft()
 	_emit_snapshot()
 
+func _on_reward_pickup_retired(event: Dictionary) -> void:
+	var instance_id := int(event.get("instance_id", 0))
+	if _active_pickups.erase(instance_id):
+		_active_pickup_count = _active_pickups.size()
+
 func _spawn_reward_pickup(event: Dictionary) -> RewardPickup:
-	var active_pickups := get_tree().get_nodes_in_group(&"reward_pickup")
-	if active_pickups.size() >= MAX_ACTIVE_PICKUPS:
-		var merge_target := active_pickups.front() as RewardPickup
+	if _active_pickup_count >= MAX_ACTIVE_PICKUPS:
+		var merge_target: RewardPickup
+		for pickup_value in _active_pickups.values():
+			if is_instance_valid(pickup_value):
+				merge_target = pickup_value as RewardPickup
+				break
 		if is_instance_valid(merge_target):
 			merge_target.merge_reward(event)
 			pickup_spawned_total += 1
@@ -568,6 +592,9 @@ func _spawn_reward_pickup(event: Dictionary) -> RewardPickup:
 	world.add_child(pickup)
 	pickup.configure(warden, event)
 	pickup.collected.connect(_on_reward_pickup_collected)
+	pickup.retired.connect(_on_reward_pickup_retired)
+	_active_pickups[pickup.get_instance_id()] = pickup
+	_active_pickup_count = _active_pickups.size()
 	pickup_spawned_total += 1
 	return pickup
 
@@ -633,6 +660,9 @@ func _on_shell_action(action: StringName) -> void:
 func _on_title_page_requested(page: String) -> void:
 	_set_title_surface(false)
 	shell.set_mode(page)
+	if page == "credits":
+		complete_run_ledger.record_credits(run_serial, shell.mode)
+	_emit_snapshot()
 
 func _open_settings_page() -> void:
 	if run_state == "paused":
@@ -958,7 +988,7 @@ func _teardown_run(route: String, reason: String) -> Dictionary:
 		"world_active":world.session_active, "tree_paused":get_tree().paused,
 		"runtime_retirement":transient_retirement.get("runtime_retirement",{}),
 		"retired_attack_presentations":transient_retirement.get("retired_attack_presentations",0),
-		"remaining_attack_presentations":get_tree().get_nodes_in_group("friendly_attack").size(),
+		"remaining_attack_presentations":post_counts.get("projectiles", -1),
 		"audio_retirement":transient_retirement.get("audio_retirement",{}), "terminal_snapshot_preserved":not terminal_snapshot.is_empty(),
 		"presentation_reset":presentation_reset,
 		"reset_invariants":reset_invariants,
@@ -1014,16 +1044,19 @@ func _retire_transient_ownership(route: String, reason: String, generation: int)
 	spawner.stop_encounter()
 	var retired_attack_presentations := _retire_run_group("friendly_attack")
 	var retired_pickups := _retire_run_group("reward_pickup")
+	_active_pickups.clear()
+	_active_pickup_count = 0
 	var audio_retirement := audio_director.retire_run_ownership(route, generation)
+	var remaining_counts := _profile_counts()
 	return {
 		"route": route, "reason": reason, "generation": generation,
 		"runtime_retirement": runtime_retirement,
 		"retired_attack_presentations": retired_attack_presentations,
-		"remaining_attack_presentations": get_tree().get_nodes_in_group("friendly_attack").size(),
+		"remaining_attack_presentations":remaining_counts.get("projectiles", -1),
 		"retired_pickups":retired_pickups,
-		"remaining_pickups":get_tree().get_nodes_in_group("reward_pickup").size(),
+		"remaining_pickups":remaining_counts.get("pickups", -1),
 		"audio_retirement": audio_retirement,
-		"complete": bool(runtime_retirement.get("complete", false)) and get_tree().get_nodes_in_group("friendly_attack").is_empty() and get_tree().get_nodes_in_group("reward_pickup").is_empty(),
+		"complete":bool(runtime_retirement.get("complete", false)) and int(remaining_counts.get("projectiles", -1)) == 0 and int(remaining_counts.get("pickups", -1)) == 0,
 	}
 
 func _retire_run_group(group_name: StringName) -> int:
@@ -1128,6 +1161,7 @@ func _advance_final_profile() -> void:
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
 	_profile_elapsed = 0.0
+	_profile_sample_counter_reads = 0
 	_profile_active = true
 	_profile_origin = "diagnostic_prepared"
 	_profile_advance_generation += 1
@@ -1173,6 +1207,7 @@ func _arm_passive_ordinary_profile(wave_snapshot: Dictionary) -> void:
 	validation_profile_receipt = _profile_arm_receipt.duplicate(true)
 
 func _representative_system_gate() -> Dictionary:
+	_profile_gate_counter_reads += 1
 	var counts := _profile_counts()
 	var animation := warden.animation_binding.get_snapshot() if warden.animation_binding else {}
 	var audio := audio_director._mcp_state()
@@ -1197,7 +1232,7 @@ func _try_begin_passive_ordinary_profile() -> void:
 	if run_route_kind != "ordinary" or int(wave_snapshot.get("wave", 0)) != 5 or int(wave_snapshot.get("diagnostic_jump_count", 0)) != 0:
 		_profile_armed = false
 		return
-	var live_density := int(spawner.get_snapshot().get("live", 0))
+	var live_density := int(spawner.get_profile_counters().get("live", 0))
 	var systems := _representative_system_gate()
 	_profile_arm_receipt["observed_density"] = live_density
 	_profile_arm_receipt["representative_systems"] = systems.duplicate(true)
@@ -1207,6 +1242,7 @@ func _try_begin_passive_ordinary_profile() -> void:
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
 	_profile_elapsed = 0.0
+	_profile_sample_counter_reads = 0
 	_profile_active = true
 	_profile_origin = "ordinary_final_wave_passive"
 	_profile_start_counts = _profile_counts()
@@ -1233,7 +1269,8 @@ func _try_begin_passive_ordinary_profile() -> void:
 func _advance_profile_sample(delta: float) -> void:
 	if not _profile_active or get_tree().paused:
 		return
-	var live_density := int(spawner.get_snapshot().get("live", 0))
+	_profile_sample_counter_reads += 1
+	var live_density := int(spawner.get_profile_counters().get("live", 0))
 	if _profile_samples_ms.is_empty():
 		_profile_minimum_enemy_workload = live_density
 		_profile_maximum_enemy_workload = live_density
@@ -1254,6 +1291,7 @@ func _advance_profile_sample(delta: float) -> void:
 	var sample_branch := String(validation_profile_sample.get("branch_id", ""))
 	var sample_setup_generation := int(validation_profile_sample.get("setup_generation", _validation_setup_generation))
 	var cohort := spawner.end_validation_profile_cohort("sample_complete") if _profile_origin.begins_with("diagnostic_") else {}
+	var end_counts := _profile_counts()
 	validation_profile_sample = {
 		"status":"complete", "branch_id":sample_branch,
 		"sample_kind":_profile_origin, "route_kind":run_route_kind,
@@ -1269,7 +1307,7 @@ func _advance_profile_sample(delta: float) -> void:
 		"frame_ms":{"p50":_percentile(sorted,0.50),"p95":_percentile(sorted,0.95),"p99":_percentile(sorted,0.99),"worst":sorted.back() if not sorted.is_empty() else 0.0},
 		"physics_ms":{"p50":_percentile(sorted_physics,0.50),"p95":_percentile(sorted_physics,0.95),"p99":_percentile(sorted_physics,0.99),"worst":sorted_physics.back() if not sorted_physics.is_empty() else 0.0},
 		"start_counts":_profile_start_counts.duplicate(true),
-		"end_counts":_profile_counts(), "counts":_profile_counts(),
+		"end_counts":end_counts.duplicate(true), "counts":end_counts.duplicate(true),
 		"start_lifecycle":_profile_start_lifecycle.duplicate(true),
 		"end_lifecycle":_lifecycle_counters(),
 		"cohort":cohort,
@@ -1277,13 +1315,14 @@ func _advance_profile_sample(delta: float) -> void:
 		"start_enemy_workload":int(cohort.get("start", _profile_start_counts.get("enemies", 0))),
 		"minimum_enemy_workload":int(cohort.get("minimum", _profile_minimum_enemy_workload)),
 		"maximum_enemy_workload":int(cohort.get("requested", _profile_maximum_enemy_workload)),
-		"end_enemy_workload":int(cohort.get("end_live", _profile_counts().get("enemies", 0))),
+		"end_enemy_workload":int(cohort.get("end_live", end_counts.get("enemies", 0))),
 		"replenished_enemy_count":int(cohort.get("replenished", 0)),
 		"viewport":_profile_viewport_receipt(),
 		"renderer":_profile_renderer_receipt(),
 		"wave_end":wave_director.get_snapshot().duplicate(true),
 		"work_caps":_dense_work_caps(spawner.get_snapshot()),
 		"workload_end":_profile_workload_receipt(spawner.get_snapshot()),
+		"observation_work":_profile_observation_work_receipt(),
 	}
 	validation_profile_sample["qualification"] = _profile_qualification(validation_profile_sample)
 	_record_profile_matrix_sample(validation_profile_sample)
@@ -1521,29 +1560,45 @@ func _profile_weapon_ranks() -> Array[Dictionary]:
 	return result
 
 func _profile_counts() -> Dictionary:
-	var encounter := spawner.get_snapshot()
-	var wisps: WanderingWispsRuntime = $World/Warden/Weapons/WanderingWispsRuntime
-	var lights := 0
-	for node in world.find_children("*","Light3D",true,false):
-		if node is Light3D and node.is_visible_in_tree():
-			lights += 1
-	var audio_voices := 0
-	audio_voices = audio_director.active_effect_voice_count()
+	var encounter := spawner.get_profile_counters()
+	var projectile_count := lantern_runtime.active_presentation_count + gravespade_runtime.active_presentation_count + wisps_runtime.active_wisp_count
+	var lights := _profile_static_light_count + int(encounter.get("active_lights", 0)) + _active_pickup_count + wisps_runtime.active_wisp_count + (1 if is_instance_valid(boss) else 0)
+	var audio_voices := audio_director.active_effect_voice_count()
 	return {
 		"enemies":int(encounter.get("live",0)),
 		"pooled_enemies":int(encounter.get("pooled",0)),
 		"bosses":1 if is_instance_valid(boss) else 0,
-		"projectiles":get_tree().get_nodes_in_group("friendly_attack").size(),
-		"pickups":get_tree().get_nodes_in_group("reward_pickup").size(),
+		"projectiles":projectile_count,
+		"pickups":_active_pickup_count,
 		"pickup_production_ready":spawner.reward_dropped.is_connected(_on_reward_dropped),
-		"effects":get_tree().get_nodes_in_group("impact_effect").size(),
+		"effects":_active_effect_count,
 		"lights":lights, "audio_voices":audio_voices,
-		"telegraph_active":int((encounter.get("telegraph_admission",{}) as Dictionary).get("active",0)),
-		"neighbor_candidate_visits":int((encounter.get("neighbor_registry",{}) as Dictionary).get("candidate_visits",0)),
-		"registered_neighbors":int((encounter.get("neighbor_registry",{}) as Dictionary).get("registered_count",0)),
-		"wisp_handles":wisps.active_wisp_count,
-		"wisp_interval_targets":wisps._target_next_hit_time.size(),
+		"telegraph_active":int(encounter.get("telegraph_active", 0)),
+		"neighbor_candidate_visits":int(encounter.get("neighbor_candidate_visits", 0)),
+		"registered_neighbors":int(encounter.get("registered_neighbors", 0)),
+		"wisp_handles":wisps_runtime.active_wisp_count,
+		"wisp_interval_targets":wisps_runtime._target_next_hit_time.size(),
 		"active_attack_ledgers":world.attack_runtime._hit_ledgers.size(),
+		"counter_source":"lifecycle_owners",
+	}
+
+func _bounded_static_light_snapshot() -> int:
+	_profile_setup_scene_scans += 1
+	var count := 0
+	for node in world.find_children("*", "Light3D", true, false):
+		if node is Light3D and node.is_visible_in_tree():
+			count += 1
+	return count
+
+func _profile_observation_work_receipt() -> Dictionary:
+	return {
+		"bounded_setup_scene_scans":_profile_setup_scene_scans,
+		"sampled_frame_scene_scans":0,
+		"sampled_frame_group_inventories":0,
+		"sampled_frame_counter_read_count":_profile_sample_counter_reads,
+		"arming_gate_counter_read_count":_profile_gate_counter_reads,
+		"counter_sources":["encounter_lifecycle_owners","weapon_presentation_owners","reward_pickup_owners","audio_fixed_voice_pool","wisp_runtime_owners"],
+		"setup_and_finalization_excluded_from_frame_samples":true,
 	}
 
 func _profile_viewport_receipt() -> Dictionary:
@@ -1642,13 +1697,14 @@ func _profile_workload_receipt(encounter: Dictionary) -> Dictionary:
 	var audio_state := audio_director._mcp_state()
 	var attack_state := world.attack_runtime._mcp_state()
 	var light_budget: Dictionary = encounter.get("ordinary_light_budget", {})
+	var counts := _profile_counts()
 	return {
 		"role_composition":(encounter.get("roles", {}) as Dictionary).duplicate(true),
 		"active_and_pooled":{"active":encounter.get("live", 0),"pooled":encounter.get("pooled", 0)},
 		"attacks":{"authorized":attack_state.get("authorized_count", 0),"hits":attack_state.get("hit_count", 0),"active_ledgers":attack_state.get("active_ledgers", 0)},
-		"projectiles":get_tree().get_nodes_in_group("friendly_attack").size(),
-		"pickups":get_tree().get_nodes_in_group("reward_pickup").size(),
-		"effects":get_tree().get_nodes_in_group("impact_effect").size(),
+		"projectiles":counts.get("projectiles", 0),
+		"pickups":counts.get("pickups", 0),
+		"effects":counts.get("effects", 0),
 		"audio":{"active_voices":audio_state.get("active_effect_voices", 0),"active_by_owner":(audio_state.get("active_by_owner", {}) as Dictionary).duplicate(true),"voice_limit":audio_state.get("voice_limit", 0)},
 		"neighbor_work":(encounter.get("neighbor_registry", {}) as Dictionary).duplicate(true),
 		"presentation_updates":(encounter.get("dense_presentation_budget", {}) as Dictionary).duplicate(true),
@@ -1823,6 +1879,7 @@ func _advance_validation_density_checkpoint() -> void:
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
 	_profile_elapsed = 0.0
+	_profile_sample_counter_reads = 0
 	_profile_active = true
 	_profile_origin = "diagnostic_density_matrix"
 	_profile_advance_generation += 1
@@ -2054,6 +2111,10 @@ func _mcp_state() -> Dictionary:
 	var profile_cohort: Dictionary = validation_profile_sample.get("cohort", {})
 	var profile_qualification: Dictionary = validation_profile_sample.get("qualification", {})
 	var cycle_comparison := _profile_cycle_comparison()
+	var ledger_snapshot := complete_run_ledger.get_snapshot()
+	var ledger_matrix: Dictionary = ledger_snapshot.get("matrix", {})
+	var ledger_checks: Dictionary = ledger_snapshot.get("contract_checks", {})
+	var observation_work: Dictionary = validation_profile_sample.get("observation_work", _profile_observation_work_receipt())
 	return {
 		"run_state":run_state, "run_serial":run_serial, "run_elapsed":run_elapsed,
 		"profile_status":validation_profile_sample.get("status", "idle"),
@@ -2073,6 +2134,9 @@ func _mcp_state() -> Dictionary:
 		"profile_minimum_enemies":profile_cohort.get("minimum", validation_profile_sample.get("minimum_enemy_workload", 0)),
 		"profile_end_enemies":profile_cohort.get("end_live", validation_profile_sample.get("end_enemy_workload", 0)),
 		"profile_qualified":profile_qualification.get("qualified", false),
+		"profile_sampled_frame_scene_scans":observation_work.get("sampled_frame_scene_scans", 0),
+		"profile_sampled_frame_group_inventories":observation_work.get("sampled_frame_group_inventories", 0),
+		"profile_sampled_frame_counter_reads":observation_work.get("sampled_frame_counter_read_count", _profile_sample_counter_reads),
 		"profile_completed_cycles":cycle_comparison.get("completed_cycle_count", 0),
 		"profile_stale_reset_context_cycles":cycle_comparison.get("stale_reset_context_cycle_count", 0),
 		"profile_three_cycle_context_truthful":cycle_comparison.get("three_cycle_context_truthful", false),
@@ -2087,6 +2151,12 @@ func _mcp_state() -> Dictionary:
 		"ordinary_diagnostic_jumps":wave_state.get("diagnostic_jump_count", 0),
 		"ordinary_natural_progression_truthful":_ordinary_progression_truthful(),
 		"ordinary_boss_two_phase_truthful":_boss_two_phase_history_truthful(),
+		"ledger_contract_checks_pass":ledger_checks.get("all_checks_pass", false),
+		"ledger_failure_result_retry":ledger_matrix.get("failure_result_retry", false),
+		"ledger_victory_result_replay":ledger_matrix.get("victory_result_replay", false),
+		"ledger_distinct_build_row_count":ledger_matrix.get("distinct_build_row_count", 0),
+		"ledger_credits_traversed":ledger_matrix.get("credits_traversed", false),
+		"ledger_missing_rows":ledger_matrix.get("missing_rows", []),
 		"authoritative_teardown":teardown_receipt,
 		"experience": experience, "experience_threshold": experience_threshold, "level": level,
 		"defeated_enemies": defeated_enemies, "damage_taken": damage_taken,
@@ -2125,7 +2195,7 @@ func _mcp_state() -> Dictionary:
 		"complete_run_ledger":complete_run_ledger.get_snapshot(),
 		"validation_profile_matrix":_profile_matrix_snapshot(),
 		"tester_victory_fixture":tester_victory_fixture_receipt,
-		"reward_pickups":{"spawned_total":pickup_spawned_total,"collected_total":pickup_collected_total,"live":get_tree().get_nodes_in_group("reward_pickup").size()},
+		"reward_pickups":{"spawned_total":pickup_spawned_total,"collected_total":pickup_collected_total,"live":_active_pickup_count},
 		"shell_focus": String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none",
 	}
 

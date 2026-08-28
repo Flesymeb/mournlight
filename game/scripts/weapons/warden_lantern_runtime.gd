@@ -20,6 +20,8 @@ var presentation_variant := -1
 var last_attack_id := ""
 var _emitting := false
 var _runtime_generation := 0
+var active_presentation_count := 0
+var _active_presentations: Dictionary = {}
 
 func _ready() -> void:
 	audio_player.stop()
@@ -66,6 +68,7 @@ func _emit_attack(target: Node3D, stats: Dictionary) -> void:
 	if bolt_scene:
 		var bolt := bolt_scene.instantiate()
 		get_tree().current_scene.add_child(bolt)
+		_track_presentation(bolt)
 		bolt.configure(global_position, target.global_position, event, presentation_variant)
 	await get_tree().create_timer(0.18 + TRAVEL_VARIANTS[presentation_variant]).timeout
 	if generation != _runtime_generation:
@@ -91,7 +94,19 @@ func retire_runtime(reason: String, generation: int) -> Dictionary:
 	selected_target_id = ""
 	last_attack_id = ""
 	_emitting = false
+	_active_presentations.clear()
+	active_presentation_count = 0
 	return {"weapon_id": String(weapon_id), "reason": reason, "generation": generation, "before": before, "active": false, "complete": true}
+
+func _track_presentation(presentation: Node) -> void:
+	var instance_id := presentation.get_instance_id()
+	_active_presentations[instance_id] = true
+	active_presentation_count = _active_presentations.size()
+	presentation.tree_exiting.connect(_on_presentation_exiting.bind(instance_id))
+
+func _on_presentation_exiting(instance_id: int) -> void:
+	if _active_presentations.erase(instance_id):
+		active_presentation_count = _active_presentations.size()
 
 func reset_runtime() -> void:
 	retire_runtime("reset", _runtime_generation + 1)
@@ -111,4 +126,5 @@ func _mcp_state() -> Dictionary:
 		"cooldown_remaining": cooldown_remaining, "attack_phase": attack_phase, "selected_target_id": selected_target_id,
 		"emitted_count": emitted_count, "resolved_hit_count": resolved_hit_count, "presentation_variant": presentation_variant,
 		"last_attack_id": last_attack_id, "stats": stats,
+		"active_presentation_count":active_presentation_count,
 	}

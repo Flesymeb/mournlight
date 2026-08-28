@@ -14,6 +14,8 @@ var presentation_variant := -1
 var last_target_id := ""
 var _emitting := false
 var _runtime_generation := 0
+var active_presentation_count := 0
+var _active_presentations: Dictionary = {}
 
 func _physics_process(delta: float) -> void:
 	if not inventory.is_equipped(weapon_id):
@@ -60,6 +62,7 @@ func _emit_sweep(primary_target: Node3D, stats: Dictionary) -> void:
 		for arc_index in arc_count:
 			var sweep: Node3D = sweep_scene.instantiate() as Node3D
 			add_child(sweep)
+			_track_presentation(sweep)
 			sweep.position.x = (float(arc_index) - float(arc_count - 1) * 0.5) * 0.38
 			if sweep.has_method("configure"):
 				sweep.configure(posmod(presentation_variant + arc_index, 3))
@@ -85,7 +88,19 @@ func retire_runtime(reason: String, generation: int) -> Dictionary:
 	attack_phase = "retired"
 	last_target_id = ""
 	_emitting = false
+	_active_presentations.clear()
+	active_presentation_count = 0
 	return {"weapon_id": String(weapon_id), "reason": reason, "generation": generation, "before": before, "active": false, "complete": true}
+
+func _track_presentation(presentation: Node) -> void:
+	var instance_id := presentation.get_instance_id()
+	_active_presentations[instance_id] = true
+	active_presentation_count = _active_presentations.size()
+	presentation.tree_exiting.connect(_on_presentation_exiting.bind(instance_id))
+
+func _on_presentation_exiting(instance_id: int) -> void:
+	if _active_presentations.erase(instance_id):
+		active_presentation_count = _active_presentations.size()
 
 func reset_runtime() -> void:
 	retire_runtime("reset", _runtime_generation + 1)
@@ -101,5 +116,6 @@ func _mcp_state() -> Dictionary:
 		"weapon_id": String(weapon_id), "equipped": inventory.is_equipped(weapon_id), "rank": inventory.get_rank(weapon_id),
 		"attack_phase": attack_phase, "cooldown_remaining": cooldown_remaining, "sweep_count": sweep_count,
 		"presentation_variant": presentation_variant, "last_target_id": last_target_id,
+		"active_presentation_count":active_presentation_count,
 		"stats": inventory.get_stats(weapon_id),
 	}
