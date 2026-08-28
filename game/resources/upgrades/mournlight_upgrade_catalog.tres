@@ -14,6 +14,8 @@
 [ext_resource type="Texture2D" uid="uid://bfotnfn02ovbb" path="res://assets/ui/upgrades/health_max.svg" id="12_hm"]
 [ext_resource type="Texture2D" uid="uid://dtq602j2r72n1" path="res://assets/ui/upgrades/dash_cooldown.svg" id="13_dc"]
 [ext_resource type="Texture2D" uid="uid://dyhi0nqoh34hy" path="res://assets/ui/upgrades/recovery.svg" id="14_re"]
+[ext_resource type="Texture2D" path="res://assets/ui/upgrades/pickup_economy.svg" id="15_pe"]
+[ext_resource type="Texture2D" path="res://assets/ui/upgrades/risk_reward.svg" id="16_rr"]
 
 [sub_resource type="Resource" id="lantern_focus"]
 script = ExtResource("2_upgrade")
@@ -120,7 +122,27 @@ max_rank = 3
 weapon_id = &""
 icon = ExtResource("14_re")
 
+[sub_resource type="Resource" id="pickup_economy"]
+script = ExtResource("2_upgrade")
+upgrade_id = &"lantern_gathering"
+title = "Lantern's Reach"
+category = "economy"
+action = "pickup_economy"
+max_rank = 3
+weapon_id = &""
+icon = ExtResource("15_pe")
+
+[sub_resource type="Resource" id="risk_reward"]
+script = ExtResource("2_upgrade")
+upgrade_id = &"cinder_pact"
+title = "Cinder Pact"
+category = "risk_reward"
+action = "risk_reward"
+max_rank = 3
+weapon_id = &""
+icon = ExtResource("16_rr")
+
 [resource]
-resource_name = "Twelve authoritative Mournlight upgrades"
+resource_name = "Fourteen authoritative Mournlight upgrades"
 script = ExtResource("1_catalog")
-upgrades = Array[Resource]([SubResource("lantern_focus"), SubResource("lantern_cadence"), SubResource("lantern_range"), SubResource("spade_unlock"), SubResource("spade_edge"), SubResource("spade_reach"), SubResource("wisps_unlock"), SubResource("wisps_orbit"), SubResource("wisps_radius"), SubResource("health_max"), SubResource("dash_cooldown"), SubResource("recovery")])
+upgrades = Array[Resource]([SubResource("lantern_focus"), SubResource("lantern_cadence"), SubResource("lantern_range"), SubResource("spade_unlock"), SubResource("spade_edge"), SubResource("spade_reach"), SubResource("wisps_unlock"), SubResource("wisps_orbit"), SubResource("wisps_radius"), SubResource("health_max"), SubResource("dash_cooldown"), SubResource("recovery"), SubResource("pickup_economy"), SubResource("risk_reward")])

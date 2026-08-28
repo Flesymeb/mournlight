@@ -41,9 +41,14 @@ func _process(delta: float) -> void:
 	if is_instance_valid(target):
 		var planar := target.global_position - global_position
 		planar.y = 0.0
-		if planar.length() <= collection_radius:
+		var resolved_collection_radius := collection_radius
+		var warden := target as WardenController
+		if warden:
+			resolved_collection_radius = maxf(collection_radius, warden.pickup_collection_radius)
+		if planar.length() <= resolved_collection_radius:
 			pickup_event.collected_at_age = age
 			pickup_event.collection_distance = planar.length()
+			pickup_event.collection_radius = resolved_collection_radius
 			collected.emit(pickup_event.duplicate(true))
 			remove_from_group(&"reward_pickup")
 			queue_free()
@@ -53,12 +58,14 @@ func _process(delta: float) -> void:
 		queue_free()
 
 func _mcp_state() -> Dictionary:
+	var warden := target as WardenController
 	return {
 		"drop_id":pickup_event.get("drop_id", ""),
 		"drop_type":pickup_event.get("drop_type", "escaped_wisp"),
 		"reward_value":pickup_event.get("reward_value", 1),
 		"age":age,
-		"collection_radius":collection_radius,
+		"base_collection_radius":collection_radius,
+		"collection_radius":maxf(collection_radius, warden.pickup_collection_radius) if warden else collection_radius,
 		"target_valid":is_instance_valid(target),
 		"production_presentation":"authored_warden_lantern",
 	}

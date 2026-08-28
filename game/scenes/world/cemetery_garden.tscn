@@ -2,7 +2,7 @@
 
 [ext_resource type="PackedScene" path="res://assets/authored/low_poly_graveyard.glb" id="1_cemetery"]
 [ext_resource type="PackedScene" path="res://assets/landmarks/keeper_post.glb" id="2_keeper_post"]
-[ext_resource type="PackedScene" path="res://assets/landmarks/cracked_bell.glb" id="3_cracked_bell"]
+[ext_resource type="PackedScene" path="res://assets/landmarks/candidates/digiba_cracked_bell.glb" id="3_cracked_bell"]
 
 [sub_resource type="BoxShape3D" id="GroundShape"]
 size = Vector3(23.2, 0.7, 21.2)
@@ -131,20 +131,20 @@ shadow_enabled = false
 position = Vector3(-10.2, 0, -7.5)
 
 [node name="CrackedBellAsset" parent="OuterDatum/CrackedMoonBellAnchor" groups=["cracked_bell_landmark"] instance=ExtResource("3_cracked_bell")]
-position = Vector3(1.2, 1.2, 3.3)
-rotation = Vector3(0, 2.72, -0.18)
-scale = Vector3(1, 1, 1)
+position = Vector3(3.7, 0.0, 6.0)
+rotation = Vector3(-1.5708, 2.72, 0)
+scale = Vector3(2, 2, 2)
 
 [node name="CrackedBellCollision" type="StaticBody3D" parent="OuterDatum/CrackedMoonBellAnchor"]
 collision_layer = 1
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision"]
-position = Vector3(1.2, 1.0, 3.3)
+position = Vector3(3.7, 0.9, 6.0)
 shape = SubResource("CrackedBellShape")
 
 [node name="BellLanternLight" type="OmniLight3D" parent="OuterDatum/CrackedMoonBellAnchor"]
-position = Vector3(1.2, 2.7, 3.3)
+position = Vector3(3.7, 2.1, 6.0)
 light_color = Color(0.82, 0.25, 0.66, 1)
 light_energy = 1.65
 omni_range = 5.2

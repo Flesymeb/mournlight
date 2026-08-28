@@ -18,6 +18,9 @@ enum DashPhase { READY, ANTICIPATION, ACTIVE, RECOVERY, COOLDOWN }
 @export var active_duration := 0.18
 @export var recovery_duration := 0.22
 @export var cooldown_duration := 0.72
+@export_category("Run modifiers")
+@export var pickup_collection_radius := 1.15
+@export var experience_yield_multiplier := 1.0
 
 @export_category("Runtime state (read-only)")
 @export var movement_input := Vector2.ZERO
@@ -189,6 +192,8 @@ func reset_for_run(spawn_position: Vector3, reset_owner := "run_reset") -> void:
 	_dash_direction = Vector3.FORWARD
 	_last_move_direction = Vector3.FORWARD
 	dash_cooldown_remaining = 0.0
+	pickup_collection_radius = 1.15
+	experience_yield_multiplier = 1.0
 	model_pivot.position = _base_model_position
 	model_pivot.rotation = Vector3.ZERO
 	model_pivot.scale = Vector3.ONE
@@ -234,6 +239,8 @@ func _mcp_state() -> Dictionary:
 		"dash_invulnerable": dash_invulnerable,
 		"movement_speed": movement_speed,
 		"dash_speed": dash_speed,
+		"pickup_collection_radius":pickup_collection_radius,
+		"experience_yield_multiplier":experience_yield_multiplier,
 		"movement_plane_y": movement_plane_y,
 		"plane_error": plane_error,
 		"authored_animation": String(_authored_animation.current_animation) if _authored_animation else "none",

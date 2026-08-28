@@ -216,6 +216,8 @@ func _begin_run() -> void:
 	health.maximum_health = 100.0
 	health.reset_warden_health()
 	warden.cooldown_duration = 0.72
+	warden.pickup_collection_radius = 1.15
+	warden.experience_yield_multiplier = 1.0
 	_last_health = health.current_health
 	_health_accounting_suspended = false
 	inventory.reset_starting_build()
@@ -456,7 +458,9 @@ func _on_reward_dropped(event: Dictionary) -> void:
 
 func _on_reward_pickup_collected(event: Dictionary) -> void:
 	pickup_collected_total += 1
-	experience += maxi(1, int(event.get("reward_value", 1)))
+	var base_reward := maxi(1, int(event.get("reward_value", 1)))
+	var resolved_reward := maxi(1, int(round(float(base_reward) * warden.experience_yield_multiplier)))
+	experience += resolved_reward
 	if experience >= experience_threshold:
 		experience -= experience_threshold
 		level += 1
@@ -867,6 +871,7 @@ func _prepare_final_profile() -> void:
 		"pool_counts":{"active":encounter.get("live",0),"pooled":encounter.get("pooled",0)},
 		"work_caps":_dense_work_caps(encounter),
 		"viewport":_profile_viewport_receipt(),
+		"renderer":_profile_renderer_receipt(),
 		"requested_profile":"representative_final_wave_and_bellkeeper",
 		"resolved_profile":"prepared_paused",
 		"preparation_paused":get_tree().paused,
@@ -951,6 +956,7 @@ func _advance_profile_sample(delta: float) -> void:
 		"end_counts":_profile_counts(), "counts":_profile_counts(),
 		"cohort":cohort,
 		"requested_enemy_workload":int(cohort.get("requested", _profile_start_counts.get("enemies", 0))),
+		"start_enemy_workload":int(cohort.get("start", _profile_start_counts.get("enemies", 0))),
 		"minimum_enemy_workload":int(cohort.get("minimum", _profile_start_counts.get("enemies", 0))),
 		"end_enemy_workload":int(cohort.get("end_live", _profile_counts().get("enemies", 0))),
 		"replenished_enemy_count":int(cohort.get("replenished", 0)),
@@ -959,6 +965,7 @@ func _advance_profile_sample(delta: float) -> void:
 		"wave_end":wave_director.get_snapshot().duplicate(true),
 		"work_caps":_dense_work_caps(spawner.get_snapshot()),
 	}
+	validation_profile_sample["qualification"] = _profile_qualification(validation_profile_sample)
 	_record_profile_cycle("advance", validation_profile_sample)
 	if _profile_origin == "diagnostic_prepared":
 		get_tree().paused = true
@@ -991,6 +998,8 @@ func _reset_final_profile() -> void:
 		"reset_isolation":_counts_are_isolated(counts),
 		"route_kind":run_route_kind,
 		"wave_route":_route_qualification(wave_director.get_snapshot()),
+		"viewport":_profile_viewport_receipt(),
+		"renderer":_profile_renderer_receipt(),
 		"next_frame_isolation_pending": true,
 	}
 	validation_density_receipt = validation_profile_receipt.duplicate(true)
@@ -1036,6 +1045,7 @@ func _profile_cycle_comparison() -> Dictionary:
 				"frame_ms":(entry.get("frame_ms", {}) as Dictionary).duplicate(true),
 				"renderer":(entry.get("renderer", {}) as Dictionary).duplicate(true),
 				"requested_enemy_workload":entry.get("requested_enemy_workload", -1),
+				"start_enemy_workload":entry.get("start_enemy_workload", -1),
 				"minimum_enemy_workload":entry.get("minimum_enemy_workload", -1),
 				"end_enemy_workload":entry.get("end_enemy_workload", -1),
 				"replenished_enemy_count":entry.get("replenished_enemy_count", 0),
@@ -1125,17 +1135,56 @@ func _profile_viewport_receipt() -> Dictionary:
 	}
 
 func _profile_renderer_receipt() -> Dictionary:
+	var adapter_name := RenderingServer.get_video_adapter_name()
+	var adapter_vendor := RenderingServer.get_video_adapter_vendor()
+	var rendering_driver := RenderingServer.get_current_rendering_driver_name()
+	var adapter_api_version := RenderingServer.get_video_adapter_api_version()
+	var driver_info := OS.get_video_adapter_driver_info()
+	var identity_text := (adapter_name + " " + adapter_vendor + " " + rendering_driver + " " + adapter_api_version + " " + str(driver_info)).to_lower()
+	var software_renderer := false
+	for marker in ["llvmpipe", "softpipe", "swiftshader", "lavapipe", "software rasterizer"]:
+		software_renderer = software_renderer or identity_text.contains(marker)
+	var identity_complete := not adapter_name.strip_edges().is_empty() and not adapter_vendor.strip_edges().is_empty() and not adapter_api_version.strip_edges().is_empty()
 	return {
 		"rendering_method":RenderingServer.get_current_rendering_method(),
-		"rendering_driver":RenderingServer.get_current_rendering_driver_name(),
-		"adapter_name":RenderingServer.get_video_adapter_name(),
-		"adapter_vendor":RenderingServer.get_video_adapter_vendor(),
+		"rendering_driver":rendering_driver,
+		"adapter_name":adapter_name,
+		"adapter_vendor":adapter_vendor,
 		"adapter_type":int(RenderingServer.get_video_adapter_type()),
-		"adapter_api_version":RenderingServer.get_video_adapter_api_version(),
-		"adapter_driver_info":OS.get_video_adapter_driver_info(),
+		"adapter_api_version":adapter_api_version,
+		"adapter_driver_info":driver_info,
+		"identity_complete":identity_complete,
+		"software_renderer":software_renderer,
+		"hardware_backed":identity_complete and not software_renderer,
+		"classification":"software" if software_renderer else ("hardware" if identity_complete else "unknown"),
+		"hardware_qualification_eligible":identity_complete and not software_renderer,
 		"project_name":String(ProjectSettings.get_setting("application/config/name", "Mournlight")),
 		"profile_identity":"mournlight.release.final_wave.v1",
 	}
+
+func _profile_qualification(sample: Dictionary) -> Dictionary:
+	var reasons: Array[String] = []
+	var renderer: Dictionary = sample.get("renderer", {})
+	var viewport: Dictionary = sample.get("viewport", {})
+	var frame_ms: Dictionary = sample.get("frame_ms", {})
+	if not bool(viewport.get("resolution_qualified", false)):
+		reasons.append("viewport_below_1920x1080")
+	if not bool(renderer.get("identity_complete", false)):
+		reasons.append("renderer_identity_incomplete")
+	if not bool(renderer.get("hardware_backed", false)):
+		reasons.append("software_or_unknown_renderer")
+	if int(sample.get("requested_enemy_workload", -1)) != 32 or int(sample.get("start_enemy_workload", -1)) != 32 or int(sample.get("minimum_enemy_workload", -1)) != 32 or int(sample.get("end_enemy_workload", -1)) != 32:
+		reasons.append("enemy_cohort_not_32_throughout")
+	if float(frame_ms.get("p95", INF)) > 16.67:
+		reasons.append("p95_above_16_67ms")
+	return {"qualified":reasons.is_empty(), "reasons":reasons, "requires_hardware":true, "p95_limit_ms":16.67}
+
+func _validation_controls_receipt() -> Dictionary:
+	var actions := [&"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_reset_density", &"validation_prepare_final_profile", &"validation_advance_final_profile", &"validation_reset_final_profile"]
+	var controls: Array[Dictionary] = []
+	for action in actions:
+		controls.append({"action":String(action), "registered":InputMap.has_action(action), "physical_binding_count":InputMap.action_get_events(action).size() if InputMap.has_action(action) else 0})
+	return {"editor_only":OS.has_feature("editor"), "release_export_available":false, "controls":controls, "prepare_and_advance_separate":true, "density_checkpoints":[3,5,10,18,32]}
 
 func _dense_work_caps(encounter: Dictionary) -> Dictionary:
 	var neighbor_state: Dictionary = encounter.get("neighbor_registry", {})
@@ -1316,6 +1365,7 @@ func _mcp_state() -> Dictionary:
 		"validation_profile_sample":validation_profile_sample,
 		"validation_profile_cycles":validation_profile_cycles,
 		"validation_profile_cycle_comparison":_profile_cycle_comparison(),
+		"validation_controls":_validation_controls_receipt(),
 		"validation_retry_baselines":validation_retry_baselines,
 		"ordinary_victory_receipt":ordinary_victory_receipt,
 		"ordinary_victory_transactions":ordinary_victory_transactions,

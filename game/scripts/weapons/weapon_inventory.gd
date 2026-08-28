@@ -7,6 +7,7 @@ signal build_changed(snapshot: Dictionary)
 @export var equipped_weapon_ids: Array[StringName] = [&"warden_lantern"]
 
 var _ranks: Dictionary = {&"warden_lantern": 1}
+var global_damage_multiplier := 1.0
 
 func _ready() -> void:
 	_validate_unique_ids()
@@ -24,13 +25,21 @@ func get_rank(weapon_id: StringName) -> int:
 	return int(_ranks.get(weapon_id, 0))
 
 func get_stats(weapon_id: StringName) -> Dictionary:
+	return get_stats_for_rank(weapon_id, maxi(1, get_rank(weapon_id)))
+
+func get_stats_for_rank(weapon_id: StringName, rank: int) -> Dictionary:
 	var definition := get_definition(weapon_id)
 	if not definition:
 		return {}
-	return definition.stats_for_rank(maxi(1, get_rank(weapon_id)))
+	var stats := definition.stats_for_rank(rank)
+	if stats.has("damage"):
+		stats["damage"] = snappedf(float(stats.damage) * global_damage_multiplier, 0.1)
+	stats["global_damage_multiplier"] = global_damage_multiplier
+	return stats
 
 func prepare_legal_build(profile: String = "representative") -> Dictionary:
 	var before := get_snapshot()
+	global_damage_multiplier = 1.0
 	equipped_weapon_ids.clear()
 	_ranks.clear()
 	for definition in definitions:
@@ -47,7 +56,17 @@ func prepare_legal_build(profile: String = "representative") -> Dictionary:
 func reset_starting_build() -> void:
 	equipped_weapon_ids = [&"warden_lantern"]
 	_ranks = {&"warden_lantern": 1}
+	global_damage_multiplier = 1.0
 	build_changed.emit(get_snapshot())
+
+func apply_damage_multiplier_projection(result_multiplier: float, expected_current: float) -> bool:
+	if not is_equal_approx(global_damage_multiplier, expected_current):
+		return false
+	if result_multiplier <= expected_current or result_multiplier > 1.6:
+		return false
+	global_damage_multiplier = result_multiplier
+	build_changed.emit(get_snapshot())
+	return true
 
 func unlock_weapon(weapon_id: StringName) -> void:
 	if not equipped_weapon_ids.has(weapon_id) and get_definition(weapon_id):
@@ -87,6 +106,7 @@ func get_snapshot() -> Dictionary:
 				"stats": get_stats(definition.weapon_id),
 			})
 	return {"equipped_weapon_ids": equipped_weapon_ids.duplicate(), "weapons": weapons,
+		"global_damage_multiplier":global_damage_multiplier,
 		"build_identity":_build_identity(weapons)}
 
 func _build_identity(weapons: Array[Dictionary]) -> Dictionary:

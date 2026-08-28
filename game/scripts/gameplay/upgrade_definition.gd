@@ -4,7 +4,7 @@ extends Resource
 @export var upgrade_id: StringName
 @export var title := ""
 @export var category := "lantern"
-@export_enum("weapon_rank", "health_max", "dash_cooldown", "recovery") var action := "weapon_rank"
+@export_enum("weapon_rank", "health_max", "dash_cooldown", "recovery", "pickup_economy", "risk_reward") var action := "weapon_rank"
 @export var max_rank := 1
 @export var weapon_id: StringName = &"warden_lantern"
 @export var required_weapon_rank := -1
@@ -34,6 +34,8 @@ func project(current_upgrade_rank: int, inventory: WeaponInventory, health: Ward
 		"health_max": _project_health_max(projection, health)
 		"dash_cooldown": _project_dash(projection, warden)
 		"recovery": _project_recovery(projection, health)
+		"pickup_economy": _project_pickup_economy(projection, warden)
+		"risk_reward": _project_risk_reward(projection, inventory, health)
 	projection["effect_lines"] = _effect_lines(projection.changes)
 	projection["concrete_change"] = " | ".join(projection.effect_lines)
 	return projection
@@ -57,6 +59,17 @@ func apply_projection(projection: Dictionary, inventory: WeaponInventory, health
 			if is_equal_approx(health.current_health, float(projection.current.health)) and is_equal_approx(health.maximum_health, float(projection.current.health_maximum)):
 				health.current_health = float(projection.result.health)
 				accepted = true
+		"pickup_economy":
+			if is_equal_approx(warden.pickup_collection_radius, float(projection.current.pickup_collection_radius)) and is_equal_approx(warden.experience_yield_multiplier, float(projection.current.experience_yield_multiplier)):
+				warden.pickup_collection_radius = float(projection.result.pickup_collection_radius)
+				warden.experience_yield_multiplier = float(projection.result.experience_yield_multiplier)
+				accepted = true
+		"risk_reward":
+			var health_matches := is_equal_approx(health.current_health, float(projection.current.health)) and is_equal_approx(health.maximum_health, float(projection.current.health_maximum))
+			if health_matches and inventory.apply_damage_multiplier_projection(float(projection.result.global_damage_multiplier), float(projection.current.global_damage_multiplier)):
+				health.maximum_health = float(projection.result.health_maximum)
+				health.current_health = float(projection.result.health)
+				accepted = true
 	var after := _authoritative_state(inventory, health, warden)
 	return {"accepted": accepted, "before": before, "advertised_result": projection.result.duplicate(true), "after": after, "matches_projection": accepted and _result_matches(projection.result, after)}
 
@@ -65,7 +78,7 @@ func _project_weapon(projection: Dictionary, inventory: WeaponInventory) -> void
 	var current_rank := inventory.get_rank(weapon_id)
 	var next_rank := current_rank + 1
 	var before_stats := inventory.get_stats(weapon_id) if current_rank > 0 else {}
-	var after_stats := definition.stats_for_rank(next_rank)
+	var after_stats := inventory.get_stats_for_rank(weapon_id, next_rank)
 	projection["current"] = {"equipped": inventory.is_equipped(weapon_id), "rank": current_rank, "stats": before_stats}
 	projection["result"] = {"equipped": true, "rank": next_rank, "stats": after_stats}
 	var changes: Array[Dictionary] = []
@@ -97,6 +110,38 @@ func _project_recovery(projection: Dictionary, health: WardenHealth) -> void:
 	projection["result"] = {"health":minf(health.maximum_health, health.current_health + 20.0), "health_maximum":health.maximum_health}
 	projection["changes"] = [{"field":"health", "label":"HEALTH", "current":health.current_health, "result":projection.result.health}]
 
+func _project_pickup_economy(projection: Dictionary, warden: WardenController) -> void:
+	projection["current"] = {
+		"pickup_collection_radius":warden.pickup_collection_radius,
+		"experience_yield_multiplier":warden.experience_yield_multiplier,
+	}
+	projection["result"] = {
+		"pickup_collection_radius":minf(2.2, warden.pickup_collection_radius + 0.35),
+		"experience_yield_multiplier":minf(1.6, warden.experience_yield_multiplier + 0.2),
+	}
+	projection["changes"] = [
+		{"field":"pickup_collection_radius", "label":"PICKUP REACH", "current":warden.pickup_collection_radius, "result":projection.result.pickup_collection_radius},
+		{"field":"experience_yield_multiplier", "label":"EXPERIENCE YIELD", "current":warden.experience_yield_multiplier, "result":projection.result.experience_yield_multiplier},
+	]
+
+func _project_risk_reward(projection: Dictionary, inventory: WeaponInventory, health: WardenHealth) -> void:
+	var next_multiplier := minf(1.6, inventory.global_damage_multiplier + 0.2)
+	var next_maximum := maxf(55.0, health.maximum_health - 12.0)
+	projection["current"] = {
+		"global_damage_multiplier":inventory.global_damage_multiplier,
+		"health":health.current_health,
+		"health_maximum":health.maximum_health,
+	}
+	projection["result"] = {
+		"global_damage_multiplier":next_multiplier,
+		"health":minf(health.current_health, next_maximum),
+		"health_maximum":next_maximum,
+	}
+	projection["changes"] = [
+		{"field":"global_damage_multiplier", "label":"WEAPON DAMAGE", "current":inventory.global_damage_multiplier, "result":next_multiplier},
+		{"field":"health_maximum", "label":"MAX HEALTH COST", "current":health.maximum_health, "result":next_maximum},
+	]
+
 func _effect_lines(changes: Array) -> Array[String]:
 	var lines: Array[String] = []
 	for change in changes:
@@ -112,6 +157,10 @@ func _format_value(value, field: String) -> String:
 		return str(int(value))
 	if field in ["cooldown", "duration", "hit_interval", "dash_cooldown"]:
 		return "%.2fs" % float(value)
+	if field in ["experience_yield_multiplier", "global_damage_multiplier"]:
+		return "×%.2f" % float(value)
+	if field == "pickup_collection_radius":
+		return "%.2fm" % float(value)
 	return "%.1f" % float(value) if not is_equal_approx(float(value), roundf(float(value))) else str(int(roundf(float(value))))
 
 func _values_equal(a, b) -> bool:
@@ -122,7 +171,15 @@ func _values_equal(a, b) -> bool:
 	return a == b
 
 func _authoritative_state(inventory: WeaponInventory, health: WardenHealth, warden: WardenController) -> Dictionary:
-	return {"weapons":inventory.get_snapshot(), "health":health.current_health, "health_maximum":health.maximum_health, "dash_cooldown":warden.cooldown_duration}
+	return {
+		"weapons":inventory.get_snapshot(),
+		"health":health.current_health,
+		"health_maximum":health.maximum_health,
+		"dash_cooldown":warden.cooldown_duration,
+		"pickup_collection_radius":warden.pickup_collection_radius,
+		"experience_yield_multiplier":warden.experience_yield_multiplier,
+		"global_damage_multiplier":inventory.global_damage_multiplier,
+	}
 
 func _result_matches(expected: Dictionary, after: Dictionary) -> bool:
 	if action == "weapon_rank":

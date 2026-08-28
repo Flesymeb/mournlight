@@ -22,6 +22,8 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 		"dash_phase": String(warden.dash_phase) if warden else "ready",
 		"dash_remaining": float(warden.dash_cooldown_remaining) if warden else 0.0,
 		"dash_duration": float(warden.cooldown_duration) if warden else 1.0,
+		"pickup_collection_radius":float(warden.pickup_collection_radius) if warden else 1.15,
+		"experience_yield_multiplier":float(warden.experience_yield_multiplier) if warden else 1.0,
 		"wave": int(wave_snapshot.get("wave",1)),
 		"wave_count": int(wave_snapshot.get("wave_count",5)),
 		"wave_id": String(wave_definition.get("id","warmup")),
