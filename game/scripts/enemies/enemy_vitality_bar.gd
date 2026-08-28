@@ -22,18 +22,24 @@ var retirement_count := 0
 var _bound := false
 var _elite := false
 var _reported_visible := false
+var _bound_health: HealthComponent
+var binding_serial := 0
+var generation_mismatch_retirements := 0
+var last_retirement_reason := "never_bound"
 
 func _ready() -> void:
 	_set_visible(false, "ready")
-	var health := get_parent().get_node_or_null("HealthComponent") as HealthComponent
-	if health and not health.health_changed.is_connected(_on_health_changed):
-		health.health_changed.connect(_on_health_changed)
 
 func bind_actor(health: HealthComponent, next_actor_id: StringName, generation: int, elite: bool) -> void:
+	_disconnect_health()
 	actor_id = String(next_actor_id)
 	spawn_generation = generation
+	binding_serial += 1
 	_elite = elite
 	_bound = true
+	_bound_health = health
+	if is_instance_valid(_bound_health) and not _bound_health.health_changed.is_connected(_on_health_changed):
+		_bound_health.health_changed.connect(_on_health_changed)
 	damage_hold_remaining = 0.0
 	alpha = 0.0
 	useful_reason = "hidden"
@@ -51,6 +57,10 @@ func reveal_damage() -> void:
 func advance(delta: float, target_distance: float, lifecycle_active: bool) -> void:
 	if not _bound or not lifecycle_active:
 		_retire_visibility("inactive")
+		return
+	if not _actor_generation_matches():
+		generation_mismatch_retirements += 1
+		retire("generation_mismatch")
 		return
 	damage_hold_remaining = maxf(0.0, damage_hold_remaining - delta)
 	var proximity_useful := target_distance <= USEFUL_PROXIMITY
@@ -80,10 +90,12 @@ func retire(reason: String) -> void:
 	# pooled identity it previously registered.
 	_set_visible(false, reason)
 	_bound = false
+	_disconnect_health()
 	spawn_generation = -1
 	damage_hold_remaining = 0.0
 	alpha = 0.0
 	useful_reason = "retired_%s" % reason
+	last_retirement_reason = reason
 
 func _retire_visibility(reason: String) -> void:
 	alpha = 0.0
@@ -102,7 +114,7 @@ func _set_visible(next_visible: bool, reason: String) -> void:
 	})
 
 func _on_health_changed(next_current: float, next_maximum: float) -> void:
-	if not _bound:
+	if not _bound or not _actor_generation_matches():
 		return
 	var was_damaged := next_current < current_health
 	current_health = next_current
@@ -118,6 +130,15 @@ func _set_ratio(next_ratio: float) -> void:
 	fill.scale.x = maxf(0.001, display_ratio)
 	fill.position.x = -0.58 * (1.0 - display_ratio)
 
+func _disconnect_health() -> void:
+	if is_instance_valid(_bound_health) and _bound_health.health_changed.is_connected(_on_health_changed):
+		_bound_health.health_changed.disconnect(_on_health_changed)
+	_bound_health = null
+
+func _actor_generation_matches() -> bool:
+	var actor := get_parent() as EnemyActor
+	return is_instance_valid(actor) and actor.spawn_generation == spawn_generation
+
 func get_snapshot() -> Dictionary:
 	return {
 		"actor_id":actor_id, "spawn_generation":spawn_generation,
@@ -126,6 +147,11 @@ func get_snapshot() -> Dictionary:
 		"ratio":display_ratio, "fill_direction":"left_to_right",
 		"alpha":alpha, "camera_facing":"material_billboard",
 		"retirement_count":retirement_count,
+		"binding_serial":binding_serial,
+		"generation_current":_actor_generation_matches() if _bound else false,
+		"generation_mismatch_retirements":generation_mismatch_retirements,
+		"last_retirement_reason":last_retirement_reason,
+		"health_signal_bound":is_instance_valid(_bound_health) and _bound_health.health_changed.is_connected(_on_health_changed),
 	}
 
 func _mcp_state() -> Dictionary:

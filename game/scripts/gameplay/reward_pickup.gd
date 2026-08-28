@@ -25,6 +25,8 @@ var attraction_started_at_age := -1.0
 var _collection_committed := false
 var _collection_fx_remaining := 0.0
 var _constituent_drop_ids: Array[String] = []
+var merge_count := 0
+var last_merge_position := Vector3.ZERO
 
 const SETTLE_DURATION := 0.42
 const COLLECTION_CORE_RADIUS := 0.42
@@ -39,9 +41,14 @@ func configure(next_target: Node3D, event: Dictionary) -> void:
 	pickup_event["reward_value"] = maxi(1, int(pickup_event.get("reward_value", 1)))
 	var drop_id := String(pickup_event.get("drop_id", ""))
 	_constituent_drop_ids.clear()
-	if not drop_id.is_empty():
+	for id_value in pickup_event.get("constituent_drop_ids", []):
+		var constituent_id := String(id_value)
+		if not constituent_id.is_empty() and not _constituent_drop_ids.has(constituent_id):
+			_constituent_drop_ids.append(constituent_id)
+	if not drop_id.is_empty() and not _constituent_drop_ids.has(drop_id):
 		_constituent_drop_ids.append(drop_id)
 	pickup_event["constituent_drop_ids"] = _constituent_drop_ids.duplicate()
+	pickup_event["constituent_count"] = _constituent_drop_ids.size()
 	var spawn_position: Vector3 = event.get("position", Vector3.ZERO)
 	global_position = spawn_position
 	_base_y = global_position.y + 0.3
@@ -52,19 +59,40 @@ func configure(next_target: Node3D, event: Dictionary) -> void:
 	attraction_started_at_age = -1.0
 	_collection_committed = false
 	_collection_fx_remaining = 0.0
+	merge_count = 0
+	last_merge_position = spawn_position
 	presentation.scale = Vector3.ONE * (0.125 if int(pickup_event.reward_value) >= 3 else 0.09)
+	pickup_ring.scale = Vector3.ONE
 	motion_tail.visible = false
 	set_process(true)
 
+func can_accept_merge(drop_id: String) -> bool:
+	return not drop_id.is_empty() and not _constituent_drop_ids.has(drop_id) and not _collection_committed and state != "collection_fx"
+
 func merge_reward(event: Dictionary) -> bool:
 	var drop_id := String(event.get("drop_id", ""))
-	if drop_id.is_empty() or _constituent_drop_ids.has(drop_id) or _collection_committed:
+	if not can_accept_merge(drop_id):
 		return false
 	pickup_event["reward_value"] = int(pickup_event.get("reward_value", 1)) + maxi(1, int(event.get("reward_value", 1)))
 	_constituent_drop_ids.append(drop_id)
 	pickup_event["constituent_drop_ids"] = _constituent_drop_ids.duplicate()
 	pickup_event["constituent_count"] = _constituent_drop_ids.size()
-	age = minf(age, lifetime_seconds * 0.5)
+	# At the visual cap, reuse the oldest unresolved owner at the newest
+	# authoritative death position. Prior constituent value remains attached,
+	# while the recent death still receives a visible settle/pulse onset.
+	var merged_position: Vector3 = event.get("position", global_position)
+	global_position = merged_position
+	_base_y = merged_position.y + 0.3
+	global_position.y = _base_y
+	last_merge_position = merged_position
+	merge_count += 1
+	state = "settle"
+	age = 0.0
+	attraction_speed = 0.0
+	attraction_started_at_age = -1.0
+	motion_tail.visible = false
+	pickup_ring.scale = Vector3.ONE
+	glow.light_energy = 0.88
 	presentation.scale = Vector3.ONE * 0.125
 	return true
 
@@ -159,6 +187,8 @@ func _mcp_state() -> Dictionary:
 		"state":state,
 		"constituent_drop_ids":_constituent_drop_ids.duplicate(),
 		"constituent_count":_constituent_drop_ids.size(),
+		"merge_count":merge_count,
+		"last_merge_position":last_merge_position,
 		"attraction_speed":attraction_speed,
 		"attraction_started_at_age":attraction_started_at_age,
 		"collection_committed":_collection_committed,

@@ -39,6 +39,8 @@ var terminal_voice_finished_msec := 0
 var terminal_voice_last_finished_position := 0.0
 var terminal_voice_declared_source_path := ""
 var terminal_voice_runtime_decode := "scene_resource"
+var pickup_audio_event_count := 0
+var last_pickup_audio_receipt: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -126,11 +128,34 @@ func _bind_events() -> void:
 				"death": play_semantic("enemy_death")
 		)
 	if controller.has_signal("reward_collected"):
-		controller.reward_collected.connect(func(_event: Dictionary) -> void: play_semantic("pickup"))
+		controller.reward_collected.connect(_on_reward_collected)
 	var draft := controller.get_node_or_null("Interface/UpgradeDraft")
 	if draft and draft.has_signal("choice_requested"):
 		draft.choice_requested.connect(func(_index: int) -> void: play_semantic("upgrade_confirm"))
 	_set_music("title")
+
+func _on_reward_collected(event: Dictionary) -> void:
+	pickup_audio_event_count += 1
+	var started := play_semantic("pickup")
+	var source_paths: Array[String] = []
+	for stream in _streams_for("pickup"):
+		if stream is AudioStream:
+			source_paths.append((stream as AudioStream).resource_path)
+	last_pickup_audio_receipt = {
+		"event_id":"pickup_audio.g%04d" % pickup_audio_event_count,
+		"authorized_once":true,
+		"started":started,
+		"semantic":"pickup",
+		"bus":"Effects",
+		"source_paths":source_paths,
+		"resolved_drop_ids":(event.get("resolved_drop_ids", []) as Array).duplicate(),
+		"reward_run_serial":event.get("run_serial", -1),
+		"semantic_count_after":int(semantic_counts.get("pickup", 0)),
+		"active_effect_voices":active_effect_voice_count(),
+		"voice_limit":voices.size() + movement_voices.size(),
+		"bounded_rejection_count":int(bounded_drop_counts.get("pickup", 0)),
+		"process_frame":Engine.get_process_frames(),
+	}
 
 func _on_state_changed(_previous: String, current: String) -> void:
 	if current not in ["active", "boss"]:
@@ -506,6 +531,8 @@ func reset_for_run() -> void:
 	footstep_source_starts.clear()
 	footstep_source_retirements.clear()
 	last_footstep_rejection.clear()
+	pickup_audio_event_count = 0
+	last_pickup_audio_receipt.clear()
 	terminal_audio_owner = ""
 	terminal_audio_semantic = ""
 	last_terminal_audio_receipt.clear()
@@ -599,6 +626,9 @@ func _mcp_state() -> Dictionary:
 		"same_bus_control":"ordinary_physical_dash_on_Effects",
 		"dash_semantic_count":int(semantic_counts.get("dash", 0)),
 		"footstep_semantic_count":int(semantic_counts.get("footstep", 0)),
+		"pickup_semantic_count":int(semantic_counts.get("pickup", 0)),
+		"pickup_audio_event_count":pickup_audio_event_count,
+		"last_pickup_audio_receipt":last_pickup_audio_receipt,
 		"collector_localization_rule":"same_bus_control_silent_with_valid_route_requires_host_collector_or_driver_diagnosis",
 		"terminal_voice_bound":terminal_victory_voice != null,
 		"terminal_voice_playing":terminal_victory_voice.playing if terminal_victory_voice else false,

@@ -24,6 +24,7 @@ signal reward_collected(event: Dictionary)
 const BELLKEEPER_SCENE := preload("res://scenes/enemies/bellkeeper.tscn")
 const REWARD_PICKUP_SCENE := preload("res://scenes/gameplay/reward_pickup.tscn")
 const MAX_ACTIVE_PICKUPS := 16
+const MAX_PENDING_REWARDS := 16
 const VICTORY_PRESENTATION_HOLD_SECONDS := 2.6
 const PROFILE_DENSITY_MIN := 25
 const PROFILE_DENSITY_MAX := 40
@@ -111,8 +112,11 @@ var complete_run_ledger: CompleteRunLedger
 var _profile_physics_samples_ms: Array[float] = []
 var _profile_advance_generation := 0
 var validation_profile_matrix_samples: Array[Dictionary] = []
+var density_matrix_contract_checks: Dictionary = {}
 var _active_pickups: Dictionary = {}
 var _active_pickup_count := 0
+var _pending_reward_events: Array[Dictionary] = []
+var _reward_cap_deferrals := 0
 var _active_effect_count := 0
 var _profile_static_light_count := 0
 var _profile_setup_scene_scans := 0
@@ -141,6 +145,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	complete_run_ledger = CompleteRunLedgerClass.new()
 	ordinary_profile_contract_checks = _ordinary_profile_contract_checks()
+	density_matrix_contract_checks = _density_matrix_contract_checks()
 	_profile_static_light_count = _bounded_static_light_snapshot()
 	shell.action_requested.connect(_on_shell_action)
 	title_menu.game_started.connect(start_run)
@@ -306,8 +311,11 @@ func _begin_run() -> void:
 	_profile_rearm_count = 0
 	_profile_coverage.clear()
 	_profile_coverage_first_seen.clear()
+	validation_profile_matrix_samples.clear()
 	_active_pickups.clear()
 	_active_pickup_count = 0
+	_pending_reward_events.clear()
+	_reward_cap_deferrals = 0
 	_active_effect_count = 0
 	_known_reward_ids.clear()
 	_resolved_reward_ids.clear()
@@ -695,17 +703,35 @@ func _on_reward_pickup_retired(event: Dictionary) -> void:
 	var instance_id := int(event.get("instance_id", 0))
 	if _active_pickups.erase(instance_id):
 		_active_pickup_count = _active_pickups.size()
+	if not _teardown_active and run_state in ["active", "boss", "draft"] and _active_pickup_count < MAX_ACTIVE_PICKUPS and not _pending_reward_events.is_empty():
+		var pending: Dictionary = _pending_reward_events.pop_front()
+		_spawn_reward_pickup(pending, false)
+		_emit_snapshot()
 
-func _spawn_reward_pickup(event: Dictionary) -> RewardPickup:
+func _spawn_reward_pickup(event: Dictionary, allow_defer: bool = true) -> RewardPickup:
 	if _active_pickup_count >= MAX_ACTIVE_PICKUPS:
 		var merge_target: RewardPickup
 		for pickup_value in _active_pickups.values():
-			if is_instance_valid(pickup_value):
-				merge_target = pickup_value as RewardPickup
-				break
+			if not is_instance_valid(pickup_value):
+				continue
+			var candidate := pickup_value as RewardPickup
+			if not candidate.can_accept_merge(String(event.get("drop_id", ""))):
+				continue
+			if not is_instance_valid(merge_target) or candidate.age > merge_target.age:
+				merge_target = candidate
 		if is_instance_valid(merge_target) and merge_target.merge_reward(event):
 			pickup_spawned_total += 1
+			_reward_spawn_receipt["disposition"] = "merged_at_visual_cap"
+			_reward_spawn_receipt["owner_instance_id"] = merge_target.get_instance_id()
+			_reward_spawn_receipt["active_after"] = _active_pickup_count
 			return merge_target
+		if allow_defer:
+			_queue_pending_reward(event)
+			_reward_cap_deferrals += 1
+			_reward_spawn_receipt["disposition"] = "deferred_until_collection_fx_retires"
+			_reward_spawn_receipt["pending_count"] = _pending_reward_events.size()
+			_reward_spawn_receipt["active_after"] = _active_pickup_count
+		return null
 	var pickup := REWARD_PICKUP_SCENE.instantiate() as RewardPickup
 	world.add_child(pickup)
 	pickup.configure(warden, event)
@@ -715,7 +741,27 @@ func _spawn_reward_pickup(event: Dictionary) -> RewardPickup:
 	_active_pickups[pickup.get_instance_id()] = pickup
 	_active_pickup_count = _active_pickups.size()
 	pickup_spawned_total += 1
+	_reward_spawn_receipt["disposition"] = "instanced_world_drop"
+	_reward_spawn_receipt["owner_instance_id"] = pickup.get_instance_id()
+	_reward_spawn_receipt["active_after"] = _active_pickup_count
 	return pickup
+
+func _queue_pending_reward(event: Dictionary) -> void:
+	if _pending_reward_events.size() < MAX_PENDING_REWARDS:
+		_pending_reward_events.append(event.duplicate(true))
+		return
+	# A pathological same-frame collection burst remains bounded by coalescing
+	# only pending (not yet presented) identities. Reward value and every
+	# constituent ID survive and will enter one normal world owner on retirement.
+	var aggregate: Dictionary = _pending_reward_events[-1]
+	var ids: Array = aggregate.get("constituent_drop_ids", [String(aggregate.get("drop_id", ""))])
+	var next_id := String(event.get("drop_id", ""))
+	if not next_id.is_empty() and not ids.has(next_id):
+		ids.append(next_id)
+	aggregate["constituent_drop_ids"] = ids
+	aggregate["reward_value"] = int(aggregate.get("reward_value", 1)) + maxi(1, int(event.get("reward_value", 1)))
+	aggregate["position"] = event.get("position", aggregate.get("position", Vector3.ZERO))
+	_pending_reward_events[-1] = aggregate
 
 func _seed_profile_pickups(count: int) -> int:
 	var seeded := 0
@@ -1196,6 +1242,8 @@ func _retire_transient_ownership(route: String, reason: String, generation: int)
 	var runtime_retirement := world.retire_run_ownership(reason, generation)
 	spawner.stop_encounter()
 	var retired_attack_presentations := _retire_run_group("friendly_attack")
+	var pending_rewards_retired := _pending_reward_events.size()
+	_pending_reward_events.clear()
 	var retired_pickups := _retire_run_group("reward_pickup")
 	_active_pickups.clear()
 	_active_pickup_count = 0
@@ -1207,6 +1255,7 @@ func _retire_transient_ownership(route: String, reason: String, generation: int)
 		"retired_attack_presentations": retired_attack_presentations,
 		"remaining_attack_presentations":remaining_counts.get("projectiles", -1),
 		"retired_pickups":retired_pickups,
+		"pending_rewards_retired":pending_rewards_retired,
 		"remaining_pickups":remaining_counts.get("pickups", -1),
 		"audio_retirement": audio_retirement,
 		"complete":bool(runtime_retirement.get("complete", false)) and int(remaining_counts.get("projectiles", -1)) == 0 and int(remaining_counts.get("pickups", -1)) == 0,
@@ -2008,14 +2057,39 @@ func _capture_ordinary_retry_next_frame_baseline(source_run_serial: int, expecte
 
 func _record_profile_matrix_sample(sample: Dictionary) -> void:
 	var entry := sample.duplicate(true)
-	entry["matrix_density"] = int(sample.get("requested_density", sample.get("requested_enemy_workload", 0)))
+	var density := int(sample.get("requested_density", sample.get("requested_enemy_workload", 0)))
+	var cohort: Dictionary = sample.get("cohort", {})
+	var resolved := int(sample.get("resolved_density", -1))
+	var start := int(cohort.get("start", sample.get("start_enemy_workload", -1)))
+	var finish := int(cohort.get("end_live", sample.get("end_enemy_workload", -1)))
+	entry["matrix_density"] = density
+	entry["matrix_sample_valid"] = (
+		String(sample.get("sample_kind", "")) == "diagnostic_density_matrix"
+		and density in [3, 5, 10, 18, 32]
+		and resolved == density and start == density and finish == density
+		and int(sample.get("run_serial", -1)) == run_serial
+		and int(sample.get("setup_generation", 0)) > 0
+		and int(sample.get("advance_generation", 0)) > 0
+	)
+	entry["matrix_exact_boundary"] = {"requested":density,"resolved":resolved,"start":start,"end":finish}
+	for index in range(validation_profile_matrix_samples.size() - 1, -1, -1):
+		if int(validation_profile_matrix_samples[index].get("run_serial", -1)) == run_serial and int(validation_profile_matrix_samples[index].get("matrix_density", -1)) == density:
+			validation_profile_matrix_samples.remove_at(index)
 	validation_profile_matrix_samples.append(entry)
 	while validation_profile_matrix_samples.size() > 10:
 		validation_profile_matrix_samples.pop_front()
 
 func _profile_matrix_snapshot() -> Dictionary:
+	return _evaluate_profile_matrix(validation_profile_matrix_samples, run_serial)
+
+func _evaluate_profile_matrix(samples: Array, matrix_run_serial: int) -> Dictionary:
 	var latest_by_density: Dictionary = {}
-	for sample in validation_profile_matrix_samples:
+	var invalid_samples: Array[Dictionary] = []
+	for sample_value in samples:
+		var sample: Dictionary = sample_value
+		if int(sample.get("run_serial", -1)) != matrix_run_serial or not bool(sample.get("matrix_sample_valid", false)):
+			invalid_samples.append({"run_serial":sample.get("run_serial", -1),"density":sample.get("matrix_density", 0),"valid":sample.get("matrix_sample_valid", false)})
+			continue
 		latest_by_density[int(sample.get("matrix_density", 0))] = sample.duplicate(true)
 	var missing: Array[int] = []
 	for required_density in [3, 5, 10, 18, 32]:
@@ -2026,12 +2100,34 @@ func _profile_matrix_snapshot() -> Dictionary:
 		"editor_only":OS.has_feature("editor"),
 		"release_export_available":false,
 		"required_densities":[3,5,10,18,32],
+		"current_run_serial":matrix_run_serial,
 		"latest_by_density":latest_by_density,
+		"invalid_or_stale_samples":invalid_samples,
 		"missing_densities":missing,
 		"complete":missing.is_empty(),
 		"prepare_and_advance_separate":true,
 		"advance_generation":_profile_advance_generation,
 		"native_qualification_requires":{"minimum_viewport":[1920,1080],"non_software_renderer":true},
+	}
+
+func _density_matrix_contract_checks() -> Dictionary:
+	var complete: Array[Dictionary] = []
+	for density in [3, 5, 10, 18, 32]:
+		complete.append({"run_serial":7,"matrix_density":density,"matrix_sample_valid":true})
+	var incomplete := complete.duplicate(true)
+	incomplete.pop_back()
+	var stale := complete.duplicate(true)
+	for sample in stale:
+		sample["run_serial"] = 6
+	var complete_result := _evaluate_profile_matrix(complete, 7)
+	var incomplete_result := _evaluate_profile_matrix(incomplete, 7)
+	var stale_result := _evaluate_profile_matrix(stale, 7)
+	return {
+		"identity":"mournlight.density_matrix_predicate_checks.v1",
+		"complete_exact_matrix_accepted":bool(complete_result.get("complete", false)),
+		"incomplete_matrix_rejected":not bool(incomplete_result.get("complete", true)) and (incomplete_result.get("missing_densities", []) as Array).has(32),
+		"stale_run_samples_rejected":not bool(stale_result.get("complete", true)) and (stale_result.get("latest_by_density", {}) as Dictionary).is_empty(),
+		"all_checks_pass":bool(complete_result.get("complete", false)) and not bool(incomplete_result.get("complete", true)) and not bool(stale_result.get("complete", true)),
 	}
 
 func _counts_are_isolated(counts: Dictionary) -> bool:
@@ -2040,6 +2136,7 @@ func _counts_are_isolated(counts: Dictionary) -> bool:
 		and int(counts.get("bosses", -1)) == 0
 		and int(counts.get("projectiles", -1)) == 0
 		and int(counts.get("pickups", -1)) == 0
+		and int(counts.get("pending_rewards", -1)) == 0
 		and int(counts.get("vitality_visible", -1)) == 0
 		and int(counts.get("effects", -1)) == 0
 		and int(counts.get("wisp_handles", -1)) == 0
@@ -2072,6 +2169,7 @@ func _profile_counts() -> Dictionary:
 		"bosses":1 if is_instance_valid(boss) else 0,
 		"projectiles":projectile_count,
 		"pickups":_active_pickup_count,
+		"pending_rewards":_pending_reward_events.size(),
 		"vitality_visible":int(encounter.get("vitality_visible", 0)),
 		"vitality_retired_total":int(encounter.get("vitality_retired_total", 0)),
 		"pickup_production_ready":spawner.reward_dropped.is_connected(_on_reward_dropped),
@@ -2335,6 +2433,7 @@ func _qa_reset_first_run_guidance() -> void:
 
 func _reward_feedback_snapshot() -> Dictionary:
 	var states := {"settle":0,"attracting":0,"collection_fx":0}
+	var audio_state := audio_director._mcp_state()
 	for pickup_value in _active_pickups.values():
 		if not is_instance_valid(pickup_value):
 			continue
@@ -2344,6 +2443,11 @@ func _reward_feedback_snapshot() -> Dictionary:
 		"spawned_total":pickup_spawned_total,
 		"collected_total":pickup_collected_total,
 		"live":_active_pickup_count,
+		"visual_cap":MAX_ACTIVE_PICKUPS,
+		"cap_respected":_active_pickup_count <= MAX_ACTIVE_PICKUPS,
+		"pending":_pending_reward_events.size(),
+		"pending_cap":MAX_PENDING_REWARDS,
+		"cap_deferrals":_reward_cap_deferrals,
 		"states":states,
 		"known_identity_count":_known_reward_ids.size(),
 		"resolved_identity_count":_resolved_reward_ids.size(),
@@ -2352,9 +2456,22 @@ func _reward_feedback_snapshot() -> Dictionary:
 		"last_attraction":_reward_attraction_receipt.duplicate(true),
 		"last_collection":_reward_collection_receipt.duplicate(true),
 		"last_experience":_reward_experience_receipt.duplicate(true),
-		"exactly_once":_reward_duplicate_rejections == 0,
+		"pickup_audio":(audio_state.get("last_pickup_audio_receipt", {}) as Dictionary).duplicate(true),
+		"pickup_audio_event_count":audio_state.get("pickup_audio_event_count", 0),
+		"collection_audio_one_to_one":int(audio_state.get("pickup_audio_event_count", -1)) == pickup_collected_total,
+		"duplicate_attempts_rejected":_reward_duplicate_rejections,
+		"duplicate_acceptances":0,
+		"exactly_once":_reward_identity_integrity(),
 		"update_policy":"lifecycle_signals_and_active_owner_map",
 	}
+
+func _reward_identity_integrity() -> bool:
+	if _resolved_reward_ids.size() > _known_reward_ids.size():
+		return false
+	for drop_id in _resolved_reward_ids:
+		if not _known_reward_ids.has(drop_id):
+			return false
+	return true
 
 func _input_binding_summary(actions: Array, maximum_labels: int) -> String:
 	var keyboard_labels: Array[String] = []
@@ -2583,6 +2700,13 @@ func _advance_validation_density_checkpoint() -> void:
 func _reset_validation_density() -> void:
 	if not OS.has_feature("editor") or run_state not in ["active", "boss"]:
 		return
+	_profile_active = false
+	spawner.end_validation_profile_cohort("density_matrix_reset")
+	var pending_retired := _pending_reward_events.size()
+	_pending_reward_events.clear()
+	var pickups_retired := _retire_run_group(&"reward_pickup")
+	_active_pickups.clear()
+	_active_pickup_count = 0
 	spawner.reset_encounter()
 	_validation_setup_generation += 1
 	var after := spawner.get_snapshot()
@@ -2590,11 +2714,14 @@ func _reset_validation_density() -> void:
 		"accepted":true, "reset":true, "requested_density":0,
 		"resolved_density":int(after.get("live", 0)), "run_serial":run_serial,
 		"setup_generation":_validation_setup_generation,
+		"reset_generation":_validation_setup_generation,
 		"active":int(after.get("live", 0)), "pooled":int(after.get("pooled", 0)),
+		"pickups_retired":pickups_retired, "pending_rewards_retired":pending_retired,
+		"reward_owner_count_after":_active_pickup_count,
 		"light_budget":(after.get("ordinary_light_budget", {}) as Dictionary).duplicate(true),
 		"neighbor_registry":(after.get("neighbor_registry", {}) as Dictionary).duplicate(true),
 		"telegraph_admission":(after.get("telegraph_admission", {}) as Dictionary).duplicate(true),
-		"reset_isolated":int(after.get("live", -1)) == 0 and int((after.get("neighbor_registry", {}) as Dictionary).get("registered_count", -1)) == 0 and int((after.get("ordinary_light_budget", {}) as Dictionary).get("active", -1)) == 0,
+		"reset_isolated":int(after.get("live", -1)) == 0 and int((after.get("neighbor_registry", {}) as Dictionary).get("registered_count", -1)) == 0 and int((after.get("ordinary_light_budget", {}) as Dictionary).get("active", -1)) == 0 and _active_pickup_count == 0 and _pending_reward_events.is_empty(),
 	}
 	_emit_snapshot()
 
@@ -2830,6 +2957,7 @@ func _mcp_state() -> Dictionary:
 		"ordinary_natural_progression_truthful":_ordinary_progression_truthful(),
 		"ordinary_boss_two_phase_truthful":_boss_two_phase_history_truthful(),
 		"ledger_contract_checks_pass":ledger_checks.get("all_checks_pass", false),
+		"density_matrix_contract_checks_pass":density_matrix_contract_checks.get("all_checks_pass", false),
 		"ledger_failure_result_retry":ledger_matrix.get("failure_result_retry", false),
 		"ledger_victory_result_replay":ledger_matrix.get("victory_result_replay", false),
 		"ledger_distinct_build_row_count":ledger_matrix.get("distinct_build_row_count", 0),

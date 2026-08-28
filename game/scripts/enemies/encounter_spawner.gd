@@ -71,6 +71,7 @@ var _vitality_visible_owners: Dictionary = {}
 var _vitality_retired_total := 0
 var _vitality_visibility_transitions := 0
 var _last_vitality_event: Dictionary = {}
+var _vitality_stale_generation_rejections := 0
 
 const LIGHT_BUDGET_REFRESH_SECONDS := 0.1
 
@@ -179,6 +180,7 @@ func reset_encounter(preserve_pressure: bool = false) -> void:
 	_vitality_retired_total = 0
 	_vitality_visibility_transitions = 0
 	_last_vitality_event.clear()
+	_vitality_stale_generation_rejections = 0
 	_light_peak_active = 0
 	_light_peak_requested = 0
 	_light_budget_refresh_remaining = 0.0
@@ -560,8 +562,15 @@ func _on_lifecycle_event(event: Dictionary) -> void:
 	enemy_lifecycle.emit(last_lifecycle_event)
 
 func _on_vitality_visibility_changed(event: Dictionary) -> void:
-	var key := "%s.g%d" % [String(event.get("actor_id", "")), int(event.get("spawn_generation", -1))]
+	var actor_id := String(event.get("actor_id", ""))
+	var event_generation := int(event.get("spawn_generation", -1))
+	var key := "%s.g%d" % [actor_id, event_generation]
 	if bool(event.get("visible", false)):
+		if int(_generation_by_id.get(StringName(actor_id), -1)) != event_generation:
+			_vitality_stale_generation_rejections += 1
+			_last_vitality_event = event.duplicate(true)
+			_last_vitality_event["rejected"] = "stale_actor_generation"
+			return
 		_vitality_visible_owners[key] = true
 	else:
 		if _vitality_visible_owners.erase(key):
@@ -590,6 +599,7 @@ func get_profile_counters() -> Dictionary:
 		"counter_source":"encounter_lifecycle_owners",
 		"vitality_visible":_vitality_visible_owners.size(),
 		"vitality_retired_total":_vitality_retired_total,
+		"vitality_stale_generation_rejections":_vitality_stale_generation_rejections,
 	}
 
 func _emit_snapshot() -> void:
@@ -706,10 +716,21 @@ func get_snapshot() -> Dictionary:
 			"visibility_transitions":_vitality_visibility_transitions,
 			"owners":_vitality_visible_owners.keys(),
 			"last_event":_last_vitality_event.duplicate(true),
+			"stale_generation_rejections":_vitality_stale_generation_rejections,
+			"owner_generations_current":_vitality_owner_generations_current(),
 			"update_policy":"authoritative_health_signals_and_actor_local_proximity",
 			"boss_uses_dedicated_hud":true,
 		},
 	}
+
+func _vitality_owner_generations_current() -> bool:
+	for actor in _pool:
+		if actor.state in ["pooled", "death"] or not actor.vitality_bar.visible:
+			continue
+		var key := "%s.g%d" % [String(actor.stable_id), actor.spawn_generation]
+		if not _vitality_visible_owners.has(key) or not bool(actor.vitality_bar.get_snapshot().get("generation_current", false)):
+			return false
+	return _vitality_stale_generation_rejections == 0
 
 func _variant_balance_receipt(role_variants: Dictionary) -> Dictionary:
 	var result: Dictionary = {}

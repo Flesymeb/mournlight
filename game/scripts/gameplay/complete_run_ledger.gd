@@ -3,7 +3,6 @@ extends RefCounted
 
 const EXPECTED_WAVES := ["first_toll", "crossing_shadows", "gravewind", "long_procession", "bellkeeper"]
 const PROVENANCE_MANIFEST := "res://ASSET_PROVENANCE.json"
-const PROVENANCE_SHA256 := "52bc131684c5d02a8541962e9a983fc7d39062a3db906a7465dc41af99b7babc"
 const MAX_SESSION_ROWS := 10
 const MAX_DIAGNOSTIC_EVENTS := 24
 const BUILD_SHAPES := ["focused_lantern", "close_gravespade", "orbiting_wisps"]
@@ -14,8 +13,13 @@ var diagnostic_events: Array[Dictionary] = []
 var credits_traversals: Array[Dictionary] = []
 var session_generation := 0
 var contract_checks: Dictionary = {}
+var provenance_manifest: Dictionary = {}
 
 func _init() -> void:
+	# Shipped manifest bytes are the sole authority. Cache this immutable
+	# runtime-session receipt once so Credits and snapshots cannot drift through
+	# a copied predecessor literal or incur file I/O on every HUD snapshot.
+	provenance_manifest = _read_provenance_manifest()
 	contract_checks = _run_contract_checks()
 
 func begin_run(run_serial: int, route_kind: String, started_from: String) -> void:
@@ -118,10 +122,11 @@ func record_credits(run_serial: int, shell_mode: String) -> void:
 		"run_serial":run_serial,
 		"session_generation":session_generation,
 		"shell_mode":shell_mode,
-		"manifest_path":PROVENANCE_MANIFEST,
-		"manifest_sha256":PROVENANCE_SHA256,
+		"manifest_path":provenance_manifest.get("path", PROVENANCE_MANIFEST),
+		"manifest_sha256":provenance_manifest.get("sha256", ""),
 		"visible_surface_observed":shell_mode == "credits",
-		"provenance_bound":shell_mode == "credits" and not PROVENANCE_MANIFEST.is_empty() and not PROVENANCE_SHA256.is_empty(),
+		"provenance_bound":shell_mode == "credits" and bool(provenance_manifest.get("bound", false)),
+		"manifest_source":provenance_manifest.get("source", "unavailable"),
 		"observed_process_frame":Engine.get_process_frames(),
 		"substitutes_for_gameplay_completion":false,
 	}
@@ -141,7 +146,7 @@ func get_snapshot() -> Dictionary:
 		"diagnostic_namespace":diagnostic_events.duplicate(true),
 		"diagnostic_events_rejected_from_ordinary":true,
 		"credits_traversals":credits_traversals.duplicate(true),
-		"provenance_manifest":{"path":PROVENANCE_MANIFEST,"sha256":PROVENANCE_SHA256},
+		"provenance_manifest":provenance_manifest.duplicate(true),
 		"matrix":matrix,
 		"contract_checks":contract_checks.duplicate(true),
 	}
@@ -385,6 +390,7 @@ func _run_contract_checks() -> Dictionary:
 		and bool(complete_matrix.get("complete", false))
 		and (missing_matrix.get("missing_rows", []) as Array).size() == 6
 		and live_rows_unchanged
+		and bool(provenance_manifest.get("bound", false))
 	)
 	return {
 		"identity":"mournlight.complete_run_predicate_checks.v2",
@@ -399,11 +405,24 @@ func _run_contract_checks() -> Dictionary:
 		"three_distinct_successful_victory_rows":int(complete_matrix.get("distinct_build_row_count", 0)) == 3 and bool(complete_matrix.get("victory_result_replay", false)),
 		"diagnostic_row_excluded":int(diagnostic_matrix.get("distinct_build_row_count", -1)) == 0,
 		"credits_independent_and_bound":bool(complete_matrix.get("credits_traversed", false)),
+		"runtime_manifest_truth_bound":bool(provenance_manifest.get("bound", false)),
+		"runtime_manifest_source":provenance_manifest.get("source", "unavailable"),
 		"explicit_missing_rows":(missing_matrix.get("missing_rows", []) as Array).size() == 6,
 		"all_checks_pass":all_checks,
 		"session_mutated":not live_rows_unchanged,
 		"rows_injected":0,
 		"ordinary_completion_substitute":false,
+	}
+
+func _read_provenance_manifest() -> Dictionary:
+	var exists := FileAccess.file_exists(PROVENANCE_MANIFEST)
+	var digest := FileAccess.get_sha256(PROVENANCE_MANIFEST) if exists else ""
+	return {
+		"path":PROVENANCE_MANIFEST,
+		"sha256":digest,
+		"exists":exists,
+		"bound":exists and digest.length() == 64,
+		"source":"runtime_shipped_manifest_bytes",
 	}
 
 func _contract_terminal(outcome: String, build_shape: String) -> Dictionary:
