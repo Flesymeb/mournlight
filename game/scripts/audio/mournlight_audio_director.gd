@@ -6,6 +6,7 @@ extends Node
 var music: AudioStreamPlayer
 var voices: Array[AudioStreamPlayer] = []
 var movement_voices: Array[AudioStreamPlayer] = []
+var terminal_victory_voice: AudioStreamPlayer
 var movement_window_remaining: Array[float] = []
 var voice_owners: Array[String] = []
 var voice_priorities: Array[int] = []
@@ -29,6 +30,15 @@ var terminal_audio_semantic := ""
 var terminal_audio_generation := 0
 var terminal_audio_reset_generation := 0
 var last_terminal_audio_receipt: Dictionary = {}
+var terminal_voice_window_remaining := 0.0
+var terminal_voice_retirement_reason := "idle"
+var terminal_source_start_count := 0
+var terminal_voice_start_pending := false
+var terminal_voice_started_msec := 0
+var terminal_voice_finished_msec := 0
+var terminal_voice_last_finished_position := 0.0
+var terminal_voice_declared_source_path := ""
+var terminal_voice_runtime_decode := "scene_resource"
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -36,6 +46,12 @@ func _ready() -> void:
 	music.name = "MusicVoice"
 	music.bus = &"Music"
 	add_child(music)
+	terminal_victory_voice = get_node_or_null("TerminalVictoryVoice") as AudioStreamPlayer
+	if terminal_victory_voice:
+		terminal_victory_voice.bus = &"Effects"
+		terminal_victory_voice.max_polyphony = 1
+		terminal_voice_declared_source_path = terminal_victory_voice.stream.resource_path if terminal_victory_voice.stream else ""
+		terminal_victory_voice.finished.connect(_on_terminal_victory_finished)
 	for child_name in [&"FootstepVoiceA", &"FootstepVoiceB"]:
 		var movement_voice := get_node_or_null(NodePath(child_name)) as AudioStreamPlayer
 		if movement_voice:
@@ -61,6 +77,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_retire_expired_movement_windows(delta)
 	_retire_expired_windows(delta)
+	_retire_expired_terminal_window(delta)
 	if get_tree().paused:
 		return
 	var controller := get_parent()
@@ -134,7 +151,8 @@ func _on_state_changed(_previous: String, current: String) -> void:
 func _acquire_terminal_audio(semantic: String, owner: String) -> bool:
 	if not terminal_audio_semantic.is_empty():
 		return terminal_audio_semantic == semantic
-	if not play_semantic(semantic):
+	var started := _play_terminal_victory() if semantic == "victory" else play_semantic(semantic)
+	if not started:
 		return false
 	terminal_audio_generation += 1
 	terminal_audio_semantic = semantic
@@ -153,8 +171,72 @@ func _acquire_terminal_audio(semantic: String, owner: String) -> bool:
 		"source_receipt":String(library.get_meta("victory_source_receipt", "")) if semantic == "victory" and library else "",
 		"source_sha256":String(library.get_meta("victory_source_sha256", "")) if semantic == "victory" and library else "",
 		"acquired_process_frame":Engine.get_process_frames(),
+		"voice_path":String(terminal_victory_voice.get_path()) if semantic == "victory" and terminal_victory_voice else "dynamic_semantic_pool",
+		"bus":String(terminal_victory_voice.bus) if semantic == "victory" and terminal_victory_voice else "Effects",
+		"source_started":terminal_victory_voice.playing if semantic == "victory" and terminal_victory_voice else true,
+		"playback_position_seconds":terminal_victory_voice.get_playback_position() if semantic == "victory" and terminal_victory_voice else 0.0,
+		"retirement_reason":terminal_voice_retirement_reason if semantic == "victory" else "dynamic_window",
 	}
 	return true
+
+func _play_terminal_victory() -> bool:
+	var streams := _streams_for("victory")
+	if not terminal_victory_voice or streams.is_empty():
+		missing_source_counts["victory"] = int(missing_source_counts.get("victory", 0)) + 1
+		rejected_counts["victory"] = int(rejected_counts.get("victory", 0)) + 1
+		return false
+	var volumes: Dictionary = library.get_meta("volumes_db", {}) if library else {}
+	var windows: Dictionary = library.get_meta("playback_windows", {}) if library else {}
+	terminal_victory_voice.stop()
+	terminal_victory_voice.volume_db = float(volumes.get("victory", -4.0))
+	terminal_victory_voice.pitch_scale = 1.0
+	terminal_voice_window_remaining = maxf(0.1, float(windows.get("victory", 1.5)))
+	terminal_voice_retirement_reason = "start_deferred"
+	terminal_voice_start_pending = true
+	call_deferred("_start_terminal_victory_source")
+	semantic_counts["victory"] = int(semantic_counts.get("victory", 0)) + 1
+	return true
+
+func _start_terminal_victory_source() -> void:
+	if not terminal_voice_start_pending or terminal_audio_semantic != "victory" or not terminal_victory_voice:
+		return
+	terminal_voice_start_pending = false
+	terminal_voice_retirement_reason = "playing_window"
+	terminal_victory_voice.play()
+	terminal_source_start_count += 1
+	terminal_voice_started_msec = Time.get_ticks_msec()
+	if not last_terminal_audio_receipt.is_empty():
+		last_terminal_audio_receipt["source_started"] = true
+		last_terminal_audio_receipt["source_start_process_frame"] = Engine.get_process_frames()
+
+func _retire_expired_terminal_window(_delta: float) -> void:
+	if terminal_voice_window_remaining <= 0.0:
+		return
+	# The accepted recording is already shorter than its declared playback
+	# window. Let AudioServer finish the scene-bound source; process-frame catchup
+	# must never stop it before the mixer emits onset.
+	if terminal_victory_voice and terminal_victory_voice.playing:
+		terminal_voice_window_remaining = maxf(0.0, 1.5 - terminal_victory_voice.get_playback_position())
+
+func _on_terminal_victory_finished() -> void:
+	terminal_voice_finished_msec = Time.get_ticks_msec()
+	terminal_voice_last_finished_position = terminal_victory_voice.get_playback_position() if terminal_victory_voice else 0.0
+	_retire_terminal_victory("source_finished", false)
+
+func _retire_terminal_victory(reason: String, stop_source := true) -> bool:
+	if not terminal_victory_voice:
+		return false
+	var was_active := terminal_victory_voice.playing or terminal_voice_window_remaining > 0.0
+	if stop_source and terminal_victory_voice.playing:
+		terminal_victory_voice.stop()
+	terminal_voice_window_remaining = 0.0
+	terminal_voice_start_pending = false
+	terminal_voice_retirement_reason = reason
+	if not last_terminal_audio_receipt.is_empty():
+		last_terminal_audio_receipt["completed"] = was_active
+		last_terminal_audio_receipt["retirement_reason"] = reason
+		last_terminal_audio_receipt["retired_process_frame"] = Engine.get_process_frames()
+	return was_active
 
 func _set_music(state: String) -> void:
 	var streams := _streams_for("music")
@@ -178,6 +260,8 @@ func _stop_music() -> void:
 func play_semantic(id: String) -> bool:
 	if id == "footstep":
 		return _play_footstep_direct()
+	if id == "victory":
+		return _acquire_terminal_audio("victory", "semantic_victory")
 	var streams := _streams_for(id)
 	if streams.is_empty():
 		missing_source_counts[id] = int(missing_source_counts.get(id, 0)) + 1
@@ -307,6 +391,8 @@ func _active_movement_voice_count() -> int:
 
 func active_effect_voice_count() -> int:
 	var active := _active_movement_voice_count()
+	if terminal_victory_voice and terminal_victory_voice.playing:
+		active += 1
 	for voice in voices:
 		if voice.playing:
 			active += 1
@@ -398,6 +484,7 @@ func _retire_movement_owner(reason: String) -> int:
 	return retired
 
 func reset_for_run() -> void:
+	_retire_terminal_victory("run_reset")
 	for index in movement_voices.size():
 		_retire_movement_voice(index, "run_reset")
 	for index in voices.size():
@@ -418,12 +505,19 @@ func reset_for_run() -> void:
 	terminal_audio_owner = ""
 	terminal_audio_semantic = ""
 	last_terminal_audio_receipt.clear()
+	terminal_voice_retirement_reason = "run_reset"
+	terminal_source_start_count = 0
+	terminal_voice_start_pending = false
+	terminal_voice_started_msec = 0
+	terminal_voice_finished_msec = 0
+	terminal_voice_last_finished_position = 0.0
 	terminal_audio_reset_generation += 1
 
 func retire_run_ownership(route: String, generation: int) -> Dictionary:
 	var stopped_effects := 0
 	var owners_before: Array[String] = []
 	var movement_before := _active_movement_voice_count()
+	var terminal_voice_before := terminal_victory_voice != null and terminal_victory_voice.playing
 	if movement_before > 0:
 		owners_before.append("movement")
 		stopped_effects += _retire_movement_owner("route_%s" % route)
@@ -433,6 +527,10 @@ func retire_run_ownership(route: String, generation: int) -> Dictionary:
 			owners_before.append(voice_owners[index])
 		voices[index].stop()
 		_release_voice(index)
+	if terminal_voice_before:
+		stopped_effects += 1
+		owners_before.append("critical_terminal")
+		_retire_terminal_victory("route_%s" % route)
 	_stop_music()
 	_footstep_clock = 0.0
 	_movement_was_active = false
@@ -445,7 +543,7 @@ func retire_run_ownership(route: String, generation: int) -> Dictionary:
 		terminal_audio_owner = ""
 		terminal_audio_semantic = ""
 		terminal_audio_reset_generation += 1
-	return {"route":route, "generation":generation, "stopped_effects":stopped_effects, "owners_before":owners_before, "movement_before":movement_before, "active_effect_voices":active_effect_voice_count(), "active_movement_voices":_active_movement_voice_count(), "music_state":music_state, "music_playing":music.playing, "released_terminal":released_terminal, "terminal_preserved":preserve_terminal}
+	return {"route":route, "generation":generation, "stopped_effects":stopped_effects, "owners_before":owners_before, "movement_before":movement_before, "terminal_voice_before":terminal_voice_before, "active_effect_voices":active_effect_voice_count(), "active_movement_voices":_active_movement_voice_count(), "music_state":music_state, "music_playing":music.playing, "released_terminal":released_terminal, "terminal_preserved":preserve_terminal}
 
 func _mcp_state() -> Dictionary:
 	var playing := _active_movement_voice_count()
@@ -457,12 +555,30 @@ func _mcp_state() -> Dictionary:
 			playing += 1
 			var owner := voice_owners[index]
 			active_by_owner[owner] = int(active_by_owner.get(owner, 0)) + 1
-	return {"music_state":music_state,"music_playing":music.playing,"active_effect_voices":playing,
+	if terminal_victory_voice and terminal_victory_voice.playing:
+		playing += 1
+		active_by_owner["critical_terminal"] = 1
+	return {"music_state":music_state,"music_playing":music.playing,
+		"terminal_voice_bound":terminal_victory_voice != null,
+		"terminal_voice_playing":terminal_victory_voice.playing if terminal_victory_voice else false,
+		"terminal_voice_start_pending":terminal_voice_start_pending,
+		"terminal_voice_bus":String(terminal_victory_voice.bus) if terminal_victory_voice else "",
+		"terminal_voice_stream_path":terminal_voice_declared_source_path,
+		"terminal_voice_runtime_decode":terminal_voice_runtime_decode,
+		"terminal_voice_window_remaining_seconds":terminal_voice_window_remaining,
+		"terminal_source_start_count":terminal_source_start_count,
+		"terminal_voice_retirement_reason":terminal_voice_retirement_reason,
+		"terminal_voice_started_msec":terminal_voice_started_msec,
+		"terminal_voice_finished_msec":terminal_voice_finished_msec,
+		"terminal_voice_wall_duration_seconds":float(terminal_voice_finished_msec - terminal_voice_started_msec) / 1000.0 if terminal_voice_finished_msec >= terminal_voice_started_msec and terminal_voice_started_msec > 0 else 0.0,
+		"terminal_voice_last_finished_position":terminal_voice_last_finished_position,
+		"active_effect_voices":playing,
 		"voice_limit":voices.size() + movement_voices.size(),"semantic_voice_limit":voices.size(),"active_by_owner":active_by_owner,"semantic_counts":semantic_counts,
 		"rejected_counts":rejected_counts,"missing_source_counts":missing_source_counts,
 		"bounded_drop_counts":bounded_drop_counts,"library_bound":library != null,
 		"owner_retire_counts":owner_retire_counts,"last_owner_retirement":last_owner_retirement,
 		"terminal_audio_lease":{"active":not terminal_audio_semantic.is_empty(),"semantic":terminal_audio_semantic,"owner":terminal_audio_owner,"generation":terminal_audio_generation,"reset_generation":terminal_audio_reset_generation,"receipt":last_terminal_audio_receipt},
+		"terminal_voice":{"bound":terminal_victory_voice != null,"path":String(terminal_victory_voice.get_path()) if terminal_victory_voice else "","stream_path":terminal_victory_voice.stream.resource_path if terminal_victory_voice and terminal_victory_voice.stream else "","bus":String(terminal_victory_voice.bus) if terminal_victory_voice else "","playing":terminal_victory_voice.playing if terminal_victory_voice else false,"playback_position_seconds":terminal_victory_voice.get_playback_position() if terminal_victory_voice else 0.0,"window_remaining_seconds":terminal_voice_window_remaining,"source_start_count":terminal_source_start_count,"retirement_reason":terminal_voice_retirement_reason},
 		"movement_voice_limit":movement_voices.size(),"active_movement_voices":_active_movement_voice_count(),
 		"footstep_sources":movement_voices.map(func(voice: AudioStreamPlayer) -> Dictionary: return {"path":String(voice.get_path()),"stream_path":voice.stream.resource_path if voice.stream else "","bus":String(voice.bus),"playing":voice.playing,"playback_position":voice.get_playback_position() if voice.playing else 0.0}),
 		"footstep_source_starts":footstep_source_starts,"footstep_source_retirements":footstep_source_retirements,"last_footstep_rejection":last_footstep_rejection,

@@ -22,6 +22,8 @@ extends Camera3D
 @export var presentation_body: NodePath
 @export var presentation_lantern: NodePath
 @export var presentation_effects: Array[NodePath] = []
+@export var tall_occluders: Array[NodePath] = []
+@export var direct_sight_volume_radius := 0.9
 
 const VISIBILITY_LAYER := 20
 
@@ -51,12 +53,16 @@ var _visibility_camera: Camera3D
 var _visibility_canvas: CanvasLayer
 var _visibility_texture: TextureRect
 var _compositor_frame_count := 0
+var _tall_occluder_bindings: Array[Dictionary] = []
+var _direct_detection_active := false
+var _detection_source := "clear"
 
 func _ready() -> void:
 	current = true
 	fov = normal_fov
 	if target:
 		_bind_visibility_presentation()
+		_bind_tall_occluders()
 		_build_visibility_compositor()
 		_snap_to_target()
 
@@ -195,6 +201,24 @@ func _bind_visibility_presentation() -> void:
 			_effect_visuals.append(visual)
 		_binding_members.append({"role":"effect", "bound":true, "source_path":String(effect_path), "isolation":"complete_private_layer_compositor", "visual_count":visuals.size()})
 
+func _bind_tall_occluders() -> void:
+	_tall_occluder_bindings.clear()
+	for source_path in tall_occluders:
+		var body := get_node_or_null(source_path) as CollisionObject3D
+		var shapes: Array[CollisionShape3D] = []
+		if is_instance_valid(body):
+			for child in body.find_children("*", "CollisionShape3D", true, false):
+				if child is CollisionShape3D and is_instance_valid((child as CollisionShape3D).shape):
+					shapes.append(child as CollisionShape3D)
+		_tall_occluder_bindings.append({
+			"source_path":String(source_path),
+			"resolved_path":String(body.get_path()) if is_instance_valid(body) else "",
+			"body":body,
+			"shapes":shapes,
+			"bound":is_instance_valid(body) and not shapes.is_empty(),
+			"shape_count":shapes.size(),
+		})
+
 func _bind_member(role: String, source_path: NodePath) -> void:
 	var source := get_node_or_null(source_path)
 	var source_members := _collect_visuals(source)
@@ -289,6 +313,14 @@ func _sync_visibility_camera() -> void:
 func _update_visibility_isolation(delta: float) -> void:
 	_visibility_samples_blocked = 0
 	_last_occluder = ""
+	_direct_detection_active = false
+	_detection_source = "clear"
+	var direct_occluder := _find_registered_sight_occluder()
+	if not direct_occluder.is_empty():
+		_direct_detection_active = true
+		_detection_source = "registered_tall_occluder_sight_volume"
+		_last_occluder = direct_occluder
+		_visibility_samples_blocked = 1
 	var space_state := get_world_3d().direct_space_state
 	var exclude: Array[RID] = []
 	if target is CollisionObject3D:
@@ -299,18 +331,20 @@ func _update_visibility_isolation(delta: float) -> void:
 	if is_instance_valid(ground):
 		exclude.append(ground.get_rid())
 	for height in [0.45, 0.95, 1.45]:
+		if _direct_detection_active:
+			break
 		var target_point: Vector3 = target.global_position + Vector3.UP * float(height)
-		var sight_direction: Vector3 = (target_point - global_position).normalized()
 		var query := PhysicsRayQueryParameters3D.new()
 		query.from = global_position
-		# Imported collision proxies are intentionally conservative. Extend the
-		# sightline by roughly one actor depth so overlap is detected while the
-		# silhouette is entering cover, not only after its origin disappears.
-		query.to = target_point + sight_direction * visibility_probe_overscan
+		# The ray remains a fallback for unregistered incidental geometry. Tall
+		# authored occluders are owned by the explicit conservative volume above,
+		# so activation no longer depends on overscanning this short ray.
+		query.to = target_point
 		query.exclude = exclude
 		query.collide_with_areas = false
 		var hit := space_state.intersect_ray(query)
 		if not hit.is_empty():
+			_detection_source = "fallback_physics_ray"
 			_visibility_samples_blocked += 1
 			if _last_occluder.is_empty() and is_instance_valid(hit.get("collider")):
 				_last_occluder = String((hit.collider as Node).get_path())
@@ -328,6 +362,68 @@ func _update_visibility_isolation(delta: float) -> void:
 	if next_active != occlusion_guard_active:
 		occlusion_guard_active = next_active
 		_apply_visibility_overlay(occlusion_guard_active)
+
+func _find_registered_sight_occluder() -> String:
+	if not is_instance_valid(target):
+		return ""
+	var target_points := [
+		target.global_position + Vector3.UP * 0.35,
+		target.global_position + Vector3.UP * 1.0,
+		target.global_position + Vector3.UP * 1.75,
+	]
+	for binding in _tall_occluder_bindings:
+		if not bool(binding.get("bound", false)):
+			continue
+		for shape in binding.get("shapes", []):
+			if not is_instance_valid(shape) or shape.disabled:
+				continue
+			for target_point in target_points:
+				if _sight_segment_intersects_shape_volume(global_position, target_point, shape):
+					return String(binding.get("resolved_path", binding.get("source_path", "")))
+	return ""
+
+func _sight_segment_intersects_shape_volume(from_world: Vector3, to_world: Vector3, collision_shape: CollisionShape3D) -> bool:
+	var shape_transform := collision_shape.global_transform
+	var local_from := shape_transform.affine_inverse() * from_world
+	var local_to := shape_transform.affine_inverse() * to_world
+	var extents := Vector3.ONE * direct_sight_volume_radius
+	if collision_shape.shape is BoxShape3D:
+		extents += (collision_shape.shape as BoxShape3D).size * 0.5
+	elif collision_shape.shape is CylinderShape3D:
+		var cylinder := collision_shape.shape as CylinderShape3D
+		extents += Vector3(cylinder.radius, cylinder.height * 0.5, cylinder.radius)
+	elif collision_shape.shape is CapsuleShape3D:
+		var capsule := collision_shape.shape as CapsuleShape3D
+		extents += Vector3(capsule.radius, capsule.height * 0.5, capsule.radius)
+	else:
+		return false
+	return _segment_intersects_centered_aabb(local_from, local_to, extents)
+
+func _segment_intersects_centered_aabb(from: Vector3, to: Vector3, extents: Vector3) -> bool:
+	var direction := to - from
+	var entry := 0.0
+	var exit := 1.0
+	for axis in 3:
+		var origin := from[axis]
+		var delta := direction[axis]
+		var minimum := -extents[axis]
+		var maximum := extents[axis]
+		if absf(delta) <= 0.00001:
+			if origin < minimum or origin > maximum:
+				return false
+			continue
+		var inverse := 1.0 / delta
+		var near_time := (minimum - origin) * inverse
+		var far_time := (maximum - origin) * inverse
+		if near_time > far_time:
+			var swap := near_time
+			near_time = far_time
+			far_time = swap
+		entry = maxf(entry, near_time)
+		exit = minf(exit, far_time)
+		if entry > exit:
+			return false
+	return true
 
 func _apply_visibility_overlay(active: bool) -> void:
 	if not is_instance_valid(_visibility_viewport) or not is_instance_valid(_visibility_texture):
@@ -383,12 +479,27 @@ func _mcp_state() -> Dictionary:
 		"follow_height": follow_height,
 		"follow_distance": follow_distance,
 		"occlusion_guard_active": occlusion_guard_active,
+		"direct_occluder_detection_active":_direct_detection_active,
+		"occluder_detection_source":_detection_source,
+		"active_occluder_path":_last_occluder,
+		"registered_tall_occluder_count":_tall_occluder_bindings.filter(func(binding: Dictionary) -> bool: return bool(binding.get("bound", false))).size(),
 		"presentation_binding_complete": _binding_members.size() == 5 and _source_visuals.size() >= 2 and _effect_visuals.size() == 3,
 		"presentation_roles": ["body", "lantern", "dash_aura", "active_ring", "warden_halo"],
 		"original_presentation_restored": _original_presentation_restored(),
 		"primary_camera_visibility_layer": get_cull_mask_value(VISIBILITY_LAYER),
 		"source_visual_count": _source_visuals.size(),
 		"visibility_strategy": "projected_safe_frame_with_secondary_private_layer_compositor",
+		"tall_occluder_registry":{
+			"requested_count":tall_occluders.size(),
+			"bound_count":_tall_occluder_bindings.filter(func(binding: Dictionary) -> bool: return bool(binding.get("bound", false))).size(),
+			"bindings":_tall_occluder_bindings.map(func(binding: Dictionary) -> Dictionary: return {
+				"source_path":binding.get("source_path", ""), "resolved_path":binding.get("resolved_path", ""),
+				"bound":binding.get("bound", false), "shape_count":binding.get("shape_count", 0),
+			}),
+			"sight_volume_radius":direct_sight_volume_radius,
+			"direct_detection_active":_direct_detection_active,
+			"detection_source":_detection_source,
+		},
 		"visibility_isolation": {
 			"active": occlusion_guard_active, "blocked_samples": _visibility_samples_blocked,
 			"sample_count": 3, "blocked_seconds": _blocked_seconds,

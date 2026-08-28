@@ -83,6 +83,7 @@ var _victory_transaction_active := false
 var _victory_hold_remaining := 0.0
 var _victory_hold_elapsed := 0.0
 var _victory_source_run_serial := -1
+var _victory_hold_started_msec := 0
 var _profile_start_lifecycle: Dictionary = {}
 
 func _ready() -> void:
@@ -237,6 +238,7 @@ func _begin_run() -> void:
 	_victory_hold_remaining = 0.0
 	_victory_hold_elapsed = 0.0
 	_victory_source_run_serial = -1
+	_victory_hold_started_msec = 0
 	boss_snapshot.clear()
 	result_committed = false
 	terminal_commit_count = 0
@@ -695,6 +697,7 @@ func _on_boss_defeated(_event: Dictionary) -> void:
 	_victory_hold_remaining = VICTORY_PRESENTATION_HOLD_SECONDS
 	_victory_hold_elapsed = 0.0
 	_victory_source_run_serial = run_serial
+	_victory_hold_started_msec = Time.get_ticks_msec()
 	var acquisition_frame := Engine.get_process_frames()
 	var lease_acquired := false
 	if warden.animation_binding:
@@ -741,16 +744,23 @@ func _advance_victory_transaction(delta: float) -> void:
 	if _victory_source_run_serial != run_serial:
 		_victory_transaction_active = false
 		return
-	_victory_hold_elapsed += delta
-	_victory_hold_remaining = maxf(0.0, _victory_hold_remaining - delta)
+	# A paused preparation can resume with a catch-up delta. The terminal hold is
+	# a presentation window, so one hitch must not skip Cheer and audio onset.
+	var presentation_delta := minf(maxf(delta, 0.0), 0.1)
+	_victory_hold_elapsed += presentation_delta
+	_victory_hold_remaining = maxf(0.0, _victory_hold_remaining - presentation_delta)
 	ordinary_victory_receipt["presentation_hold"] = {
 		"required_seconds":VICTORY_PRESENTATION_HOLD_SECONDS,
 		"elapsed_seconds":_victory_hold_elapsed,
 		"remaining_seconds":_victory_hold_remaining,
 		"complete":_victory_hold_remaining <= 0.0,
+		"wall_elapsed_seconds":float(Time.get_ticks_msec() - _victory_hold_started_msec) / 1000.0,
+		"audio_source_completed":audio_director.terminal_voice_retirement_reason == "source_finished",
 	}
 	ordinary_victory_receipt["held_animation"] = warden.animation_binding.get_snapshot() if warden.animation_binding else {}
-	if _victory_hold_remaining <= 0.0:
+	var wall_elapsed := float(Time.get_ticks_msec() - _victory_hold_started_msec) / 1000.0
+	var audio_source_completed := audio_director.terminal_voice_retirement_reason == "source_finished"
+	if _victory_hold_remaining <= 0.0 and wall_elapsed >= VICTORY_PRESENTATION_HOLD_SECONDS and audio_source_completed:
 		_commit_victory_transaction()
 
 func _commit_victory_transaction() -> void:
