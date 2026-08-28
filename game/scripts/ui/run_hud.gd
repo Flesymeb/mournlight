@@ -56,8 +56,29 @@ func _draw() -> void:
 	_draw_encounter_cluster(Vector2(viewport.x - 270, 28))
 	_draw_weapon_cluster(Vector2(viewport.x * 0.5 - 128, viewport.y - 106))
 	_draw_dash_cluster(Vector2(viewport.x - 132, viewport.y - 126))
+	_draw_first_run_guidance(viewport)
 	if bool(snapshot.get("boss_active", false)):
 		_draw_boss_cluster(Vector2(viewport.x * 0.5 - 260, 72))
+
+func _draw_first_run_guidance(viewport: Vector2) -> void:
+	var guidance: Dictionary = snapshot.get("first_run_guidance", {})
+	if not bool(guidance.get("visible", false)):
+		return
+	var rect := Rect2(Vector2(viewport.x * 0.5 - 295.0, viewport.y - 174.0), Vector2(590.0, 48.0))
+	draw_rect(rect, Color(0.015, 0.02, 0.045, 0.82), true)
+	draw_line(rect.position, rect.position + Vector2(rect.size.x, 0), BRASS, 2.0, true)
+	draw_line(rect.end - Vector2(rect.size.x, 0), rect.end, Color(BRASS, 0.38), 1.0, true)
+	var icon_center := rect.position + Vector2(28.0, 24.0)
+	match String(guidance.get("icon", "lantern")):
+		"wisp":
+			draw_circle(icon_center, 8.0, VIOLET)
+			draw_arc(icon_center, 14.0, -2.6, 0.55, 18, SILVER, 2.0, true)
+		"upgrade":
+			draw_colored_polygon(PackedVector2Array([icon_center + Vector2(0,-12),icon_center + Vector2(11,0),icon_center + Vector2(0,12),icon_center + Vector2(-11,0)]), Color(GOLD,0.9))
+		_:
+			_draw_lantern(icon_center, 15.0, GOLD)
+	_draw_text(String(guidance.get("title", "KEEPER'S FIRST VIGIL")), rect.position + Vector2(52, 18), 10, GOLD)
+	_draw_text(String(guidance.get("prompt", "")), rect.position + Vector2(52, 36), 10, INK)
 
 func _draw_health_cluster(origin: Vector2) -> void:
 	var current := float(snapshot.get("health", 0.0))
@@ -177,7 +198,8 @@ func _mcp_state() -> Dictionary:
 		"experience":snapshot.get("experience",0),"experience_threshold":snapshot.get("experience_threshold",0),
 		"level":snapshot.get("level",1),"wave":snapshot.get("wave",1),"wave_count":snapshot.get("wave_count",5),
 		"elapsed":snapshot.get("elapsed",0.0),"weapon_ranks":_weapon_rank_digest(),"dash_phase":snapshot.get("dash_phase","ready"),
-		"boss_active":snapshot.get("boss_active",false),"boss_health":snapshot.get("boss_health",0.0),"boss_health_maximum":snapshot.get("boss_health_maximum",0.0)},
+		"boss_active":snapshot.get("boss_active",false),"boss_health":snapshot.get("boss_health",0.0),"boss_health_maximum":snapshot.get("boss_health_maximum",0.0),
+		"first_run_guidance":snapshot.get("first_run_guidance",{})},
 		"snapshot_serial": snapshot_serial, "visible": visible}
 
 func _weapon_rank_digest() -> Array[Dictionary]:

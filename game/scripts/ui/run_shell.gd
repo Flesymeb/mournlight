@@ -258,7 +258,10 @@ func set_mode(next_mode: String, next_summary: Dictionary = {}) -> void:
 			_configure("MOURNLIGHT","THE CEMETERY GARDEN STIRS","Keep an escape lane. Let the lantern choose its mark.",
 				[["play","PLAY"],["settings","SETTINGS"],["credits","CREDITS & NOTICES"],["quit","QUIT"]])
 		"pause":
-			_configure("NIGHT HELD","THE WARDEN'S FLAME WAITS","The run is paused; no combat clock is advancing.",
+			var guidance: Dictionary = summary.get("first_run_guidance", {})
+			var bindings: Dictionary = guidance.get("bindings", {})
+			var controls := "MOVE  %s    ·    DASH  %s\nThe lantern attacks automatically; fallen threats release collectible wisps." % [String(bindings.get("move", "MOVE")), String(bindings.get("dash", "DASH"))]
+			_configure("NIGHT HELD","THE WARDEN'S FLAME WAITS","The run is paused; no combat clock is advancing.\n\n" + controls,
 				[["resume","RESUME"],["settings","SETTINGS"],["retry","RESTART RUN"],["title","RETURN TO TITLE"],["quit","QUIT"]])
 		"settings":
 			_refresh_settings_page()

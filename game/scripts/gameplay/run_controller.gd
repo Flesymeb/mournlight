@@ -118,6 +118,8 @@ var _profile_sample_counter_reads := 0
 var _profile_gate_counter_reads := 0
 var _profile_coverage: Dictionary = {}
 var _profile_coverage_first_seen: Dictionary = {}
+var _first_run_guidance_completed := false
+var _first_run_guidance_completion: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -763,6 +765,16 @@ func _on_draft_choice(index: int) -> void:
 	choice["natural_choice"] = run_route_kind == "ordinary" and int(wave_state.get("diagnostic_jump_count", 0)) == 0
 	choice["truthful_transaction"] = bool((choice.get("application", {}) as Dictionary).get("accepted", false)) and bool((choice.get("application", {}) as Dictionary).get("matches_projection", false))
 	selected_upgrades.append(choice)
+	if bool(choice.get("natural_choice", false)) and not _first_run_guidance_completed:
+		_first_run_guidance_completed = true
+		_first_run_guidance_completion = {
+			"completed":true,
+			"run_serial":run_serial,
+			"draft_serial":draft_controller.draft_serial,
+			"upgrade_id":String(choice.get("id", "")),
+			"elapsed":run_elapsed,
+			"stages_taught":["movement_and_automatic_attack", "world_drop", "attraction_and_collection", "natural_upgrade_draft"],
+		}
 	complete_run_ledger.record_draft(choice, run_elapsed, run_route_kind, int(wave_state.get("diagnostic_jump_count", 0)))
 	draft_view.close()
 	get_tree().paused = false
@@ -1205,6 +1217,11 @@ func _advance_final_profile() -> void:
 	_profile_start_counts = _profile_counts()
 	_profile_start_lifecycle = _lifecycle_counters()
 	var cohort := spawner.begin_validation_profile_cohort(32, int(validation_profile_receipt.get("setup_generation", 0)))
+	_profile_coverage.clear()
+	_profile_coverage_first_seen.clear()
+	var initial_density := int(spawner.get_profile_counters().get("live", 0))
+	var initial_observation := _profile_cached_system_observation(initial_density)
+	_accumulate_profile_coverage(initial_observation)
 	validation_profile_sample = {
 		"status":"sampling", "branch_id":validation_profile_receipt.get("branch_id",""),
 		"sample_kind":_profile_origin, "route_kind":run_route_kind,
@@ -1220,6 +1237,9 @@ func _advance_final_profile() -> void:
 		"start_counts":_profile_start_counts.duplicate(true),
 		"start_lifecycle":_profile_start_lifecycle.duplicate(true),
 		"cohort_start":cohort,
+		"coverage":_profile_coverage.duplicate(true),
+		"coverage_first_seen":_profile_coverage_first_seen.duplicate(true),
+		"initial_observation":initial_observation,
 		"work_caps":_dense_work_caps(spawner.get_snapshot()),
 		"workload_start":_profile_workload_receipt(spawner.get_snapshot()),
 	}
@@ -1332,8 +1352,7 @@ func _advance_profile_sample(delta: float) -> void:
 		return
 	_profile_sample_counter_reads += 1
 	var live_density := int(spawner.get_profile_counters().get("live", 0))
-	if _profile_origin == "ordinary_final_wave_passive":
-		_accumulate_profile_coverage(_profile_cached_system_observation(live_density))
+	_accumulate_profile_coverage(_profile_cached_system_observation(live_density))
 	if _profile_samples_ms.is_empty():
 		_profile_minimum_enemy_workload = live_density
 		_profile_maximum_enemy_workload = live_density
@@ -1356,6 +1375,14 @@ func _advance_profile_sample(delta: float) -> void:
 	var sample_start := validation_profile_sample.duplicate(true)
 	var cohort := spawner.end_validation_profile_cohort("sample_complete") if _profile_origin.begins_with("diagnostic_") else {}
 	var end_counts := _profile_counts()
+	var end_workload := _profile_workload_receipt(spawner.get_snapshot())
+	var over_budget_count := 0
+	var long_frame_count := 0
+	for sample_ms in _profile_samples_ms:
+		if sample_ms > 16.67:
+			over_budget_count += 1
+		if sample_ms > 33.33:
+			long_frame_count += 1
 	validation_profile_sample = {
 		"status":"complete", "branch_id":sample_branch,
 		"sample_kind":_profile_origin, "route_kind":run_route_kind,
@@ -1372,8 +1399,8 @@ func _advance_profile_sample(delta: float) -> void:
 		"missing_coverage":_missing_profile_coverage(_profile_coverage),
 		"density_threshold_crossing":sample_start.get("density_threshold_crossing", {}),
 		"sample_count":sorted.size(), "window_seconds":_profile_elapsed,
-		"frame_ms":{"p50":_percentile(sorted,0.50),"p95":_percentile(sorted,0.95),"p99":_percentile(sorted,0.99),"worst":sorted.back() if not sorted.is_empty() else 0.0},
-		"physics_ms":{"p50":_percentile(sorted_physics,0.50),"p95":_percentile(sorted_physics,0.95),"p99":_percentile(sorted_physics,0.99),"worst":sorted_physics.back() if not sorted_physics.is_empty() else 0.0},
+		"frame_ms":{"p50":_percentile(sorted,0.50),"p95":_percentile(sorted,0.95),"p99":_percentile(sorted,0.99),"worst":sorted.back() if not sorted.is_empty() else 0.0,"maximum":sorted.back() if not sorted.is_empty() else 0.0,"budget_ms":16.67,"over_budget_16_67_count":over_budget_count,"over_budget_ratio":float(over_budget_count) / float(sorted.size()) if not sorted.is_empty() else 0.0,"long_frame_33_33_count":long_frame_count},
+		"physics_ms":{"p50":_percentile(sorted_physics,0.50),"p95":_percentile(sorted_physics,0.95),"p99":_percentile(sorted_physics,0.99),"worst":sorted_physics.back() if not sorted_physics.is_empty() else 0.0,"maximum":sorted_physics.back() if not sorted_physics.is_empty() else 0.0},
 		"start_counts":_profile_start_counts.duplicate(true),
 		"end_counts":end_counts.duplicate(true), "counts":end_counts.duplicate(true),
 		"start_lifecycle":_profile_start_lifecycle.duplicate(true),
@@ -1390,7 +1417,8 @@ func _advance_profile_sample(delta: float) -> void:
 		"wave_end":wave_director.get_snapshot().duplicate(true),
 		"work_caps":_dense_work_caps(spawner.get_snapshot()),
 		"workload_start":sample_start.get("workload_start", _profile_workload_receipt(spawner.get_snapshot())),
-		"workload_end":_profile_workload_receipt(spawner.get_snapshot()),
+		"workload_end":end_workload,
+		"subsystem_window":_profile_workload_window(sample_start.get("workload_start", {}), end_workload),
 		"observation_work":_profile_observation_work_receipt(),
 		"route_qualification":_route_qualification(wave_director.get_snapshot()),
 	}
@@ -2089,6 +2117,8 @@ func _profile_workload_receipt(encounter: Dictionary) -> Dictionary:
 	var attack_state := world.attack_runtime._mcp_state()
 	var light_budget: Dictionary = encounter.get("ordinary_light_budget", {})
 	var counts := _profile_counts()
+	var neighbor_work: Dictionary = encounter.get("neighbor_registry", {})
+	var actor_work: Dictionary = encounter.get("actor_workload", {})
 	return {
 		"role_composition":(encounter.get("roles", {}) as Dictionary).duplicate(true),
 		"active_and_pooled":{"active":encounter.get("live", 0),"pooled":encounter.get("pooled", 0)},
@@ -2097,11 +2127,88 @@ func _profile_workload_receipt(encounter: Dictionary) -> Dictionary:
 		"pickups":counts.get("pickups", 0),
 		"effects":counts.get("effects", 0),
 		"audio":{"active_voices":audio_state.get("active_effect_voices", 0),"active_by_owner":(audio_state.get("active_by_owner", {}) as Dictionary).duplicate(true),"voice_limit":audio_state.get("voice_limit", 0)},
-		"neighbor_work":(encounter.get("neighbor_registry", {}) as Dictionary).duplicate(true),
+		"neighbor_work":neighbor_work.duplicate(true),
+		"targeting":{"queries":neighbor_work.get("total_target_queries", 0),"candidate_visits":neighbor_work.get("total_target_candidate_visits", 0),"maximum_result_size":neighbor_work.get("target_maximum_result_size", 0),"full_group_inventories":neighbor_work.get("full_group_inventory_count", 0)},
+		"steering":{"steps":actor_work.get("steering_steps", 0),"neighbor_queries":neighbor_work.get("total_queries", 0),"candidate_visits":neighbor_work.get("total_candidate_visits", 0)},
+		"physics":{"actor_steps":actor_work.get("physics_steps", 0),"body_motion_steps":actor_work.get("body_motion_steps", 0),"explicit_space_queries":actor_work.get("explicit_space_queries", 0)},
 		"presentation_updates":(encounter.get("dense_presentation_budget", {}) as Dictionary).duplicate(true),
 		"light_owners":{"active":light_budget.get("active", 0),"role":(light_budget.get("role", {}) as Dictionary).duplicate(true),"hurt":(light_budget.get("hurt", {}) as Dictionary).duplicate(true)},
 		"telegraph_admission":(encounter.get("telegraph_admission", {}) as Dictionary).duplicate(true),
 	}
+
+func _profile_workload_window(start: Dictionary, finish: Dictionary) -> Dictionary:
+	var start_targeting: Dictionary = start.get("targeting", {})
+	var end_targeting: Dictionary = finish.get("targeting", {})
+	var start_steering: Dictionary = start.get("steering", {})
+	var end_steering: Dictionary = finish.get("steering", {})
+	var start_physics: Dictionary = start.get("physics", {})
+	var end_physics: Dictionary = finish.get("physics", {})
+	var start_presentation: Dictionary = start.get("presentation_updates", {})
+	var end_presentation: Dictionary = finish.get("presentation_updates", {})
+	var start_attacks: Dictionary = start.get("attacks", {})
+	var end_attacks: Dictionary = finish.get("attacks", {})
+	return {
+		"targeting":{"queries":maxi(0, int(end_targeting.get("queries", 0)) - int(start_targeting.get("queries", 0))),"candidate_visits":maxi(0, int(end_targeting.get("candidate_visits", 0)) - int(start_targeting.get("candidate_visits", 0))),"full_group_inventories":int(end_targeting.get("full_group_inventories", 0))},
+		"steering":{"steps":maxi(0, int(end_steering.get("steps", 0)) - int(start_steering.get("steps", 0))),"neighbor_queries":maxi(0, int(end_steering.get("neighbor_queries", 0)) - int(start_steering.get("neighbor_queries", 0))),"candidate_visits":maxi(0, int(end_steering.get("candidate_visits", 0)) - int(start_steering.get("candidate_visits", 0)))},
+		"physics":{"actor_steps":maxi(0, int(end_physics.get("actor_steps", 0)) - int(start_physics.get("actor_steps", 0))),"body_motion_steps":maxi(0, int(end_physics.get("body_motion_steps", 0)) - int(start_physics.get("body_motion_steps", 0))),"explicit_space_queries":maxi(0, int(end_physics.get("explicit_space_queries", 0)) - int(start_physics.get("explicit_space_queries", 0)))},
+		"presentation":{"updates":maxi(0, int(end_presentation.get("updates", 0)) - int(start_presentation.get("updates", 0))),"skips":maxi(0, int(end_presentation.get("skips", 0)) - int(start_presentation.get("skips", 0))),"facing_updates":maxi(0, int(end_presentation.get("facing_updates", 0)) - int(start_presentation.get("facing_updates", 0)))},
+		"combat":{"attacks_authorized":maxi(0, int(end_attacks.get("authorized", 0)) - int(start_attacks.get("authorized", 0))),"hits":maxi(0, int(end_attacks.get("hits", 0)) - int(start_attacks.get("hits", 0)))},
+		"end_state":{"projectiles":finish.get("projectiles", 0),"pickups":finish.get("pickups", 0),"effects":finish.get("effects", 0),"audio":finish.get("audio", {}),"lights":finish.get("light_owners", {}),"telegraphs":finish.get("telegraph_admission", {})},
+		"counter_reset_scope":"ordinary_run",
+	}
+
+func _first_run_guidance_snapshot() -> Dictionary:
+	var bindings := {
+		"move":_input_binding_summary([&"move_forward", &"move_left", &"move_back", &"move_right"], 5),
+		"dash":_input_binding_summary([&"context_confirm"], 2),
+		"confirm":_input_binding_summary([&"ui_accept"], 2),
+	}
+	if _first_run_guidance_completed:
+		return {"visible":false,"stage":"complete","completed":true,"completion":_first_run_guidance_completion.duplicate(true),"bindings":bindings,"help_surface":"pause"}
+	if run_route_kind != "ordinary" or run_state not in ["active", "draft"]:
+		return {"visible":false,"stage":"inactive","completed":false,"bindings":bindings,"help_surface":"pause"}
+	var stage := "movement_and_automatic_attack"
+	var title := "KEEPER'S FIRST VIGIL"
+	var prompt := "MOVE  %s    ·    THE WARDEN LANTERN ATTACKS AUTOMATICALLY" % String(bindings.move)
+	var icon := "lantern"
+	if draft_controller.active:
+		stage = "natural_upgrade_draft"
+		prompt = "CHOOSE ONE TRUE UPGRADE  %s    ·    COMBAT RESUMES AFTER IT APPLIES" % String(bindings.confirm)
+		icon = "upgrade"
+	elif pickup_collected_total > 0:
+		stage = "collection_progress"
+		prompt = "COLLECT WISPS TO FILL THE MOON-SILVER LEVEL RING"
+		icon = "wisp"
+	elif pickup_spawned_total > 0:
+		stage = "world_drop_and_attraction"
+		prompt = "FALLEN THREATS RELEASE WISPS    ·    MOVE CLOSE TO DRAW THEM IN"
+		icon = "wisp"
+	return {"visible":true,"stage":stage,"title":title,"prompt":prompt,"icon":icon,"completed":false,"bindings":bindings,"inputmap_bound":true,"dismissal":"complete_first_natural_draft","persists_across_retry_after_completion":true,"help_surface":"pause"}
+
+func _input_binding_summary(actions: Array, maximum_labels: int) -> String:
+	var keyboard_labels: Array[String] = []
+	var device_labels: Array[String] = []
+	for action in actions:
+		for event in InputMap.action_get_events(action):
+			var label := ""
+			if event is InputEventKey:
+				var key_event := event as InputEventKey
+				var keycode := key_event.physical_keycode if key_event.physical_keycode != KEY_NONE else key_event.keycode
+				label = OS.get_keycode_string(keycode).to_upper()
+			elif event is InputEventJoypadMotion:
+				label = "LEFT STICK"
+			elif event is InputEventJoypadButton:
+				label = "GAMEPAD SOUTH"
+			else:
+				label = event.as_text().strip_edges()
+			var destination: Array[String] = keyboard_labels if event is InputEventKey else device_labels
+			if label.is_empty() or destination.has(label):
+				continue
+			destination.append(label)
+	var labels := keyboard_labels + device_labels
+	if labels.size() > maximum_labels:
+		labels.resize(maximum_labels)
+	return " / ".join(labels) if not labels.is_empty() else "UNBOUND"
 
 func _lifecycle_counters() -> Dictionary:
 	var owned_signal_bindings := 0
@@ -2521,6 +2628,10 @@ func _mcp_state() -> Dictionary:
 		"profile_p95_ms":profile_frame_ms.get("p95", 0.0),
 		"profile_p99_ms":profile_frame_ms.get("p99", 0.0),
 		"profile_worst_ms":profile_frame_ms.get("worst", 0.0),
+		"profile_frame_sample_count":validation_profile_sample.get("sample_count", 0),
+		"profile_frame_duration_seconds":validation_profile_sample.get("window_seconds", 0.0),
+		"profile_frames_over_budget":profile_frame_ms.get("over_budget_16_67_count", 0),
+		"profile_subsystem_window":validation_profile_sample.get("subsystem_window", {}),
 		"profile_renderer_classification":profile_renderer.get("classification", "unknown"),
 		"profile_hardware_eligible":profile_renderer.get("hardware_qualification_eligible", false),
 		"profile_viewport_width":profile_viewport.get("width", 0),
@@ -2596,6 +2707,7 @@ func _mcp_state() -> Dictionary:
 		"validation_profile_matrix":_profile_matrix_snapshot(),
 		"tester_victory_fixture":tester_victory_fixture_receipt,
 		"reward_pickups":{"spawned_total":pickup_spawned_total,"collected_total":pickup_collected_total,"live":_active_pickup_count},
+		"first_run_guidance":_first_run_guidance_snapshot(),
 		"shell_focus": String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none",
 	}
 

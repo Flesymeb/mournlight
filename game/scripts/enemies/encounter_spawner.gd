@@ -177,6 +177,7 @@ func reset_encounter(preserve_pressure: bool = false) -> void:
 	for actor in _pool:
 		actor.remove_from_group("active_enemies")
 		actor.return_to_pool()
+		actor.reset_workload_counters()
 	_live_count = 0
 	neighbor_registry.clear()
 
@@ -586,7 +587,16 @@ func get_snapshot() -> Dictionary:
 	var facing_updates := 0
 	var facing_skips := 0
 	var manual_animation_players := 0
+	var actor_physics_steps := 0
+	var actor_steering_steps := 0
+	var actor_body_motion_steps := 0
+	var explicit_space_queries := 0
 	for actor in _pool:
+		var actor_work := actor.get_workload_counters()
+		actor_physics_steps += int(actor_work.get("physics_steps", 0))
+		actor_steering_steps += int(actor_work.get("steering_steps", 0))
+		actor_body_motion_steps += int(actor_work.get("body_motion_steps", 0))
+		explicit_space_queries += int(actor_work.get("explicit_space_queries", 0))
 		if actor.state == "pooled" or not actor.profile:
 			continue
 		var role := String(actor.profile.role_id)
@@ -659,6 +669,14 @@ func get_snapshot() -> Dictionary:
 			"light_budget_refresh_seconds":LIGHT_BUDGET_REFRESH_SECONDS,
 			"light_budget_updates":_light_budget_update_count,
 			"light_budget_skipped_frames":_light_budget_skipped_frames,
+		},
+		"actor_workload":{
+			"physics_steps":actor_physics_steps,
+			"steering_steps":actor_steering_steps,
+			"body_motion_steps":actor_body_motion_steps,
+			"explicit_space_queries":explicit_space_queries,
+			"neighbor_query_owner":"EnemyNeighborRegistry",
+			"counter_reset_scope":"ordinary_run",
 		},
 	}
 

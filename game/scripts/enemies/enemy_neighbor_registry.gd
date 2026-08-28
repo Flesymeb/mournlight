@@ -32,6 +32,11 @@ var _total_target_queries := 0
 var _total_target_candidate_visits := 0
 var _duplicate_registration_rejections := 0
 var _duplicate_retirement_rejections := 0
+var _maximum_rebuilds_per_physics_frame := 0
+var _maximum_neighbor_queries_per_physics_frame := 0
+var _maximum_neighbor_candidate_visits_per_physics_frame := 0
+var _maximum_target_queries_per_physics_frame := 0
+var _maximum_target_candidate_visits_per_physics_frame := 0
 
 func _ready() -> void:
 	name = "EnemyNeighborRegistry"
@@ -81,7 +86,39 @@ func clear() -> void:
 	_sorted_ids.clear()
 	_built_physics_frame = -1
 	set_physics_process(false)
-	_begin_frame(Engine.get_physics_frames())
+	reset_telemetry()
+
+func reset_telemetry() -> void:
+	_built_physics_frame = -1
+	_telemetry_frame = Engine.get_physics_frames()
+	_frame_rebuilds = 0
+	_frame_queries = 0
+	_frame_candidate_visits = 0
+	_frame_max_query_size = 0
+	_last_completed_frame = -1
+	_last_frame_rebuilds = 0
+	_last_frame_queries = 0
+	_last_frame_candidate_visits = 0
+	_last_frame_max_query_size = 0
+	_total_rebuilds = 0
+	_total_queries = 0
+	_total_candidate_visits = 0
+	_stale_rejections = 0
+	_target_frame_queries = 0
+	_target_frame_candidate_visits = 0
+	_target_frame_maximum_result_size = 0
+	_last_target_frame_queries = 0
+	_last_target_frame_candidate_visits = 0
+	_last_target_frame_maximum_result_size = 0
+	_total_target_queries = 0
+	_total_target_candidate_visits = 0
+	_duplicate_registration_rejections = 0
+	_duplicate_retirement_rejections = 0
+	_maximum_rebuilds_per_physics_frame = 0
+	_maximum_neighbor_queries_per_physics_frame = 0
+	_maximum_neighbor_candidate_visits_per_physics_frame = 0
+	_maximum_target_queries_per_physics_frame = 0
+	_maximum_target_candidate_visits_per_physics_frame = 0
 
 func query_neighbors(actor: EnemyActor, radius: float) -> Array[EnemyActor]:
 	var frame := Engine.get_physics_frames()
@@ -189,6 +226,11 @@ func _begin_frame(frame: int) -> void:
 		_last_target_frame_queries = _target_frame_queries
 		_last_target_frame_candidate_visits = _target_frame_candidate_visits
 		_last_target_frame_maximum_result_size = _target_frame_maximum_result_size
+		_maximum_rebuilds_per_physics_frame = maxi(_maximum_rebuilds_per_physics_frame, _frame_rebuilds)
+		_maximum_neighbor_queries_per_physics_frame = maxi(_maximum_neighbor_queries_per_physics_frame, _frame_queries)
+		_maximum_neighbor_candidate_visits_per_physics_frame = maxi(_maximum_neighbor_candidate_visits_per_physics_frame, _frame_candidate_visits)
+		_maximum_target_queries_per_physics_frame = maxi(_maximum_target_queries_per_physics_frame, _target_frame_queries)
+		_maximum_target_candidate_visits_per_physics_frame = maxi(_maximum_target_candidate_visits_per_physics_frame, _target_frame_candidate_visits)
 	_telemetry_frame = frame
 	_frame_rebuilds = 0
 	_frame_queries = 0
@@ -249,6 +291,13 @@ func get_snapshot() -> Dictionary:
 		"target_current_frame":{"query_count":_target_frame_queries,"candidate_visits":_target_frame_candidate_visits,"maximum_result_size":_target_frame_maximum_result_size},
 		"total_target_queries":_total_target_queries,
 		"total_target_candidate_visits":_total_target_candidate_visits,
+		"maximum_rebuilds_per_physics_frame":_maximum_rebuilds_per_physics_frame,
+		"maximum_neighbor_queries_per_physics_frame":_maximum_neighbor_queries_per_physics_frame,
+		"maximum_neighbor_candidate_visits_per_physics_frame":_maximum_neighbor_candidate_visits_per_physics_frame,
+		"maximum_target_queries_per_physics_frame":_maximum_target_queries_per_physics_frame,
+		"maximum_target_candidate_visits_per_physics_frame":_maximum_target_candidate_visits_per_physics_frame,
+		"rebuild_bound_respected":_maximum_rebuilds_per_physics_frame <= 1 and _frame_rebuilds <= 1,
+		"telemetry_reset_scope":"ordinary_run",
 		"full_group_inventory_count":0,
 		"duplicate_registration_rejections":_duplicate_registration_rejections,
 		"duplicate_retirement_rejections":_duplicate_retirement_rejections,

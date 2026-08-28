@@ -38,6 +38,9 @@ var _hurt_light_active := false
 var _facing_bucket := 0
 var _facing_updates := 0
 var _facing_skips := 0
+var _physics_steps_total := 0
+var _steering_steps_total := 0
+var _body_motion_steps_total := 0
 
 func _ready() -> void:
 	add_to_group("mcp_watch")
@@ -127,6 +130,7 @@ func retire_from_pressure(reason: String, reconciliation_id: int) -> Dictionary:
 	return receipt
 
 func _physics_process(delta: float) -> void:
+	_physics_steps_total += 1
 	_lifetime += delta
 	_hurt_light_remaining = maxf(0.0, _hurt_light_remaining - delta)
 	if _hurt_light_remaining <= 0.0 and _hurt_light_active:
@@ -164,6 +168,7 @@ func _physics_process(delta: float) -> void:
 			if state_remaining <= 0.0:
 				_set_state("approach")
 	move_and_slide()
+	_body_motion_steps_total += 1
 	global_position.y = 0.05
 	model_pivot.advance(delta, velocity, state_remaining, _state_duration(state))
 	if velocity.length_squared() > 0.04 and state == "approach":
@@ -174,6 +179,7 @@ func _physics_process(delta: float) -> void:
 			_facing_skips += 1
 
 func _steer_approach(delta: float) -> void:
+	_steering_steps_total += 1
 	var to_target := target.global_position - global_position
 	to_target.y = 0.0
 	var desired := to_target.normalized()
@@ -365,3 +371,17 @@ func get_presentation_budget_snapshot() -> Dictionary:
 	receipt["facing_skips"] = _facing_skips
 	receipt["non_priority_facing_staggered"] = true
 	return receipt
+
+func reset_workload_counters() -> void:
+	_physics_steps_total = 0
+	_steering_steps_total = 0
+	_body_motion_steps_total = 0
+
+func get_workload_counters() -> Dictionary:
+	return {
+		"physics_steps":_physics_steps_total,
+		"steering_steps":_steering_steps_total,
+		"body_motion_steps":_body_motion_steps_total,
+		"explicit_space_queries":0,
+		"space_query_policy":"registry_neighbors_and_move_and_slide_only",
+	}
