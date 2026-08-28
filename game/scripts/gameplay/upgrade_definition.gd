@@ -85,15 +85,30 @@ func _project_weapon(projection: Dictionary, inventory: WeaponInventory) -> void
 	projection["current"] = {"equipped": inventory.is_equipped(weapon_id), "rank": current_rank, "stats": before_stats}
 	projection["result"] = {"equipped": true, "rank": next_rank, "stats": after_stats}
 	var changes: Array[Dictionary] = []
-	if current_rank == 0:
-		changes.append({"field":"equipped", "label":"WEAPON", "current":"LOCKED", "result":"EQUIPPED"})
-	changes.append({"field":"rank", "label":"WEAPON RANK", "current":current_rank, "result":next_rank})
-	for field in STAT_FIELDS:
-		var current_value = before_stats.get(field, null)
+	var decision_fields := _weapon_decision_fields(current_rank)
+	for field in decision_fields:
+		if changes.size() >= 3:
+			break
+		# Identity and unlock state live in the dominant silhouette/header. A new
+		# weapon therefore shows only defining tradeoffs, never a redundant
+		# LOCKED-to-EQUIPPED decision row or a numeric zero placeholder.
+		var current_value = before_stats.get(field, null) if current_rank > 0 else "NEW"
 		var result_value = after_stats.get(field, null)
-		if current_rank == 0 or not _values_equal(current_value, result_value):
+		if result_value != null and (current_rank == 0 or not _values_equal(current_value, result_value)):
 			changes.append({"field":field, "label":STAT_LABELS[field], "current":current_value, "result":result_value})
 	projection["changes"] = changes
+
+func _weapon_decision_fields(current_rank: int) -> Array[String]:
+	if current_rank == 0:
+		match weapon_id:
+			&"warden_lantern": return ["damage", "cooldown"]
+			&"gravespade": return ["area", "damage"]
+			&"wandering_wisps": return ["count", "hit_interval"]
+	match weapon_id:
+		&"warden_lantern": return ["damage", "cooldown", "range", "count"]
+		&"gravespade": return ["area", "damage", "range", "cooldown"]
+		&"wandering_wisps": return ["count", "hit_interval", "area", "damage"]
+	return STAT_FIELDS.duplicate()
 
 func _project_health_max(projection: Dictionary, health: WardenHealth) -> void:
 	projection["current"] = {"health":health.current_health, "health_maximum":health.maximum_health}

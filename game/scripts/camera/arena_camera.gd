@@ -68,10 +68,12 @@ var _coverage_response_source := "spawn"
 var _coverage_settled_seconds := 0.0
 var _coverage_obstructed_count := 0
 var _coverage_obstructing_path := ""
+var _coverage_obstructing_paths: Array[String] = []
 var _arena_containment_active := false
 var _obstruction_response_strength := 0.0
 var _obstruction_bypass_sign := 0.0
 var _coverage_occluder_visual_bindings: Array[GeometryInstance3D] = []
+var _coverage_visuals_by_occluder: Dictionary = {}
 var _coverage_occluder_original_transparency: Dictionary = {}
 var _coverage_occluder_original_visibility: Dictionary = {}
 var _blocked_seconds := 0.0
@@ -104,6 +106,9 @@ func _ready() -> void:
 		_bind_coverage_occluder_visuals()
 		_build_visibility_compositor()
 		_snap_to_target()
+
+func _exit_tree() -> void:
+	reset_occlusion_response()
 
 func set_movement_velocity(value: Vector3) -> void:
 	movement_velocity = Vector3(value.x, 0.0, value.z)
@@ -217,12 +222,15 @@ func _compose_arena_target(requested_target: Vector3, subjects: Array[Node3D]) -
 		composed = composed.lerp(threat_center, coverage_threat_weight)
 	_coverage_obstructed_count = 0
 	_coverage_obstructing_path = ""
+	_coverage_obstructing_paths.clear()
 	_obstruction_bypass_sign = 0.0
 	for subject in subjects:
 		var obstruction := _find_registered_subject_occluder(subject)
 		if obstruction.is_empty():
 			continue
 		_coverage_obstructed_count += 1
+		if not _coverage_obstructing_paths.has(obstruction):
+			_coverage_obstructing_paths.append(obstruction)
 		if _coverage_obstructing_path.is_empty():
 			_coverage_obstructing_path = obstruction
 			var obstruction_node := get_node_or_null(obstruction) as Node3D
@@ -439,9 +447,14 @@ func _bind_tall_occluders() -> void:
 
 func _bind_coverage_occluder_visuals() -> void:
 	_coverage_occluder_visual_bindings.clear()
+	_coverage_visuals_by_occluder.clear()
 	_coverage_occluder_original_transparency.clear()
 	_coverage_occluder_original_visibility.clear()
-	for source_path in coverage_occluder_visuals:
+	for index in mini(coverage_occluder_visuals.size(), _tall_occluder_bindings.size()):
+		var source_path := coverage_occluder_visuals[index]
+		var binding: Dictionary = _tall_occluder_bindings[index]
+		var occluder_path := String(binding.get("resolved_path", ""))
+		var bound_visuals: Array[GeometryInstance3D] = []
 		var source := get_node_or_null(source_path)
 		for member in _collect_visuals(source):
 			if not member is GeometryInstance3D:
@@ -450,16 +463,43 @@ func _bind_coverage_occluder_visuals() -> void:
 			if _coverage_occluder_visual_bindings.has(visual):
 				continue
 			_coverage_occluder_visual_bindings.append(visual)
+			bound_visuals.append(visual)
 			_coverage_occluder_original_transparency[visual.get_instance_id()] = visual.transparency
 			_coverage_occluder_original_visibility[visual.get_instance_id()] = visual.visible
+		if not occluder_path.is_empty():
+			_coverage_visuals_by_occluder[occluder_path] = bound_visuals
 
 func _apply_coverage_occluder_fade() -> void:
 	for visual in _coverage_occluder_visual_bindings:
 		if not is_instance_valid(visual):
 			continue
+		var active_for_visual := false
+		for occluder_path in _coverage_obstructing_paths:
+			if visual in (_coverage_visuals_by_occluder.get(occluder_path, []) as Array):
+				active_for_visual = true
+				break
+		var response := _obstruction_response_strength if active_for_visual else 0.0
 		var original := float(_coverage_occluder_original_transparency.get(visual.get_instance_id(), 0.0))
-		visual.transparency = lerpf(original, coverage_occluder_transparency, _obstruction_response_strength)
-		visual.visible = bool(_coverage_occluder_original_visibility.get(visual.get_instance_id(), true)) and _obstruction_response_strength < 0.65
+		visual.transparency = lerpf(original, maxf(original, coverage_occluder_transparency), response)
+		# Never hard-hide a registered occluder. Members authored hidden stay hidden;
+		# originally visible members remain rendered throughout the continuous fade.
+		visual.visible = bool(_coverage_occluder_original_visibility.get(visual.get_instance_id(), true))
+
+func reset_occlusion_response() -> void:
+	_obstruction_response_strength = 0.0
+	_coverage_obstructed_count = 0
+	_coverage_obstructing_path = ""
+	_coverage_obstructing_paths.clear()
+	_blocked_seconds = 0.0
+	_clear_seconds = 0.0
+	occlusion_guard_active = false
+	_apply_visibility_overlay(false)
+	for visual in _coverage_occluder_visual_bindings:
+		if not is_instance_valid(visual):
+			continue
+		var instance_id := visual.get_instance_id()
+		visual.transparency = float(_coverage_occluder_original_transparency.get(instance_id, visual.transparency))
+		visual.visible = bool(_coverage_occluder_original_visibility.get(instance_id, visual.visible))
 
 func _bind_member(role: String, source_path: NodePath) -> void:
 	var source := get_node_or_null(source_path)
@@ -705,6 +745,22 @@ func _original_presentation_restored() -> bool:
 			return false
 	return true
 
+func _coverage_occluders_restored() -> bool:
+	# Camera containment also contributes to the shared response strength. It does
+	# not fade any landmark when there is no registered occluder, so restoration
+	# truth is the exact member state plus an empty occluder set.
+	if not _coverage_obstructing_paths.is_empty():
+		return false
+	for visual in _coverage_occluder_visual_bindings:
+		if not is_instance_valid(visual):
+			return false
+		var instance_id := visual.get_instance_id()
+		if not is_equal_approx(visual.transparency, float(_coverage_occluder_original_transparency.get(instance_id, visual.transparency))):
+			return false
+		if visual.visible != bool(_coverage_occluder_original_visibility.get(instance_id, visual.visible)):
+			return false
+	return true
+
 func _mcp_state() -> Dictionary:
 	return {
 		"binding_member_count": _binding_members.size(),
@@ -730,7 +786,11 @@ func _mcp_state() -> Dictionary:
 		"obstruction_bypass_sign":_obstruction_bypass_sign,
 		"coverage_occluder_visual_count":_coverage_occluder_visual_bindings.size(),
 		"coverage_occluder_transparency":coverage_occluder_transparency * _obstruction_response_strength,
-		"coverage_occluders_isolated":_coverage_occluder_visual_bindings.size() > 0 and _obstruction_response_strength >= 0.65,
+		"coverage_occluders_continuously_faded":_coverage_occluder_visual_bindings.size() > 0 and _obstruction_response_strength > 0.001,
+		"coverage_hard_hide_disabled":true,
+		"coverage_bound_visual_paths":_coverage_occluder_visual_bindings.map(func(visual: GeometryInstance3D) -> String: return String(visual.get_path())),
+		"coverage_active_occluders":_coverage_obstructing_paths.duplicate(),
+		"coverage_restoration_result":_coverage_occluders_restored(),
 		"effective_follow_height":follow_height + obstruction_height_boost * _obstruction_response_strength,
 		"effective_follow_distance":follow_distance - obstruction_distance_reduction * _obstruction_response_strength,
 		"isolated_visual_count": _presentation_visuals.size(),

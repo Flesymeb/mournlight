@@ -37,6 +37,10 @@ var _maximum_neighbor_queries_per_physics_frame := 0
 var _maximum_neighbor_candidate_visits_per_physics_frame := 0
 var _maximum_target_queries_per_physics_frame := 0
 var _maximum_target_candidate_visits_per_physics_frame := 0
+var _target_query_cache: Dictionary = {}
+var _target_cache_frame := -1
+var _target_cache_hits := 0
+var _target_cache_misses := 0
 
 func _ready() -> void:
 	name = "EnemyNeighborRegistry"
@@ -60,6 +64,7 @@ func register_target(target: Node3D, generation: int) -> void:
 		_sorted_ids.append(key)
 		_sorted_ids.sort()
 	_built_physics_frame = -1
+	_target_query_cache.clear()
 	set_physics_process(true)
 
 func unregister_actor(stable_id: StringName, generation: int) -> void:
@@ -77,6 +82,7 @@ func unregister_target(stable_id: StringName, generation: int) -> void:
 	_entries.erase(key)
 	_sorted_ids.erase(key)
 	_built_physics_frame = -1
+	_target_query_cache.clear()
 	if _entries.is_empty():
 		set_physics_process(false)
 
@@ -84,6 +90,8 @@ func clear() -> void:
 	_entries.clear()
 	_cells.clear()
 	_sorted_ids.clear()
+	_target_query_cache.clear()
+	_target_cache_frame = -1
 	_built_physics_frame = -1
 	set_physics_process(false)
 	reset_telemetry()
@@ -119,6 +127,10 @@ func reset_telemetry() -> void:
 	_maximum_neighbor_candidate_visits_per_physics_frame = 0
 	_maximum_target_queries_per_physics_frame = 0
 	_maximum_target_candidate_visits_per_physics_frame = 0
+	_target_query_cache.clear()
+	_target_cache_frame = -1
+	_target_cache_hits = 0
+	_target_cache_misses = 0
 
 func query_neighbors(actor: EnemyActor, radius: float) -> Array[EnemyActor]:
 	var frame := Engine.get_physics_frames()
@@ -187,6 +199,15 @@ func _query_target_candidates(origin: Vector3, radius: float) -> Array[Node3D]:
 	var result: Array[Node3D] = []
 	if radius <= 0.0:
 		return result
+	var cache_key := "%d:%d:%d" % [roundi(origin.x * 20.0), roundi(origin.z * 20.0), roundi(radius * 100.0)]
+	if _target_query_cache.has(cache_key):
+		_target_cache_hits += 1
+		for cached_candidate in (_target_query_cache[cache_key] as Array):
+			if is_instance_valid(cached_candidate):
+				result.append(cached_candidate as Node3D)
+		_target_frame_maximum_result_size = maxi(_target_frame_maximum_result_size, result.size())
+		return result
+	_target_cache_misses += 1
 	var center := _cell_for(origin)
 	var cell_radius := ceili(radius / cell_size)
 	var radius_squared := radius * radius
@@ -207,6 +228,7 @@ func _query_target_candidates(origin: Vector3, radius: float) -> Array[Node3D]:
 				if origin.distance_squared_to(candidate.global_position) <= radius_squared:
 					result.append(candidate)
 	_target_frame_maximum_result_size = maxi(_target_frame_maximum_result_size, result.size())
+	_target_query_cache[cache_key] = result.duplicate()
 	return result
 
 func _physics_process(_delta: float) -> void:
@@ -215,6 +237,9 @@ func _physics_process(_delta: float) -> void:
 	_rebuild_if_needed(frame)
 
 func _begin_frame(frame: int) -> void:
+	if _target_cache_frame != frame:
+		_target_cache_frame = frame
+		_target_query_cache.clear()
 	if _telemetry_frame == frame:
 		return
 	if _telemetry_frame >= 0:
@@ -291,6 +316,9 @@ func get_snapshot() -> Dictionary:
 		"target_current_frame":{"query_count":_target_frame_queries,"candidate_visits":_target_frame_candidate_visits,"maximum_result_size":_target_frame_maximum_result_size},
 		"total_target_queries":_total_target_queries,
 		"total_target_candidate_visits":_total_target_candidate_visits,
+		"target_cache_hits":_target_cache_hits,
+		"target_cache_misses":_target_cache_misses,
+		"target_cache_entries":_target_query_cache.size(),
 		"maximum_rebuilds_per_physics_frame":_maximum_rebuilds_per_physics_frame,
 		"maximum_neighbor_queries_per_physics_frame":_maximum_neighbor_queries_per_physics_frame,
 		"maximum_neighbor_candidate_visits_per_physics_frame":_maximum_neighbor_candidate_visits_per_physics_frame,

@@ -263,3 +263,44 @@ position = Vector3(4.8, 0, 1.6)
 
 [node name="TargetAnchorB" type="Marker3D" parent="OuterDatum" groups=["combat_anchor"]]
 position = Vector3(-5.4, 0, -1.8)
+
+[node name="RouteCheckpoints" type="Node3D" parent="OuterDatum"]
+
+[node name="00_Spawn" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
+position = Vector3(0, 0.05, 3)
+
+[node name="01_South" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
+position = Vector3(0, 0.05, 8.7)
+
+[node name="02_Southeast" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
+position = Vector3(7.8, 0.05, 7.2)
+
+[node name="03_East" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
+position = Vector3(9.1, 0.05, 0)
+
+[node name="04_Northeast" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
+position = Vector3(7.7, 0.05, -7.5)
+
+[node name="05_North" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
+position = Vector3(0, 0.05, -8.5)
+
+[node name="06_Northwest" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
+position = Vector3(-7.4, 0.05, -7.4)
+
+[node name="07_West" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
+position = Vector3(-8.4, 0.05, 0)
+
+[node name="08_KeeperPost" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
+position = Vector3(-5.9, 0.05, 2.9)
+
+[node name="09_CrackedBell" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
+position = Vector3(-7.5, 0.05, -0.2)
+
+[node name="10_Mausoleum" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
+position = Vector3(5.1, 0.05, -2.5)
+
+[node name="11_CrossRouteEast" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
+position = Vector3(5.8, 0.05, 3.6)
+
+[node name="12_Return" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
+position = Vector3(0, 0.05, 3)

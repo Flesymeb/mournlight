@@ -21,6 +21,7 @@ signal reward_collected(event: Dictionary)
 @onready var lantern_runtime: WardenLanternRuntime = $World/Warden/Weapons/WardenLanternRuntime
 @onready var gravespade_runtime: GravespadeRuntime = $World/Warden/Weapons/GravespadeRuntime
 @onready var wisps_runtime: WanderingWispsRuntime = $World/Warden/Weapons/WanderingWispsRuntime
+@onready var arena_camera: ArenaCamera = $World/ArenaCamera
 const BELLKEEPER_SCENE := preload("res://scenes/enemies/bellkeeper.tscn")
 const REWARD_PICKUP_SCENE := preload("res://scenes/gameplay/reward_pickup.tscn")
 const MAX_ACTIVE_PICKUPS := 16
@@ -362,6 +363,7 @@ func _begin_run() -> void:
 	run_route_kind = "ordinary"
 	terminal_snapshot.clear()
 	draft_controller.reset()
+	arena_camera.reset_occlusion_response()
 	audio_director.reset_for_run()
 	world.reset_session(true, "begin_run_%s" % _next_baseline_reason)
 	_guidance_attack_baseline = world.attack_runtime.authorized_count
@@ -899,6 +901,7 @@ func _open_upgrade_draft() -> void:
 	if run_state != "active" or draft_controller.active:
 		return
 	warden.reset_input_latch("draft")
+	arena_camera.reset_occlusion_response()
 	_transition("draft")
 	get_tree().paused = true
 	draft_controller.open_draft(inventory, health, warden)
@@ -1145,6 +1148,7 @@ func _teardown_run(route: String, reason: String) -> Dictionary:
 	warden.reset_input_latch("teardown_%s_%s" % [route, reason])
 	draft_controller.reset()
 	draft_view.close()
+	arena_camera.reset_occlusion_response()
 	if route == "result":
 		wave_director.terminate(reason)
 	else:

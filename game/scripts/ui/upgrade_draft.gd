@@ -26,6 +26,7 @@ var _title_nodes: Array[Label] = []
 var _consequence_nodes: Array[Label] = []
 var _state_nodes: Array[Label] = []
 var _stat_bodies: Array[VBoxContainer] = []
+var _presentation_serial := 0
 @onready var buttons: Array[Button] = [$Cards/CardA, $Cards/CardB, $Cards/CardC]
 
 func _ready() -> void:
@@ -42,6 +43,7 @@ func _ready() -> void:
 	visible = false
 
 func present(next_cards: Array[Dictionary]) -> void:
+	_presentation_serial += 1
 	cards = next_cards.duplicate(true)
 	latched = false
 	selected_index = -1
@@ -50,7 +52,7 @@ func present(next_cards: Array[Dictionary]) -> void:
 		_icon_nodes[index].texture = load(String(card.icon_path)) as Texture2D
 		_title_nodes[index].text = String(card.title).to_upper()
 		_consequence_nodes[index].text = String(card.get("consequence", "Shape the next exchange."))
-		_rebuild_stat_rows(index, card.get("changes", []))
+		_rebuild_stat_rows(index, _decision_changes(card.get("changes", [])))
 		buttons[index].disabled = not bool(card.get("available", true))
 		_refresh_card_state(index)
 	visible = true
@@ -77,6 +79,7 @@ func _focus_first_available() -> void:
 			return
 
 func close() -> void:
+	_presentation_serial += 1
 	visible = false
 	cards.clear()
 	selected_index = -1
@@ -88,12 +91,37 @@ func _choose(index: int) -> void:
 	if latched or index < 0 or index >= cards.size() or buttons[index].disabled:
 		return
 	latched = true
+	var commit_serial := _presentation_serial
 	selected_index = index
 	for card_index in buttons.size():
 		buttons[card_index].disabled = card_index != index
 		_refresh_card_state(card_index)
 	await get_tree().create_timer(0.18, true, false, true).timeout
+	if commit_serial != _presentation_serial or not visible:
+		return
 	choice_requested.emit(index)
+
+func _decision_changes(source_changes: Array) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for value in source_changes:
+		if result.size() >= 3:
+			break
+		var change := value as Dictionary
+		if change.is_empty() or not change.has("field") or not change.has("current") or not change.has("result"):
+			continue
+		if _display_values_equal(change.current, change.result):
+			continue
+		result.append(change.duplicate(true))
+	return result
+
+func _display_values_equal(current, next) -> bool:
+	if current == null or next == null:
+		return current == next
+	if current is String or next is String:
+		return current is String and next is String and String(current) == String(next)
+	if current is float or next is float or current is int or next is int:
+		return is_equal_approx(float(current), float(next))
+	return current == next
 
 func _build_card_content(button: Button) -> void:
 	button.text = ""
@@ -280,5 +308,5 @@ func _mcp_state() -> Dictionary:
 	var visible_cards: Array[Dictionary] = []
 	for index in cards.size():
 		var card: Dictionary = cards[index]
-		visible_cards.append({"id":card.id, "title":card.title, "icon_path":card.icon_path, "changes":card.changes, "consequence":card.get("consequence", ""), "interaction_state":_state_nodes[index].text})
+		visible_cards.append({"id":card.id, "title":card.title, "icon_path":card.icon_path, "changes":_decision_changes(card.changes), "consequence":card.get("consequence", ""), "interaction_state":_state_nodes[index].text})
 	return {"authored_cards":visible_cards, "visible":visible, "latched":latched, "selected_index":selected_index, "focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none", "input_device":input_device, "device_generation":device_generation, "cancel_policy":"draft_is_deliberately_non_cancelable", "stable_card_dimensions":Vector2(328,522), "hierarchy":"dominant_icon + consequence + projected_change_rows"}
