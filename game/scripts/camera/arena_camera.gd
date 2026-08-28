@@ -2,6 +2,7 @@ class_name ArenaCamera
 extends Camera3D
 
 @export var target: Node3D
+@export var arena_contract: CemeterySpatialContract
 @export var follow_height := 10.8
 @export var follow_distance := 8.6
 @export var follow_damping := 8.5
@@ -26,6 +27,9 @@ extends Camera3D
 @export var coverage_max_correction := 2.8
 @export var coverage_correction_damping := 8.0
 @export var coverage_threat_weight := 0.18
+@export var dense_fov_boost := 8.0
+@export var dense_fov_start_count := 16
+@export var dense_fov_full_count := 32
 @export var arena_fill_limit := Vector2(6.2, 4.6)
 @export var obstruction_inward_weight := 0.38
 @export var obstruction_lateral_bypass := 0.0
@@ -58,6 +62,7 @@ var _safe_frame_screen_shift := Vector2.ZERO
 var _coverage_offset := Vector3.ZERO
 var _coverage_screen_shift := Vector2.ZERO
 var _coverage_subject_paths: Array[String] = []
+var _coverage_active_count := 0
 var _coverage_receipt: Dictionary = {}
 var _coverage_response_source := "spawn"
 var _coverage_settled_seconds := 0.0
@@ -139,7 +144,12 @@ func _process(delta: float) -> void:
 	framing_target = arena_target + _coverage_offset
 	framing_target.x = clampf(framing_target.x, -arena_fill_limit.x, arena_fill_limit.x)
 	framing_target.z = clampf(framing_target.z, -arena_fill_limit.y, arena_fill_limit.y)
-	fov = normal_fov + obstruction_fov_boost * _obstruction_response_strength
+	var dense_fraction := clampf(
+		float(_coverage_active_count - dense_fov_start_count) / float(maxi(1, dense_fov_full_count - dense_fov_start_count)),
+		0.0,
+		1.0
+	)
+	fov = normal_fov + dense_fov_boost * dense_fraction + obstruction_fov_boost * _obstruction_response_strength
 	var effective_height := follow_height + obstruction_height_boost * _obstruction_response_strength
 	var effective_distance := follow_distance - obstruction_distance_reduction * _obstruction_response_strength
 	var desired_position := framing_target + Vector3(0.0, effective_height, effective_distance)
@@ -166,7 +176,9 @@ func _select_coverage_subjects() -> Array[Node3D]:
 	if is_instance_valid(target):
 		subjects.append(target)
 	var candidates: Array[Dictionary] = []
-	for member in get_tree().get_nodes_in_group(coverage_group):
+	var active_members := get_tree().get_nodes_in_group(coverage_group)
+	_coverage_active_count = active_members.size()
+	for member in active_members:
 		if not member is Node3D or not is_instance_valid(member) or member == target:
 			continue
 		var actor := member as Node3D
@@ -191,9 +203,10 @@ func _select_coverage_subjects() -> Array[Node3D]:
 	return subjects
 
 func _compose_arena_target(requested_target: Vector3, subjects: Array[Node3D]) -> Vector3:
-	var composed := requested_target
-	composed.x = clampf(composed.x, -arena_fill_limit.x, arena_fill_limit.x)
-	composed.z = clampf(composed.z, -arena_fill_limit.y, arena_fill_limit.y)
+	var composed := arena_contract.clamp_camera_target(requested_target) if is_instance_valid(arena_contract) else requested_target
+	if not is_instance_valid(arena_contract):
+		composed.x = clampf(composed.x, -arena_fill_limit.x, arena_fill_limit.x)
+		composed.z = clampf(composed.z, -arena_fill_limit.y, arena_fill_limit.y)
 	_arena_containment_active = not is_equal_approx(composed.x, requested_target.x) or not is_equal_approx(composed.z, requested_target.z)
 	if subjects.size() > 1:
 		var threat_center := Vector3.ZERO
@@ -219,8 +232,11 @@ func _compose_arena_target(requested_target: Vector3, subjects: Array[Node3D]) -
 		var inward := Vector3.ZERO
 		inward.y = composed.y
 		composed = composed.lerp(inward, obstruction_inward_weight)
-	composed.x = clampf(composed.x, -arena_fill_limit.x, arena_fill_limit.x)
-	composed.z = clampf(composed.z, -arena_fill_limit.y, arena_fill_limit.y)
+	if is_instance_valid(arena_contract):
+		composed = arena_contract.clamp_camera_target(composed)
+	else:
+		composed.x = clampf(composed.x, -arena_fill_limit.x, arena_fill_limit.x)
+		composed.z = clampf(composed.z, -arena_fill_limit.y, arena_fill_limit.y)
 	return composed
 
 func _find_registered_subject_occluder(subject: Node3D) -> String:
@@ -703,9 +719,12 @@ func _mcp_state() -> Dictionary:
 		"safe_frame_fraction":safe_frame_fraction,
 		"multi_subject_coverage":_coverage_receipt.duplicate(true),
 		"coverage_frame_fraction":coverage_frame_fraction,
+		"coverage_active_count":_coverage_active_count,
+		"dense_fov_boost":dense_fov_boost,
 		"coverage_offset":_coverage_offset,
 		"coverage_screen_shift":_coverage_screen_shift,
 		"arena_fill_limit":arena_fill_limit,
+		"arena_spatial_contract":arena_contract.get_snapshot() if is_instance_valid(arena_contract) else {},
 		"camera_response_source":_coverage_response_source,
 		"obstruction_response_strength":_obstruction_response_strength,
 		"obstruction_bypass_sign":_obstruction_bypass_sign,

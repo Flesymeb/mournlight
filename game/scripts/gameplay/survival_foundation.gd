@@ -11,6 +11,7 @@ extends Node3D
 @onready var gravespade_runtime: GravespadeRuntime = $Warden/Weapons/GravespadeRuntime
 @onready var wisps_runtime: WanderingWispsRuntime = $Warden/Weapons/WanderingWispsRuntime
 @onready var spawner: EncounterSpawner = $EncounterSpawner
+@onready var arena_contract: CemeterySpatialContract = $CemeteryGarden
 
 var last_attack_event: Dictionary = {}
 var last_hit_event: Dictionary = {}
@@ -61,7 +62,7 @@ func set_session_active(value: bool) -> void:
 
 func reset_session(reset_presentation := true, presentation_reset_owner := "run_reset") -> void:
 	if reset_presentation:
-		warden.reset_for_run(Vector3(0, 0.05, 6.0), presentation_reset_owner)
+		warden.reset_for_run(arena_contract.get_player_spawn(), presentation_reset_owner)
 	else:
 		# Result teardown retires combat ownership but leaves the authored
 		# terminal deformation and lantern attachment alive until Retry/Title.
@@ -127,4 +128,5 @@ func _mcp_state() -> Dictionary:
 		"last_hit_event": last_hit_event,
 		"last_drop_event": last_drop_event,
 		"build": inventory.get_snapshot() if inventory else {},
+		"arena_spatial_contract": arena_contract.get_snapshot() if arena_contract else {},
 	}

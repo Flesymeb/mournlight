@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://scripts/gameplay/survival_foundation.gd" id="1_foundation"]
 [ext_resource type="PackedScene" path="res://scenes/player/warden.tscn" id="2_warden"]
@@ -11,11 +11,26 @@
 [ext_resource type="Resource" path="res://resources/enemies/bone_slinger.tres" id="9_slinger"]
 [ext_resource type="Resource" path="res://resources/enemies/grave_brute.tres" id="10_brute"]
 
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSky_mournlight"]
+sky_top_color = Color(0.012, 0.02, 0.075, 1)
+sky_horizon_color = Color(0.09, 0.105, 0.23, 1)
+sky_curve = 0.09
+sky_energy_multiplier = 0.42
+ground_bottom_color = Color(0.008, 0.012, 0.035, 1)
+ground_horizon_color = Color(0.055, 0.068, 0.15, 1)
+ground_curve = 0.07
+ground_energy_multiplier = 0.28
+use_debanding = true
+
+[sub_resource type="Sky" id="Sky_mournlight"]
+sky_material = SubResource("ProceduralSky_mournlight")
+
 [sub_resource type="Environment" id="Environment_moonlit"]
-background_mode = 1
-background_color = Color(0.0015, 0.0025, 0.009, 1)
-background_energy_multiplier = 0.14
-ambient_light_source = 3
+background_mode = 2
+background_color = Color(0.012, 0.018, 0.055, 1)
+background_energy_multiplier = 0.3
+sky = SubResource("Sky_mournlight")
+ambient_light_source = 2
 ambient_light_color = Color(0.28, 0.34, 0.62, 1)
 ambient_light_energy = 1.12
 reflected_light_source = 2
@@ -24,9 +39,14 @@ glow_enabled = true
 glow_intensity = 0.58
 bloom = 0.08
 fog_enabled = true
-fog_light_color = Color(0.055, 0.07, 0.15, 1)
-fog_light_energy = 0.28
-fog_density = 0.0065
+fog_light_color = Color(0.075, 0.09, 0.19, 1)
+fog_light_energy = 0.38
+fog_density = 0.009
+fog_sky_affect = 0.88
+fog_aerial_perspective = 0.2
+fog_depth_begin = 8.0
+fog_depth_end = 48.0
+fog_depth_curve = 1.15
 fog_height = 0.0
 fog_height_density = 0.045
 
@@ -52,25 +72,28 @@ light_specular = 0.0
 shadow_enabled = false
 
 [node name="CemeteryGarden" parent="." instance=ExtResource("4_cemetery")]
+scale = Vector3(1.65, 1.65, 1.65)
 
 [node name="Warden" parent="." instance=ExtResource("2_warden")]
 position = Vector3(0, 0.05, 6)
 
-[node name="EncounterSpawner" type="Node3D" parent="." groups=["mcp_watch"] node_paths=PackedStringArray("player")]
+[node name="EncounterSpawner" type="Node3D" parent="." groups=["mcp_watch"] node_paths=PackedStringArray("player", "arena_contract")]
 script = ExtResource("5_spawner")
 enemy_scene = ExtResource("6_enemy")
 profiles = Array[EnemyProfile]([ExtResource("7_moss"), ExtResource("8_bat"), ExtResource("9_slinger"), ExtResource("10_brute")])
 player = NodePath("../Warden")
+arena_contract = NodePath("../CemeteryGarden")
 pool_size = 40
 
-[node name="ArenaCamera" type="Camera3D" parent="." groups=["mcp_watch"] node_paths=PackedStringArray("target")]
+[node name="ArenaCamera" type="Camera3D" parent="." groups=["mcp_watch"] node_paths=PackedStringArray("target", "arena_contract")]
 process_mode = 1
 script = ExtResource("3_camera")
 target = NodePath("../Warden")
+arena_contract = NodePath("../CemeteryGarden")
 near = 0.15
-far = 90.0
-arena_limit = Vector2(9.2, 9.0)
-arena_fill_limit = Vector2(10.2, 9.2)
+far = 120.0
+arena_limit = Vector2(16.0, 15.0)
+arena_fill_limit = Vector2(8.0, 7.2)
 normal_fov = 50.0
 follow_height = 11.3
 follow_distance = 9.0

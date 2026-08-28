@@ -9,6 +9,7 @@ signal reward_dropped(event: Dictionary)
 @export var enemy_scene: PackedScene
 @export var profiles: Array[EnemyProfile] = []
 @export var player: WardenController
+@export var arena_contract: CemeterySpatialContract
 @export var pool_size := 40
 @export var live_cap := 10
 @export var minimum_player_safe_radius := 7.0
@@ -77,7 +78,7 @@ var _vitality_stale_generation_rejections := 0
 
 const LIGHT_BUDGET_REFRESH_SECONDS := 0.1
 
-const LANES := [
+const FALLBACK_LANES := [
 	Vector3(-8.8, 0.05, -8.5), Vector3(-4.2, 0.05, -8.8),
 	Vector3(4.6, 0.05, -8.7), Vector3(9.5, 0.05, -3.6),
 	Vector3(9.5, 0.05, 7.2), Vector3(4.8, 0.05, 9.0),
@@ -215,10 +216,13 @@ func _spawn_one(role_offset: int) -> bool:
 	var actor := _next_pooled_actor()
 	if not actor or profiles.is_empty():
 		return false
-	for attempt in range(LANES.size()):
-		var lane_index := (_spawn_cursor + attempt * 3) % LANES.size()
+	var lanes := _spawn_lanes()
+	if lanes.is_empty():
+		return false
+	for attempt in range(lanes.size()):
+		var lane_index := (_spawn_cursor + attempt * 5) % lanes.size()
 		var spread_angle := float(spawned_total + attempt) * 2.399963
-		var position: Vector3 = LANES[lane_index] + Vector3(cos(spread_angle), 0.0, sin(spread_angle)) * 0.72
+		var position: Vector3 = lanes[lane_index] + Vector3(cos(spread_angle), 0.0, sin(spread_angle)) * 0.92
 		var validation := validate_spawn_position(position)
 		if not bool(validation.valid):
 			rejected_spawn_count += 1
@@ -231,7 +235,7 @@ func _spawn_one(role_offset: int) -> bool:
 		actor.activate(selected_profile, player, position, generation, neighbor_registry, self, variant_index)
 		spawned_total += 1
 		_wave_spawned += 1
-		_spawn_cursor = (lane_index + 1) % LANES.size()
+		_spawn_cursor = (lane_index + 1) % lanes.size()
 		last_spawn_receipt = {
 			"stable_id": String(actor.stable_id), "generation": generation,
 			"role_id": String(selected_profile.role_id), "lane_index": lane_index,
@@ -240,8 +244,15 @@ func _spawn_one(role_offset: int) -> bool:
 		}
 		_emit_snapshot()
 		return true
-	_spawn_cursor = (_spawn_cursor + 1) % LANES.size()
+	_spawn_cursor = (_spawn_cursor + 1) % lanes.size()
 	return false
+
+func _spawn_lanes() -> Array[Vector3]:
+	if is_instance_valid(arena_contract):
+		return arena_contract.get_spawn_lanes()
+	var fallback: Array[Vector3] = []
+	fallback.assign(FALLBACK_LANES)
+	return fallback
 
 func _allocate_role_variant(role_id: String, stable_id: StringName, generation: int) -> int:
 	var ordinal := int(_role_variant_cursor.get(role_id, 0))
@@ -394,6 +405,8 @@ func _reconcile_to_cap(target_cap: int, reason: String) -> void:
 	_emit_snapshot()
 
 func validate_spawn_position(position: Vector3) -> Dictionary:
+	if is_instance_valid(arena_contract) and is_instance_valid(player):
+		return arena_contract.validate_spawn_position(position, player.global_position)
 	if position.x < playable_min.x or position.x > playable_max.x or position.z < playable_min.y or position.z > playable_max.y:
 		return {"valid": false, "reason": "outside_playable_datum"}
 	if not is_instance_valid(player):
@@ -688,12 +701,13 @@ func get_snapshot() -> Dictionary:
 		"validation_roster_size":_validation_role_sequence.size(),
 		"validation_profile_cohort":get_validation_profile_cohort_snapshot() if _validation_cohort_active else _validation_cohort_last_receipt.duplicate(true),
 		"spawn_datum":{
-			"minimum":playable_min,
-			"maximum":playable_max,
-			"protected_camera_half_extents":protected_camera_half_extents,
-			"player_safe_radius":minimum_player_safe_radius,
+			"minimum":arena_contract.get_playable_rect().position if is_instance_valid(arena_contract) else playable_min,
+			"maximum":arena_contract.get_playable_rect().end if is_instance_valid(arena_contract) else playable_max,
+			"protected_camera_half_extents":arena_contract.protected_camera_half_extents if is_instance_valid(arena_contract) else protected_camera_half_extents,
+			"player_safe_radius":arena_contract.minimum_player_safe_radius if is_instance_valid(arena_contract) else minimum_player_safe_radius,
 			"landmark_collision_predicate":"crypt + 3 trees + keeper post + cracked bell + 3 coffins + 2 grave clusters",
-			"ordinary_lane_count":LANES.size(),
+			"ordinary_lane_count":_spawn_lanes().size(),
+			"shared_contract":arena_contract.get_snapshot() if is_instance_valid(arena_contract) else {},
 		},
 		"rejected_spawns": rejected_spawn_count, "last_spawn_receipt": last_spawn_receipt,
 		"last_lifecycle_event": last_lifecycle_event,

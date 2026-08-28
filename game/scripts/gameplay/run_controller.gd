@@ -166,6 +166,8 @@ func _ready() -> void:
 	warden.dash_phase_changed.connect(_on_dash_changed)
 	input_router.logical_press_edge.connect(_on_logical_press_edge)
 	input_router.context_changed.connect(_on_input_context_changed)
+	input_router.device_changed.connect(_on_input_device_changed)
+	draft_view.set_input_device(input_router.active_device, input_router.device_generation)
 	if OS.has_feature("editor"):
 		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_draft", &"validation_prepare_result_failure", &"validation_prepare_result_victory", &"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_advance_density", &"validation_reset_density", &"validation_prepare_final_profile", &"validation_advance_final_profile", &"validation_reset_final_profile", &"tester_victory_prepare", &"tester_victory_advance", &"tester_victory_commit", &"tester_final_profile_prepare", &"tester_final_profile_advance", &"tester_final_profile_reset", &"qa_reset_first_run_guidance"]:
 			if not InputMap.has_action(action):
@@ -808,6 +810,9 @@ func _on_logical_press_edge(action: StringName, activation: int, receipt: Dictio
 func _on_input_context_changed(_previous: String, current: String, _generation: int) -> void:
 	if current not in ["active", "boss"]:
 		warden.clear_dash_ownership("context_%s" % current)
+
+func _on_input_device_changed(_previous: String, current: String, generation: int) -> void:
+	draft_view.set_input_device(current, generation)
 
 func _on_shell_action(action: StringName) -> void:
 	match action:

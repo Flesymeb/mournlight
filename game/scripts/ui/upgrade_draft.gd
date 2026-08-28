@@ -17,6 +17,8 @@ const STAT_ICON_PATHS := {
 var cards: Array[Dictionary] = []
 var latched := false
 var selected_index := -1
+var input_device := "keyboard"
+var device_generation := 0
 var _hovered: Array[bool] = [false, false, false]
 var _pressed: Array[bool] = [false, false, false]
 var _icon_nodes: Array[TextureRect] = []
@@ -53,6 +55,26 @@ func present(next_cards: Array[Dictionary]) -> void:
 		_refresh_card_state(index)
 	visible = true
 	buttons[0].grab_focus()
+
+func set_input_device(next_device: String, generation: int) -> void:
+	if next_device not in ["keyboard", "gamepad", "mouse"]:
+		return
+	input_device = next_device
+	device_generation = generation
+	if visible and input_device in ["keyboard", "gamepad"] and not _focused_card_available():
+		_focus_first_available()
+	for index in buttons.size():
+		_refresh_card_state(index)
+
+func _focused_card_available() -> bool:
+	var owner := get_viewport().gui_get_focus_owner()
+	return owner in buttons and not (owner as Button).disabled
+
+func _focus_first_available() -> void:
+	for button in buttons:
+		if not button.disabled:
+			button.grab_focus()
+			return
 
 func close() -> void:
 	visible = false
@@ -229,7 +251,7 @@ func _refresh_card_state(index: int) -> void:
 	elif not available: state = "UNAVAILABLE"
 	elif latched: state = "CHOICE LOCKED"
 	elif _pressed[index]: state = "PRESS  •  RELEASE TO CHOOSE"
-	elif buttons[index].has_focus(): state = "FOCUSED  •  CONFIRM TO CHOOSE"
+	elif buttons[index].has_focus(): state = ("GAMEPAD FOCUS" if input_device == "gamepad" else "KEYBOARD FOCUS") + "  •  CONFIRM TO CHOOSE"
 	elif _hovered[index]: state = "HOVER  •  CLICK TO CHOOSE"
 	elif newly_unlocked: state = "NEW WEAPON"
 	_state_nodes[index].text = state
@@ -248,7 +270,7 @@ func _card_style(state: String, emphasized: bool) -> StyleBoxFlat:
 	style.border_color = Color(0.42, 0.31, 0.18, 0.85)
 	if state.begins_with("SELECTED"):
 		style.border_color = Color(1.0, 0.76, 0.31, 1.0); style.bg_color = Color(0.105, 0.072, 0.035, 0.97)
-	elif state.begins_with("FOCUSED") or state.begins_with("HOVER") or emphasized:
+	elif "FOCUS" in state or state.begins_with("HOVER") or emphasized:
 		style.border_color = Color(0.43, 0.96, 0.86, 1.0); style.bg_color = Color(0.035, 0.065, 0.072, 0.97)
 	elif state == "NEW WEAPON": style.border_color = Color(0.72, 0.57, 0.95, 0.95)
 	elif state in ["UNAVAILABLE", "CHOICE LOCKED"]: style.border_color = Color(0.32, 0.34, 0.4, 0.7)
@@ -259,4 +281,4 @@ func _mcp_state() -> Dictionary:
 	for index in cards.size():
 		var card: Dictionary = cards[index]
 		visible_cards.append({"id":card.id, "title":card.title, "icon_path":card.icon_path, "changes":card.changes, "consequence":card.get("consequence", ""), "interaction_state":_state_nodes[index].text})
-	return {"authored_cards":visible_cards, "visible":visible, "latched":latched, "selected_index":selected_index, "focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none", "hierarchy":"dominant_icon + consequence + projected_change_rows"}
+	return {"authored_cards":visible_cards, "visible":visible, "latched":latched, "selected_index":selected_index, "focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none", "input_device":input_device, "device_generation":device_generation, "cancel_policy":"draft_is_deliberately_non_cancelable", "stable_card_dimensions":Vector2(328,522), "hierarchy":"dominant_icon + consequence + projected_change_rows"}

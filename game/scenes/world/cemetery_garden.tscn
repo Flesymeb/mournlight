@@ -1,8 +1,9 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=19 format=3]
 
 [ext_resource type="PackedScene" path="res://assets/authored/low_poly_graveyard.glb" id="1_cemetery"]
 [ext_resource type="PackedScene" path="res://assets/landmarks/keeper_post.glb" id="2_keeper_post"]
 [ext_resource type="PackedScene" path="res://assets/landmarks/candidates/digiba_cracked_bell.glb" id="3_cracked_bell"]
+[ext_resource type="Script" path="res://scripts/world/cemetery_spatial_contract.gd" id="4_spatial_contract"]
 
 [sub_resource type="BoxShape3D" id="GroundShape"]
 size = Vector3(21.0, 0.7, 20.1)
@@ -39,7 +40,8 @@ size = Vector3(2.8, 1.0, 1.5)
 [sub_resource type="BoxShape3D" id="GraveClusterShape"]
 size = Vector3(3.8, 1.2, 1.9)
 
-[node name="CemeteryGarden" type="Node3D" groups=["authored_environment"]]
+[node name="CemeteryGarden" type="Node3D" groups=["authored_environment", "mcp_watch"]]
+script = ExtResource("4_spatial_contract")
 
 [node name="PackageTransform" type="Node3D" parent="."]
 position = Vector3(0.28, 0.02, -147.12)
@@ -123,6 +125,44 @@ shape = SubResource("TreeShape")
 
 [node name="PlayerSpawn" type="Marker3D" parent="OuterDatum" groups=["spawn_anchor"]]
 position = Vector3(0, 0.05, 3)
+
+[node name="SpawnLanes" type="Node3D" parent="OuterDatum"]
+
+[node name="Lane00" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
+position = Vector3(-8.8, 0.05, -8.5)
+
+[node name="Lane01" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
+position = Vector3(-4.2, 0.05, -8.8)
+
+[node name="Lane02" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
+position = Vector3(0.4, 0.05, -8.75)
+
+[node name="Lane03" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
+position = Vector3(4.6, 0.05, -8.7)
+
+[node name="Lane04" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
+position = Vector3(9.5, 0.05, -3.6)
+
+[node name="Lane05" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
+position = Vector3(9.45, 0.05, 2.1)
+
+[node name="Lane06" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
+position = Vector3(9.5, 0.05, 7.2)
+
+[node name="Lane07" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
+position = Vector3(4.8, 0.05, 9.0)
+
+[node name="Lane08" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
+position = Vector3(0.0, 0.05, 9.1)
+
+[node name="Lane09" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
+position = Vector3(-5.4, 0.05, 9.0)
+
+[node name="Lane10" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
+position = Vector3(-8.8, 0.05, 5.0)
+
+[node name="Lane11" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
+position = Vector3(-8.9, 0.05, -1.8)
 
 [node name="KeeperLanternPostAnchor" type="Marker3D" parent="OuterDatum" groups=["landmark_anchor"]]
 position = Vector3(-4.8, 0, 1.8)
