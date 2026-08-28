@@ -26,6 +26,11 @@ const MAX_ACTIVE_PICKUPS := 16
 const VICTORY_PRESENTATION_HOLD_SECONDS := 2.6
 const PROFILE_DENSITY_MIN := 25
 const PROFILE_DENSITY_MAX := 40
+const PROFILE_COVERAGE_CELLS := [
+	"enemy_density", "boss", "warden_lantern", "gravespade",
+	"wandering_wisps", "pickups", "hud", "animation", "vfx",
+	"lights", "audio",
+]
 const CompleteRunLedgerClass := preload("res://scripts/gameplay/complete_run_ledger.gd")
 
 var run_state := "title"
@@ -111,6 +116,8 @@ var _profile_static_light_count := 0
 var _profile_setup_scene_scans := 0
 var _profile_sample_counter_reads := 0
 var _profile_gate_counter_reads := 0
+var _profile_coverage: Dictionary = {}
+var _profile_coverage_first_seen: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -265,6 +272,9 @@ func _begin_run() -> void:
 	_profile_maximum_enemy_workload = 0
 	_profile_sample_counter_reads = 0
 	_profile_gate_counter_reads = 0
+	_profile_rearm_count = 0
+	_profile_coverage.clear()
+	_profile_coverage_first_seen.clear()
 	_active_pickups.clear()
 	_active_pickup_count = 0
 	_active_effect_count = 0
@@ -1233,24 +1243,40 @@ func _arm_passive_ordinary_profile(wave_snapshot: Dictionary) -> void:
 	}
 	validation_profile_receipt = _profile_arm_receipt.duplicate(true)
 
-func _representative_system_gate() -> Dictionary:
-	_profile_gate_counter_reads += 1
+func _profile_cached_system_observation(live_density: int) -> Dictionary:
 	var counts := _profile_counts()
-	var animation := warden.animation_binding.get_snapshot() if warden.animation_binding else {}
-	var audio := audio_director._mcp_state()
-	var equipped: Array = inventory.get_snapshot().get("equipped_weapon_ids", [])
 	var vfx_active := int(counts.get("projectiles", 0)) > 0 or int(counts.get("effects", 0)) > 0 or int(counts.get("wisp_handles", 0)) > 0
 	return {
+		"enemy_density":live_density >= PROFILE_DENSITY_MIN and live_density <= PROFILE_DENSITY_MAX,
 		"boss":is_instance_valid(boss) and bool(boss_snapshot.get("active", false)),
-		"three_weapon_families":equipped.size() == 3,
+		"warden_lantern":inventory.is_equipped(&"warden_lantern") and (lantern_runtime.active_presentation_count > 0 or lantern_runtime.attack_phase in ["anticipation", "onset", "impact", "recovery"]),
+		"gravespade":inventory.is_equipped(&"gravespade") and (gravespade_runtime.active_presentation_count > 0 or gravespade_runtime.attack_phase in ["anticipation", "active", "impact", "recovery"]),
+		"wandering_wisps":inventory.is_equipped(&"wandering_wisps") and wisps_runtime.active_wisp_count > 0,
 		"pickups":int(counts.get("pickups", 0)) > 0,
 		"hud":hud.visible,
-		"animation":bool(animation.get("binding_valid", false)),
+		"animation":warden.animation_binding != null and warden.animation_binding.binding_valid,
 		"vfx":vfx_active,
 		"lights":int(counts.get("lights", 0)) > 0,
-		"audio":int(audio.get("active_effect_voices", 0)) > 0,
-		"all_ready":is_instance_valid(boss) and bool(boss_snapshot.get("active", false)) and equipped.size() == 3 and int(counts.get("pickups", 0)) > 0 and hud.visible and bool(animation.get("binding_valid", false)) and vfx_active and int(counts.get("lights", 0)) > 0 and int(audio.get("active_effect_voices", 0)) > 0,
+		"audio":int(counts.get("audio_voices", 0)) > 0,
 	}
+
+func _accumulate_profile_coverage(observation: Dictionary) -> void:
+	for cell in PROFILE_COVERAGE_CELLS:
+		if bool(_profile_coverage.get(cell, false)) or not bool(observation.get(cell, false)):
+			continue
+		_profile_coverage[cell] = true
+		_profile_coverage_first_seen[cell] = {
+			"process_frame":Engine.get_process_frames(),
+			"window_seconds":_profile_elapsed,
+			"run_elapsed_seconds":run_elapsed,
+		}
+
+func _missing_profile_coverage(coverage: Dictionary) -> Array[String]:
+	var missing: Array[String] = []
+	for cell in PROFILE_COVERAGE_CELLS:
+		if not bool(coverage.get(cell, false)):
+			missing.append(cell)
+	return missing
 
 func _try_begin_passive_ordinary_profile() -> void:
 	if not _profile_armed or _profile_active or get_tree().paused or result_committed:
@@ -1260,10 +1286,9 @@ func _try_begin_passive_ordinary_profile() -> void:
 		_profile_armed = false
 		return
 	var live_density := int(spawner.get_profile_counters().get("live", 0))
-	var systems := _representative_system_gate()
+	_profile_gate_counter_reads += 1
 	_profile_arm_receipt["observed_density"] = live_density
-	_profile_arm_receipt["representative_systems"] = systems.duplicate(true)
-	if live_density < PROFILE_DENSITY_MIN or live_density > PROFILE_DENSITY_MAX or not bool(systems.get("all_ready", false)):
+	if live_density < PROFILE_DENSITY_MIN or live_density > PROFILE_DENSITY_MAX:
 		return
 	_profile_armed = false
 	_profile_samples_ms.clear()
@@ -1276,6 +1301,10 @@ func _try_begin_passive_ordinary_profile() -> void:
 	_profile_start_lifecycle = _lifecycle_counters()
 	_profile_minimum_enemy_workload = live_density
 	_profile_maximum_enemy_workload = live_density
+	_profile_coverage.clear()
+	_profile_coverage_first_seen.clear()
+	var initial_observation := _profile_cached_system_observation(live_density)
+	_accumulate_profile_coverage(initial_observation)
 	validation_profile_sample = {
 		"status":"sampling", "branch_id":"ordinary_final_wave_window",
 		"sample_kind":_profile_origin, "route_kind":run_route_kind,
@@ -1287,8 +1316,12 @@ func _try_begin_passive_ordinary_profile() -> void:
 		"start_counts":_profile_start_counts.duplicate(true),
 		"start_lifecycle":_profile_start_lifecycle.duplicate(true),
 		"wave_start":wave_snapshot.duplicate(true),
+		"boss_presence":is_instance_valid(boss) and bool(boss_snapshot.get("active", false)),
+		"weapon_ranks":_profile_weapon_ranks(),
 		"density_threshold_crossing":{"process_frame":Engine.get_process_frames(),"elapsed_seconds":run_elapsed,"live_enemies":live_density,"required_minimum":PROFILE_DENSITY_MIN,"required_maximum":PROFILE_DENSITY_MAX},
-		"representative_systems":systems.duplicate(true),
+		"coverage":_profile_coverage.duplicate(true),
+		"coverage_first_seen":_profile_coverage_first_seen.duplicate(true),
+		"initial_observation":initial_observation,
 		"work_caps":_dense_work_caps(spawner.get_snapshot()),
 		"workload_start":_profile_workload_receipt(spawner.get_snapshot()),
 	}
@@ -1299,6 +1332,8 @@ func _advance_profile_sample(delta: float) -> void:
 		return
 	_profile_sample_counter_reads += 1
 	var live_density := int(spawner.get_profile_counters().get("live", 0))
+	if _profile_origin == "ordinary_final_wave_passive":
+		_accumulate_profile_coverage(_profile_cached_system_observation(live_density))
 	if _profile_samples_ms.is_empty():
 		_profile_minimum_enemy_workload = live_density
 		_profile_maximum_enemy_workload = live_density
@@ -1332,7 +1367,9 @@ func _advance_profile_sample(delta: float) -> void:
 		"resolved_density":validation_profile_sample.get("resolved_density", _profile_start_counts.get("enemies", 0)),
 		"boss_presence":validation_profile_sample.get("boss_presence", is_instance_valid(boss)),
 		"weapon_ranks":validation_profile_sample.get("weapon_ranks", _profile_weapon_ranks()),
-		"representative_systems":sample_start.get("representative_systems", {}),
+		"coverage":_profile_coverage.duplicate(true),
+		"coverage_first_seen":_profile_coverage_first_seen.duplicate(true),
+		"missing_coverage":_missing_profile_coverage(_profile_coverage),
 		"density_threshold_crossing":sample_start.get("density_threshold_crossing", {}),
 		"sample_count":sorted.size(), "window_seconds":_profile_elapsed,
 		"frame_ms":{"p50":_percentile(sorted,0.50),"p95":_percentile(sorted,0.95),"p99":_percentile(sorted,0.99),"worst":sorted.back() if not sorted.is_empty() else 0.0},
@@ -1358,13 +1395,15 @@ func _advance_profile_sample(delta: float) -> void:
 		"route_qualification":_route_qualification(wave_director.get_snapshot()),
 	}
 	validation_profile_sample["qualification"] = _profile_qualification(validation_profile_sample)
+	validation_profile_sample["status"] = "qualified" if bool((validation_profile_sample["qualification"] as Dictionary).get("qualified", false)) else "rejected"
+	validation_profile_sample["rejection_reasons"] = (validation_profile_sample["qualification"] as Dictionary).get("reasons", []).duplicate()
 	_record_profile_matrix_sample(validation_profile_sample)
 	_record_profile_cycle("advance", validation_profile_sample)
 	if _profile_origin == "ordinary_final_wave_passive":
 		_record_ordinary_profile_sample(validation_profile_sample)
 	if _profile_origin.begins_with("diagnostic_"):
 		get_tree().paused = true
-	elif not bool((validation_profile_sample.get("qualification", {}) as Dictionary).get("density_qualified", false)) and run_state == "boss" and not result_committed:
+	elif not bool((validation_profile_sample.get("qualification", {}) as Dictionary).get("ordinary_route_qualified", false)) and run_state == "boss" and not result_committed:
 		_profile_rearm_count += 1
 		_profile_armed = true
 		_profile_arm_receipt = {
@@ -1559,6 +1598,10 @@ func _ordinary_profile_contract_checks() -> Dictionary:
 	var hardware_sample := _contract_ordinary_profile_sample("hardware", 1920, 1080)
 	var software_sample := _contract_ordinary_profile_sample("software", 1920, 1080)
 	var low_resolution_sample := _contract_ordinary_profile_sample("hardware", 1280, 720)
+	var missing_coverage_sample := hardware_sample.duplicate(true)
+	(missing_coverage_sample["coverage"] as Dictionary)["audio"] = false
+	missing_coverage_sample["missing_coverage"] = ["audio"]
+	missing_coverage_sample["qualification"] = _profile_qualification(missing_coverage_sample)
 	var diagnostic_sample := hardware_sample.duplicate(true)
 	diagnostic_sample["passive"] = false
 	diagnostic_sample["diagnostic_mutation"] = true
@@ -1583,6 +1626,7 @@ func _ordinary_profile_contract_checks() -> Dictionary:
 		and bool(complete.get("three_cycle_no_growth", false))
 		and not bool((software_sample.get("qualification", {}) as Dictionary).get("ordinary_route_qualified", false))
 		and not bool((low_resolution_sample.get("qualification", {}) as Dictionary).get("ordinary_route_qualified", false))
+		and not bool((missing_coverage_sample.get("qualification", {}) as Dictionary).get("ordinary_route_qualified", false))
 		and not bool((diagnostic_sample.get("qualification", {}) as Dictionary).get("ordinary_route_qualified", false))
 		and int(missing_retry_result.get("completed_cycle_count", -1)) == 0
 		and int(repeated.get("completed_cycle_count", -1)) == 1
@@ -1593,6 +1637,7 @@ func _ordinary_profile_contract_checks() -> Dictionary:
 		"three_distinct_complete_cycles_accepted":bool(complete.get("three_cycle_ready", false)),
 		"software_renderer_rejected":not bool((software_sample.get("qualification", {}) as Dictionary).get("ordinary_route_qualified", false)),
 		"sub_1920x1080_rejected":not bool((low_resolution_sample.get("qualification", {}) as Dictionary).get("ordinary_route_qualified", false)),
+		"missing_representative_coverage_rejected":not bool((missing_coverage_sample.get("qualification", {}) as Dictionary).get("ordinary_route_qualified", false)),
 		"diagnostic_sample_rejected":not bool((diagnostic_sample.get("qualification", {}) as Dictionary).get("ordinary_route_qualified", false)),
 		"missing_player_retry_rejected":int(missing_retry_result.get("completed_cycle_count", -1)) == 0,
 		"repeated_run_serial_rejected":int(repeated.get("completed_cycle_count", -1)) == 1,
@@ -1608,7 +1653,13 @@ func _contract_ordinary_profile_sample(renderer_classification: String, viewport
 		"route_kind":"ordinary",
 		"run_serial":1,
 		"wave_start":{"wave":5,"diagnostic_jump_count":0},
-		"representative_systems":{"all_ready":true},
+		"coverage":{
+			"enemy_density":true, "boss":true, "warden_lantern":true,
+			"gravespade":true, "wandering_wisps":true, "pickups":true,
+			"hud":true, "animation":true, "vfx":true, "lights":true,
+			"audio":true,
+		},
+		"missing_coverage":[],
 		"boss_presence":true,
 		"weapon_ranks":[{"weapon_id":"warden_lantern","rank":4},{"weapon_id":"gravespade","rank":3},{"weapon_id":"wandering_wisps","rank":2}],
 		"requested_enemy_workload":32,
@@ -1972,12 +2023,13 @@ func _profile_qualification(sample: Dictionary) -> Dictionary:
 	var end_workload := int(sample.get("end_enemy_workload", -1))
 	var passive_ordinary := bool(sample.get("passive", false)) and not bool(sample.get("diagnostic_mutation", true))
 	if passive_ordinary:
-		var representative_systems: Dictionary = sample.get("representative_systems", {})
+		var coverage: Dictionary = sample.get("coverage", {})
 		var wave_start: Dictionary = sample.get("wave_start", {})
 		if String(sample.get("route_kind", "")) != "ordinary" or int(wave_start.get("wave", 0)) != 5 or int(wave_start.get("diagnostic_jump_count", -1)) != 0:
 			reasons.append("ordinary_zero_jump_fifth_wave_missing")
-		if not bool(representative_systems.get("all_ready", false)):
-			reasons.append("representative_systems_not_simultaneously_active")
+		var missing_coverage := _missing_profile_coverage(coverage)
+		if not missing_coverage.is_empty():
+			reasons.append("representative_coverage_missing:%s" % ",".join(missing_coverage))
 		if not bool(sample.get("boss_presence", false)) or (sample.get("weapon_ranks", []) as Array).size() != 3:
 			reasons.append("boss_or_three_weapon_families_missing")
 		if start_workload < PROFILE_DENSITY_MIN or start_workload > PROFILE_DENSITY_MAX or end_workload < PROFILE_DENSITY_MIN or end_workload > PROFILE_DENSITY_MAX:
@@ -2436,6 +2488,7 @@ func _mcp_state() -> Dictionary:
 	var profile_frame_ms: Dictionary = validation_profile_sample.get("frame_ms", {})
 	var profile_cohort: Dictionary = validation_profile_sample.get("cohort", {})
 	var profile_qualification: Dictionary = validation_profile_sample.get("qualification", {})
+	var profile_coverage: Dictionary = validation_profile_sample.get("coverage", {})
 	var cycle_comparison := _profile_cycle_comparison()
 	var ledger_snapshot := complete_run_ledger.get_snapshot()
 	var ledger_matrix: Dictionary = ledger_snapshot.get("matrix", {})
@@ -2446,6 +2499,9 @@ func _mcp_state() -> Dictionary:
 		"profile_status":validation_profile_sample.get("status", "idle"),
 		"profile_armed":_profile_armed,
 		"profile_arm_receipt":_profile_arm_receipt,
+		"profile_rearm_count":_profile_rearm_count,
+		"profile_coverage":profile_coverage,
+		"profile_missing_coverage":validation_profile_sample.get("missing_coverage", _missing_profile_coverage(profile_coverage) if not profile_coverage.is_empty() else []),
 		"profile_sample_kind":validation_profile_sample.get("sample_kind", ""),
 		"profile_p50_ms":profile_frame_ms.get("p50", 0.0),
 		"profile_p95_ms":profile_frame_ms.get("p95", 0.0),
