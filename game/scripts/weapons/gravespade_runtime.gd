@@ -6,6 +6,7 @@ extends Node3D
 @onready var owner_actor: Node3D = get_parent().get_parent()
 @onready var inventory: WeaponInventory = get_parent().get_node("WeaponInventory")
 @onready var attack_runtime: AttackRuntime = get_parent().get_node("AttackRuntime")
+var target_registry: EnemyNeighborRegistry
 
 var cooldown_remaining := 0.35
 var attack_phase := "unequipped"
@@ -17,6 +18,9 @@ var _runtime_generation := 0
 var active_presentation_count := 0
 var _active_presentations: Dictionary = {}
 
+func configure_target_registry(registry: EnemyNeighborRegistry) -> void:
+	target_registry = registry
+
 func _physics_process(delta: float) -> void:
 	if not inventory.is_equipped(weapon_id):
 		attack_phase = "unequipped"
@@ -25,7 +29,7 @@ func _physics_process(delta: float) -> void:
 	if cooldown_remaining > 0.0 or _emitting:
 		return
 	var stats := inventory.get_stats(weapon_id)
-	var target := TargetSelector.nearest_legal(owner_actor, float(stats.range))
+	var target := TargetSelector.nearest_legal(owner_actor, float(stats.range), target_registry)
 	if target:
 		_emit_sweep(target, stats)
 	else:
@@ -66,7 +70,7 @@ func _emit_sweep(primary_target: Node3D, stats: Dictionary) -> void:
 			sweep.position.x = (float(arc_index) - float(arc_count - 1) * 0.5) * 0.38
 			if sweep.has_method("configure"):
 				sweep.configure(posmod(presentation_variant + arc_index, 3))
-	var targets := TargetSelector.legal_in_radius(owner_actor.global_position, float(stats.area), get_tree())
+	var targets := TargetSelector.legal_in_radius(owner_actor.global_position, float(stats.area), target_registry)
 	for target in targets:
 		var to_target := (target.global_position - owner_actor.global_position).normalized()
 		if direction.normalized().dot(to_target) >= -0.15:

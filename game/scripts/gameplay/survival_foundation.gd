@@ -31,6 +31,9 @@ func _ready() -> void:
 	attack_runtime.hit_resolved.connect(_on_hit_resolved)
 	spawner.enemy_lifecycle.connect(_on_enemy_lifecycle)
 	spawner.reward_dropped.connect(_on_drop_committed)
+	lantern_runtime.configure_target_registry(spawner.neighbor_registry)
+	gravespade_runtime.configure_target_registry(spawner.neighbor_registry)
+	wisps_runtime.configure_target_registry(spawner.neighbor_registry)
 	set_session_active(false)
 
 func _unhandled_input(event: InputEvent) -> void:

@@ -46,5 +46,5 @@ cast_shadow = 0
 [node name="HealthComponent" type="Node" parent="."]
 script = ExtResource("3")
 actor_id = &"boss.bellkeeper"
-maximum_health = 1400.0
-current_health = 1400.0
+current_health = 1100.0
+maximum_health = 1100.0

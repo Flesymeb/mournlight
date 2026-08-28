@@ -7,13 +7,13 @@ script = ExtResource("1")
 weapon_id = &"wandering_wisps"
 display_name = "Wandering Wisps"
 strategy = "persistent_orbit"
-base_damage = 8.0
+base_damage = 10.5
 base_cooldown = 0.2
 base_range = 4.4
 base_area = 2.35
 base_count = 2
 base_duration = 30.0
-base_hit_interval = 0.9
+base_hit_interval = 0.78
 max_rank = 4
 rank_modifiers = Array[Dictionary]([{
 "count_add": 1.0,
@@ -26,4 +26,3 @@ rank_modifiers = Array[Dictionary]([{
 "area_mult": 1.18,
 "damage_mult": 1.2
 }])
-

@@ -560,6 +560,12 @@ func get_profile_counters() -> Dictionary:
 		"active_lights":_role_light_owners.size() + _hurt_light_owners.size(),
 		"neighbor_candidate_visits":int(neighbor.get("candidate_visits", 0)),
 		"registered_neighbors":int(neighbor.get("registered_count", 0)),
+		"target_query_count":int(neighbor.get("target_query_count", 0)),
+		"target_candidate_visits":int(neighbor.get("target_candidate_visits", 0)),
+		"target_registry_members":int(neighbor.get("registered_count", 0)),
+		"target_full_group_inventories":int(neighbor.get("full_group_inventory_count", 0)),
+		"total_target_queries":int(neighbor.get("total_target_queries", 0)),
+		"total_target_candidate_visits":int(neighbor.get("total_target_candidate_visits", 0)),
 		"counter_source":"encounter_lifecycle_owners",
 	}
 
@@ -689,6 +695,10 @@ func _mcp_state() -> Dictionary:
 		"neighbor_candidate_visits":neighbors.get("candidate_visits", 0),
 		"neighbor_candidate_budget":neighbors.get("candidate_budget", 0),
 		"neighbor_stable_order_cache_size":neighbors.get("stable_order_cache_size", 0),
+		"target_queries":neighbors.get("target_query_count", 0),
+		"target_candidate_visits":neighbors.get("target_candidate_visits", 0),
+		"target_registry_members":neighbors.get("registered_count", 0),
+		"target_full_group_inventories":neighbors.get("full_group_inventory_count", 0),
 		"roles":snapshot.get("roles", {}),
 		"role_variants":snapshot.get("role_variants", {}),
 		"variant_balance":snapshot.get("variant_balance", {}),

@@ -787,7 +787,7 @@ func _spawn_bellkeeper() -> void:
 	boss = BELLKEEPER_SCENE.instantiate() as BellkeeperActor
 	world.get_node("BossAnchor").add_child(boss)
 	boss.position = Vector3.ZERO
-	boss.configure(warden)
+	boss.configure(warden, spawner.neighbor_registry)
 	var wave_state := wave_director.get_snapshot()
 	boss_transition_history.append({
 		"event":"bellkeeper_spawned", "elapsed":run_elapsed,
@@ -1944,6 +1944,12 @@ func _profile_counts() -> Dictionary:
 		"telegraph_active":int(encounter.get("telegraph_active", 0)),
 		"neighbor_candidate_visits":int(encounter.get("neighbor_candidate_visits", 0)),
 		"registered_neighbors":int(encounter.get("registered_neighbors", 0)),
+		"target_query_count":int(encounter.get("target_query_count", 0)),
+		"target_candidate_visits":int(encounter.get("target_candidate_visits", 0)),
+		"target_registry_members":int(encounter.get("target_registry_members", 0)),
+		"target_full_group_inventories":int(encounter.get("target_full_group_inventories", 0)),
+		"total_target_queries":int(encounter.get("total_target_queries", 0)),
+		"total_target_candidate_visits":int(encounter.get("total_target_candidate_visits", 0)),
 		"wisp_handles":wisps_runtime.active_wisp_count,
 		"wisp_interval_targets":wisps_runtime._target_next_hit_time.size(),
 		"active_attack_ledgers":world.attack_runtime._hit_ledgers.size(),
@@ -1959,13 +1965,18 @@ func _bounded_static_light_snapshot() -> int:
 	return count
 
 func _profile_observation_work_receipt() -> Dictionary:
+	var target_work := spawner.neighbor_registry.get_snapshot() if is_instance_valid(spawner.neighbor_registry) else {}
 	return {
 		"bounded_setup_scene_scans":_profile_setup_scene_scans,
 		"sampled_frame_scene_scans":0,
-		"sampled_frame_group_inventories":0,
+		"sampled_frame_group_inventories":int(target_work.get("full_group_inventory_count", 0)),
+		"target_query_owner":"EncounterSpawner/EnemyNeighborRegistry",
+		"target_query_count":int(target_work.get("total_target_queries", 0)),
+		"target_candidate_visits":int(target_work.get("total_target_candidate_visits", 0)),
+		"target_registry_members":int(target_work.get("registered_count", 0)),
 		"sampled_frame_counter_read_count":_profile_sample_counter_reads,
 		"arming_gate_counter_read_count":_profile_gate_counter_reads,
-		"counter_sources":["encounter_lifecycle_owners","weapon_presentation_owners","reward_pickup_owners","audio_fixed_voice_pool","wisp_runtime_owners"],
+		"counter_sources":["encounter_lifecycle_owners","encounter_target_registry","weapon_presentation_owners","reward_pickup_owners","audio_fixed_voice_pool","wisp_runtime_owners"],
 		"setup_and_finalization_excluded_from_frame_samples":true,
 	}
 
@@ -2041,6 +2052,9 @@ func _profile_qualification(sample: Dictionary) -> Dictionary:
 		reasons.append("enemy_density_outside_25_40")
 	if float(frame_ms.get("p95", INF)) > 16.67:
 		reasons.append("p95_above_16_67ms")
+	var observation_work: Dictionary = sample.get("observation_work", {})
+	if int(observation_work.get("sampled_frame_group_inventories", 0)) != 0:
+		reasons.append("weapon_target_full_group_inventory_detected")
 	var density_qualified := minimum_workload >= PROFILE_DENSITY_MIN and maximum_workload <= PROFILE_DENSITY_MAX and start_workload >= PROFILE_DENSITY_MIN and end_workload >= PROFILE_DENSITY_MIN
 	return {"qualified":reasons.is_empty(), "ordinary_route_qualified":passive_ordinary and reasons.is_empty(), "density_qualified":density_qualified, "reasons":reasons, "requires_hardware":true, "p95_limit_ms":16.67,
 		"required_density_range":{"minimum":25,"maximum":40,"boundary_target":32}}

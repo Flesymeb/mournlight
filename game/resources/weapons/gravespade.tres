@@ -7,7 +7,7 @@ script = ExtResource("1")
 weapon_id = &"gravespade"
 display_name = "Gravespade"
 strategy = "threat_sweep"
-base_damage = 18.0
+base_damage = 24.0
 base_cooldown = 1.18
 base_range = 5.0
 base_area = 3.1
@@ -23,4 +23,3 @@ rank_modifiers = Array[Dictionary]([{
 "count_add": 1.0,
 "area_mult": 1.22
 }])
-

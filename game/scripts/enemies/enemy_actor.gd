@@ -40,7 +40,6 @@ var _facing_updates := 0
 var _facing_skips := 0
 
 func _ready() -> void:
-	add_to_group("combat_targets")
 	add_to_group("mcp_watch")
 	health.hurt.connect(_on_hurt)
 	health.died.connect(_on_died)
@@ -83,6 +82,7 @@ func activate(next_profile: EnemyProfile, next_target: WardenController, at_posi
 	_apply_accent(profile.accent_color)
 	visible = true
 	collider.disabled = false
+	add_to_group("combat_targets")
 	_set_state("spawn", 0.55)
 	set_physics_process(true)
 	if is_instance_valid(neighbor_registry):
@@ -91,8 +91,9 @@ func activate(next_profile: EnemyProfile, next_target: WardenController, at_posi
 
 func return_to_pool() -> void:
 	_release_telegraph_admission("pool_return")
-	if is_instance_valid(neighbor_registry):
+	if is_instance_valid(neighbor_registry) and state != "death":
 		neighbor_registry.unregister_actor(stable_id, spawn_generation)
+	remove_from_group("combat_targets")
 	set_physics_process(false)
 	velocity = Vector3.ZERO
 	target = null
@@ -243,6 +244,9 @@ func _on_died(event: Dictionary) -> void:
 	if state == "death":
 		return
 	death_count += 1
+	if is_instance_valid(neighbor_registry):
+		neighbor_registry.unregister_actor(stable_id, spawn_generation)
+	remove_from_group("combat_targets")
 	_release_telegraph_admission("death")
 	_hurt_light_remaining = 0.0
 	_set_light_budget(false, false)
@@ -257,6 +261,9 @@ func _on_died(event: Dictionary) -> void:
 	drops.commit_from_death(drop_event)
 	lifecycle_event.emit(_event("death", {"death_id": event.get("death_id", "")}))
 	defeated.emit(self, event)
+
+func get_target_generation() -> int:
+	return spawn_generation
 
 func _on_drop(event: Dictionary) -> void:
 	drop_committed.emit(event)

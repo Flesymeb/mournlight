@@ -5,6 +5,9 @@ signal boss_changed(snapshot: Dictionary)
 signal defeated(event: Dictionary)
 signal phase_shifted(phase: int)
 
+@export var phase_one_recovery_duration := 2.2
+@export var phase_two_recovery_duration := 1.7
+
 @onready var health: HealthComponent = $HealthComponent
 @onready var telegraph: MeshInstance3D = $Telegraph
 @onready var presentation: Node3D = $Presentation
@@ -25,9 +28,11 @@ var _telegraph_direction := Vector3.FORWARD
 var _retirement_receipt: Dictionary = {}
 var _death_tween: Tween
 var _authored_presentation_scale := Vector3.ONE
+var target_registry: EnemyNeighborRegistry
+var _target_generation := 0
+var _registry_member := false
 
 func _ready() -> void:
-	add_to_group("combat_targets")
 	add_to_group("active_enemies")
 	add_to_group("mcp_watch")
 	health.hurt.connect(_on_hurt)
@@ -36,8 +41,11 @@ func _ready() -> void:
 	_authored_presentation_scale = presentation.scale
 	boss_changed.emit(get_snapshot())
 
-func configure(next_target: WardenController) -> void:
+func configure(next_target: WardenController, registry: EnemyNeighborRegistry = null) -> void:
+	_set_targetable(false)
 	target = next_target
+	target_registry = registry
+	_target_generation += 1
 	health.reset_health()
 	state = "entrance"
 	phase = 1
@@ -77,7 +85,7 @@ func _physics_process(delta: float) -> void:
 	elif state == "recovery":
 		velocity = Vector3.ZERO
 		if state_clock <= 0.0:
-			vulnerable = false
+			_set_targetable(false)
 			state = "pursuit"
 	elif state == "telegraph":
 		velocity = Vector3.ZERO
@@ -115,13 +123,13 @@ func _resolve_toll() -> void:
 		accepted = global_position.distance_to(target.global_position) <= 5.4
 		if accepted:
 			target.get_node("HealthComponent").apply_damage({"attack_id":"bellkeeper.toll.%d" % attack_serial,"damage":18.0 if phase == 1 else 24.0,"damage_channel":"boss_toll"})
-	_enter_recovery(1.45 if phase == 1 else 1.0)
+	_enter_recovery(phase_one_recovery_duration if phase == 1 else phase_two_recovery_duration)
 	boss_changed.emit(get_snapshot())
 
 func _enter_recovery(duration: float) -> void:
 	state = "recovery"
 	state_clock = duration
-	vulnerable = true
+	_set_targetable(true)
 	telegraph.visible = false
 
 func _on_hurt(_event: Dictionary) -> void:
@@ -129,7 +137,7 @@ func _on_hurt(_event: Dictionary) -> void:
 		phase = 2
 		state = "phase_shift"
 		state_clock = 1.2
-		vulnerable = false
+		_set_targetable(false)
 		phase_shift_count += 1
 		phase_shifted.emit(phase)
 	boss_changed.emit(get_snapshot())
@@ -139,7 +147,7 @@ func _on_died(event: Dictionary) -> void:
 		return
 	committed = true
 	state = "defeated"
-	vulnerable = false
+	_set_targetable(false)
 	set_physics_process(false)
 	remove_from_group("active_enemies")
 	velocity = Vector3.ZERO
@@ -162,7 +170,7 @@ func retire_run_actor(reason: String, completion_generation: int) -> Dictionary:
 		return _retirement_receipt.duplicate(true)
 	committed = true
 	state = "retired_" + reason
-	vulnerable = false
+	_set_targetable(false)
 	target = null
 	velocity = Vector3.ZERO
 	attack_clock = 0.0
@@ -176,7 +184,6 @@ func retire_run_actor(reason: String, completion_generation: int) -> Dictionary:
 	collision_layer = 0
 	collision_mask = 0
 	remove_from_group("active_enemies")
-	remove_from_group("combat_targets")
 	if is_instance_valid(_death_tween):
 		_death_tween.kill()
 	_retirement_receipt = {
@@ -194,6 +201,22 @@ func is_legal_target() -> bool:
 
 func get_stable_id() -> StringName:
 	return &"boss.bellkeeper"
+
+func get_target_generation() -> int:
+	return _target_generation
+
+func _set_targetable(next_value: bool) -> void:
+	vulnerable = next_value
+	if next_value and not _registry_member:
+		add_to_group("combat_targets")
+		if is_instance_valid(target_registry):
+			target_registry.register_target(self, _target_generation)
+		_registry_member = true
+	elif not next_value and _registry_member:
+		remove_from_group("combat_targets")
+		if is_instance_valid(target_registry):
+			target_registry.unregister_target(get_stable_id(), _target_generation)
+		_registry_member = false
 
 func get_snapshot() -> Dictionary:
 	return {"active":not committed,"state":state,"phase":phase,"health":health.current_health,"health_maximum":health.maximum_health,

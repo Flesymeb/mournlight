@@ -10,6 +10,7 @@ const TRAVEL_VARIANTS: Array[float] = [0.0, 0.025, -0.02, 0.04]
 @onready var inventory: WeaponInventory = get_parent().get_node("WeaponInventory")
 @onready var attack_runtime: AttackRuntime = get_parent().get_node("AttackRuntime")
 @onready var audio_player: AudioStreamPlayer3D = $Audio
+var target_registry: EnemyNeighborRegistry
 
 var cooldown_remaining := 0.18
 var attack_phase := "cooldown"
@@ -27,6 +28,9 @@ func _ready() -> void:
 	audio_player.stop()
 	audio_player.stream = null
 
+func configure_target_registry(registry: EnemyNeighborRegistry) -> void:
+	target_registry = registry
+
 func _physics_process(delta: float) -> void:
 	if not inventory.is_equipped(weapon_id):
 		return
@@ -34,7 +38,7 @@ func _physics_process(delta: float) -> void:
 	if cooldown_remaining > 0.0 or _emitting:
 		return
 	var stats := inventory.get_stats(weapon_id)
-	var target := TargetSelector.nearest_legal(owner_actor, float(stats.get("range", 0.0)))
+	var target := TargetSelector.nearest_legal(owner_actor, float(stats.get("range", 0.0)), target_registry)
 	if not target:
 		attack_phase = "ready_no_target"
 		selected_target_id = ""

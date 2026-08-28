@@ -6,6 +6,7 @@ extends Node3D
 @onready var owner_actor: Node3D = get_parent().get_parent()
 @onready var inventory: WeaponInventory = get_parent().get_node("WeaponInventory")
 @onready var attack_runtime: AttackRuntime = get_parent().get_node("AttackRuntime")
+var target_registry: EnemyNeighborRegistry
 
 var orbit_phase := 0.0
 var contact_hit_count := 0
@@ -15,6 +16,9 @@ var _target_next_hit_time: Dictionary = {}
 var _gameplay_time := 0.0
 var _retired := false
 var _retirement_generation := 0
+
+func configure_target_registry(registry: EnemyNeighborRegistry) -> void:
+	target_registry = registry
 
 func _physics_process(delta: float) -> void:
 	if _retired:
@@ -46,7 +50,7 @@ func _sync_wisp_count(count: int) -> void:
 
 func _resolve_contacts(stats: Dictionary) -> void:
 	const CONTACT_RADIUS := 1.35
-	for target in TargetSelector.legal_in_radius(owner_actor.global_position, float(stats.area) + CONTACT_RADIUS, get_tree()):
+	for target in TargetSelector.legal_in_radius(owner_actor.global_position, float(stats.area) + CONTACT_RADIUS, target_registry):
 		var target_id := String(target.get_stable_id())
 		if _gameplay_time < float(_target_next_hit_time.get(target_id, 0.0)):
 			continue
