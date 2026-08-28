@@ -60,6 +60,12 @@ var _victory_vfx_duration := 0.0
 var _victory_vfx_generation := -1
 var victory_vfx_event_count := 0
 var victory_vfx_receipt: Dictionary = {}
+const SHIPPED_CAMERA_HAT_NODE_NAME := "Mage_Hat"
+var _isolated_hat: MeshInstance3D
+var _isolated_hat_original_visibility := true
+var _hat_isolation_generation := 0
+var _hat_restoration_generation := 0
+var hat_isolation_receipt: Dictionary = {}
 
 func _ready() -> void:
 	motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
@@ -69,6 +75,7 @@ func _ready() -> void:
 	_base_lantern_position = lantern.position
 	_base_presentation_scale = presentation_root.scale
 	_authored_animation = _find_animation_player(authored_character)
+	_resolve_and_apply_shipped_camera_hat_isolation("ready")
 	animation_binding = WardenAnimationBinding.new()
 	animation_binding.name = "SemanticAnimationBinding"
 	add_child(animation_binding)
@@ -346,6 +353,7 @@ func reset_for_run(spawn_position: Vector3, reset_owner := "run_reset") -> void:
 	lantern.position = _base_lantern_position
 	lantern.rotation = Vector3.ZERO
 	presentation_root.scale = _base_presentation_scale
+	_restore_and_reapply_hat_isolation(reset_owner)
 	end_victory_presentation(reset_owner)
 	_victory_vfx_duration = 0.0
 	_victory_vfx_generation = -1
@@ -364,6 +372,47 @@ func _find_animation_player(root: Node) -> AnimationPlayer:
 		if found:
 			return found
 	return null
+
+func _resolve_and_apply_shipped_camera_hat_isolation(reason: String) -> bool:
+	# Presentation policy lives at the accepted wrapper. The imported GLB,
+	# skeleton, animation tracks, transforms and lantern socket stay untouched.
+	var resolved := authored_character.find_child(SHIPPED_CAMERA_HAT_NODE_NAME, true, false)
+	if not resolved is MeshInstance3D or not authored_character.is_ancestor_of(resolved):
+		hat_isolation_receipt = {
+			"policy":"shipped_camera_self_costume_isolation",
+			"resolved":false,
+			"isolated":false,
+			"requested_node":SHIPPED_CAMERA_HAT_NODE_NAME,
+			"reason":reason,
+		}
+		return false
+	if not is_instance_valid(_isolated_hat):
+		_isolated_hat = resolved as MeshInstance3D
+		_isolated_hat_original_visibility = _isolated_hat.visible
+	_isolated_hat.visible = false
+	_hat_isolation_generation += 1
+	hat_isolation_receipt = {
+		"policy":"shipped_camera_self_costume_isolation",
+		"resolved":true,
+		"isolated":not _isolated_hat.visible,
+		"resolved_binding":String(_isolated_hat.get_path()),
+		"resolved_type":_isolated_hat.get_class(),
+		"source_mesh":String(_isolated_hat.mesh.resource_path) if _isolated_hat.mesh else "",
+		"original_visibility":_isolated_hat_original_visibility,
+		"authored_character":String(authored_character.get_path()),
+		"authored_animation_owner":String(_authored_animation.get_path()) if _authored_animation else "",
+		"lantern_socket":String(lantern_socket.get_path()),
+		"isolation_generation":_hat_isolation_generation,
+		"restoration_generation":_hat_restoration_generation,
+		"reason":reason,
+	}
+	return true
+
+func _restore_and_reapply_hat_isolation(reason: String) -> void:
+	if is_instance_valid(_isolated_hat):
+		_isolated_hat.visible = _isolated_hat_original_visibility
+		_hat_restoration_generation += 1
+	_resolve_and_apply_shipped_camera_hat_isolation("%s_reapplied" % reason)
 
 func reset_input_latch(reason := "input_latch_reset") -> void:
 	clear_dash_ownership(reason)
@@ -401,5 +450,6 @@ func _mcp_state() -> Dictionary:
 		"plane_error": plane_error,
 		"authored_animation": String(_authored_animation.current_animation) if _authored_animation else "none",
 		"semantic_animation": animation_binding.get_snapshot() if animation_binding else {},
+		"hat_isolation":hat_isolation_receipt.duplicate(true),
 		"victory_vfx":{"active":_victory_vfx_active,"remaining_seconds":_victory_vfx_remaining,"duration_seconds":_victory_vfx_duration,"generation":_victory_vfx_generation,"event_count":victory_vfx_event_count,"receipt":victory_vfx_receipt},
 	}

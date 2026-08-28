@@ -68,5 +68,8 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 		"boss_transition_history":controller.boss_transition_history.duplicate(true),
 		"ordinary_victory_receipt":controller.ordinary_victory_receipt.duplicate(true),
 		"tester_victory_fixture":controller.tester_victory_fixture_receipt.duplicate(true),
+		"warden_hat_isolation":warden.hat_isolation_receipt.duplicate(true) if warden else {},
+		"complete_run_ledger":controller.complete_run_ledger.get_snapshot() if controller.complete_run_ledger else {},
+		"validation_profile_matrix":controller._profile_matrix_snapshot(),
 		"world_active": world.session_active if world else false,
 	}

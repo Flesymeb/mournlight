@@ -23,6 +23,7 @@ const MAX_ACTIVE_PICKUPS := 16
 const VICTORY_PRESENTATION_HOLD_SECONDS := 2.6
 const PROFILE_DENSITY_MIN := 25
 const PROFILE_DENSITY_MAX := 40
+const CompleteRunLedgerClass := preload("res://scripts/gameplay/complete_run_ledger.gd")
 
 var run_state := "title"
 var run_serial := 0
@@ -94,9 +95,14 @@ var _profile_maximum_enemy_workload := 0
 var _profile_rearm_count := 0
 var _victory_fixture_commit_held := false
 var _victory_fixture_hold_generation := -1
+var complete_run_ledger: CompleteRunLedger
+var _profile_physics_samples_ms: Array[float] = []
+var _profile_advance_generation := 0
+var validation_profile_matrix_samples: Array[Dictionary] = []
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	complete_run_ledger = CompleteRunLedgerClass.new()
 	shell.action_requested.connect(_on_shell_action)
 	title_menu.game_started.connect(start_run)
 	title_menu.game_exited.connect(_on_title_exit_requested)
@@ -117,7 +123,7 @@ func _ready() -> void:
 	input_router.logical_press_edge.connect(_on_logical_press_edge)
 	input_router.context_changed.connect(_on_input_context_changed)
 	if OS.has_feature("editor"):
-		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_draft", &"validation_prepare_result_failure", &"validation_prepare_result_victory", &"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_reset_density", &"validation_prepare_final_profile", &"validation_advance_final_profile", &"validation_reset_final_profile", &"tester_victory_prepare", &"tester_victory_advance", &"tester_victory_commit", &"tester_final_profile_prepare", &"tester_final_profile_advance", &"tester_final_profile_reset"]:
+		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_draft", &"validation_prepare_result_failure", &"validation_prepare_result_victory", &"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_advance_density", &"validation_reset_density", &"validation_prepare_final_profile", &"validation_advance_final_profile", &"validation_reset_final_profile", &"tester_victory_prepare", &"tester_victory_advance", &"tester_victory_commit", &"tester_final_profile_prepare", &"tester_final_profile_advance", &"tester_final_profile_reset"]:
 			if not InputMap.has_action(action):
 				InputMap.add_action(action)
 	_enter_title()
@@ -191,6 +197,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_prepare_validation_density_checkpoint(32)
 		get_viewport().set_input_as_handled()
 		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"validation_advance_density"):
+		_advance_validation_density_checkpoint()
+		get_viewport().set_input_as_handled()
+		return
 	if OS.has_feature("editor") and event.is_action_pressed(&"validation_reset_density"):
 		_reset_validation_density()
 		get_viewport().set_input_as_handled()
@@ -232,6 +242,7 @@ func _begin_run() -> void:
 	_profile_active = false
 	_profile_origin = ""
 	_profile_samples_ms.clear()
+	_profile_physics_samples_ms.clear()
 	_profile_elapsed = 0.0
 	_profile_start_counts.clear()
 	_profile_armed = false
@@ -240,6 +251,7 @@ func _begin_run() -> void:
 	_profile_maximum_enemy_workload = 0
 	_transition("initializing")
 	run_serial += 1
+	complete_run_ledger.begin_run(run_serial, "ordinary", "retry" if _next_baseline_reason == "retry" else "title_play")
 	run_elapsed = 0.0
 	experience = 0
 	experience_threshold = 5
@@ -293,6 +305,7 @@ func retry_run() -> void:
 	var victory_transaction := ordinary_victory_receipt.duplicate(true)
 	var victory_fixture := tester_victory_fixture_receipt.duplicate(true)
 	_next_baseline_reason = "retry"
+	complete_run_ledger.record_exit(run_serial, "retry", run_elapsed)
 	_teardown_run("retry", "player_retry")
 	_transition("retrying")
 	_begin_run()
@@ -302,6 +315,8 @@ func retry_run() -> void:
 		_finalize_victory_retry(victory_transaction)
 
 func _enter_title() -> void:
+	if run_serial > 0:
+		complete_run_ledger.record_exit(run_serial, "title", run_elapsed)
 	_context_handoff_active = false
 	_terminal_handoff_active = false
 	_teardown_run("title", "return_to_title")
@@ -457,6 +472,7 @@ func _on_warden_failed(event: Dictionary) -> void:
 
 func _present_result(_event: Dictionary) -> void:
 	_transition("result")
+	complete_run_ledger.record_result_presented(run_serial, outcome)
 	hud.visible = false
 	shell.set_mode("result", terminal_snapshot)
 	if outcome == "victory" and int(ordinary_victory_receipt.get("source_run_serial", -1)) == run_serial:
@@ -632,6 +648,7 @@ func _open_credits_page() -> void:
 	if run_state == "title":
 		_set_title_surface(false)
 		shell.set_mode("credits")
+		complete_run_ledger.record_credits(run_serial, shell.mode)
 	_emit_snapshot()
 
 func _return_from_shell_page() -> void:
@@ -689,6 +706,7 @@ func _on_draft_choice(index: int) -> void:
 	choice["natural_choice"] = run_route_kind == "ordinary" and int(wave_state.get("diagnostic_jump_count", 0)) == 0
 	choice["truthful_transaction"] = bool((choice.get("application", {}) as Dictionary).get("accepted", false)) and bool((choice.get("application", {}) as Dictionary).get("matches_projection", false))
 	selected_upgrades.append(choice)
+	complete_run_ledger.record_draft(choice, run_elapsed, run_route_kind, int(wave_state.get("diagnostic_jump_count", 0)))
 	draft_view.close()
 	get_tree().paused = false
 	_transition("active")
@@ -696,6 +714,7 @@ func _on_draft_choice(index: int) -> void:
 
 func _on_wave_phase_changed(snapshot: Dictionary) -> void:
 	if String(snapshot.get("phase","")) == "active":
+		complete_run_ledger.record_wave(snapshot, run_elapsed, run_route_kind)
 		var definition: Dictionary = snapshot.get("definition",{})
 		spawner.configure_pressure(definition)
 		if not spawner.active:
@@ -719,6 +738,7 @@ func _spawn_bellkeeper() -> void:
 		"wave_index":int(wave_state.get("wave", 0)), "route_kind":run_route_kind,
 		"natural_transition":run_route_kind == "ordinary" and int(wave_state.get("diagnostic_jump_count", 0)) == 0,
 	})
+	complete_run_ledger.record_boss("bellkeeper_spawned", boss_transition_history.back(), run_elapsed, run_route_kind, int(wave_state.get("diagnostic_jump_count", 0)))
 	boss.boss_changed.connect(_on_boss_changed)
 	boss.defeated.connect(_on_boss_defeated)
 	boss.phase_shifted.connect(_on_boss_phase_shifted)
@@ -734,6 +754,7 @@ func _on_boss_phase_shifted(next_phase: int) -> void:
 		"route_kind":run_route_kind,
 		"natural_transition":run_route_kind == "ordinary" and int(wave_state.get("diagnostic_jump_count", 0)) == 0,
 	})
+	complete_run_ledger.record_boss("bellkeeper_phase_shifted", boss_transition_history.back(), run_elapsed, run_route_kind, int(wave_state.get("diagnostic_jump_count", 0)))
 
 func _on_boss_changed(snapshot: Dictionary) -> void:
 	boss_snapshot = snapshot.duplicate(true)
@@ -754,6 +775,7 @@ func _on_boss_defeated(_event: Dictionary) -> void:
 		lease_acquired = warden.animation_binding.acquire_terminal_lease("victory", "run_controller.bellkeeper_defeat", run_serial)
 	var vfx_receipt := warden.begin_victory_presentation(VICTORY_PRESENTATION_HOLD_SECONDS, run_serial)
 	var wave_state := wave_director.get_snapshot()
+	complete_run_ledger.record_boss("bellkeeper_defeated", {"phase":boss_snapshot.get("phase",0),"defeat_committed":true}, run_elapsed, run_route_kind, int(wave_state.get("diagnostic_jump_count", 0)))
 	wave_director.terminate("victory_presentation")
 	_teardown_generation += 1
 	var hold_retirement := _retire_transient_ownership("victory_hold", "bellkeeper_defeated", _teardown_generation)
@@ -875,6 +897,7 @@ func _commit_terminal_snapshot(terminal_outcome: String) -> void:
 		and _ordinary_progression_truthful()
 		and _boss_two_phase_history_truthful()
 	)
+	complete_run_ledger.record_terminal(terminal_snapshot, wave_state)
 	terminal_snapshot = terminal_snapshot.duplicate(true)
 
 func _teardown_run(route: String, reason: String) -> Dictionary:
@@ -1032,6 +1055,7 @@ func _prepare_final_profile() -> void:
 	_profile_origin = "diagnostic_prepared"
 	run_route_kind = "diagnostic_prepared"
 	_profile_samples_ms.clear()
+	_profile_physics_samples_ms.clear()
 	_profile_elapsed = 0.0
 	get_tree().paused = false
 	health.maximum_health = 5000.0
@@ -1102,9 +1126,11 @@ func _advance_final_profile() -> void:
 	if not OS.has_feature("editor") or not bool(validation_profile_receipt.get("accepted",false)) or _profile_active:
 		return
 	_profile_samples_ms.clear()
+	_profile_physics_samples_ms.clear()
 	_profile_elapsed = 0.0
 	_profile_active = true
 	_profile_origin = "diagnostic_prepared"
+	_profile_advance_generation += 1
 	_profile_start_counts = _profile_counts()
 	_profile_start_lifecycle = _lifecycle_counters()
 	var cohort := spawner.begin_validation_profile_cohort(32, int(validation_profile_receipt.get("setup_generation", 0)))
@@ -1112,6 +1138,11 @@ func _advance_final_profile() -> void:
 		"status":"sampling", "branch_id":validation_profile_receipt.get("branch_id",""),
 		"sample_kind":_profile_origin, "route_kind":run_route_kind,
 		"run_serial":run_serial, "setup_generation":validation_profile_receipt.get("setup_generation",0),
+		"advance_generation":_profile_advance_generation,
+		"requested_density":32,
+		"resolved_density":int(validation_profile_receipt.get("resolved_density", 0)),
+		"boss_presence":is_instance_valid(boss),
+		"weapon_ranks":_profile_weapon_ranks(),
 		"window_seconds":_profile_duration,
 		"viewport":_profile_viewport_receipt(),
 		"renderer":_profile_renderer_receipt(),
@@ -1174,6 +1205,7 @@ func _try_begin_passive_ordinary_profile() -> void:
 		return
 	_profile_armed = false
 	_profile_samples_ms.clear()
+	_profile_physics_samples_ms.clear()
 	_profile_elapsed = 0.0
 	_profile_active = true
 	_profile_origin = "ordinary_final_wave_passive"
@@ -1210,23 +1242,32 @@ func _advance_profile_sample(delta: float) -> void:
 		_profile_maximum_enemy_workload = maxi(_profile_maximum_enemy_workload, live_density)
 	var frame_ms := maxf(0.0,delta*1000.0)
 	_profile_samples_ms.append(frame_ms)
+	_profile_physics_samples_ms.append(maxf(0.0, float(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)) * 1000.0))
 	_profile_elapsed += delta
 	if _profile_elapsed < _profile_duration:
 		return
 	_profile_active = false
 	var sorted := _profile_samples_ms.duplicate()
 	sorted.sort()
+	var sorted_physics := _profile_physics_samples_ms.duplicate()
+	sorted_physics.sort()
 	var sample_branch := String(validation_profile_sample.get("branch_id", ""))
 	var sample_setup_generation := int(validation_profile_sample.get("setup_generation", _validation_setup_generation))
-	var cohort := spawner.end_validation_profile_cohort("sample_complete") if _profile_origin == "diagnostic_prepared" else {}
+	var cohort := spawner.end_validation_profile_cohort("sample_complete") if _profile_origin.begins_with("diagnostic_") else {}
 	validation_profile_sample = {
 		"status":"complete", "branch_id":sample_branch,
 		"sample_kind":_profile_origin, "route_kind":run_route_kind,
 		"passive":_profile_origin == "ordinary_final_wave_passive",
-		"diagnostic_mutation":_profile_origin == "diagnostic_prepared",
+		"diagnostic_mutation":_profile_origin.begins_with("diagnostic_"),
 		"run_serial":run_serial, "setup_generation":sample_setup_generation,
+		"advance_generation":validation_profile_sample.get("advance_generation", _profile_advance_generation),
+		"requested_density":validation_profile_sample.get("requested_density", _profile_start_counts.get("enemies", 0)),
+		"resolved_density":validation_profile_sample.get("resolved_density", _profile_start_counts.get("enemies", 0)),
+		"boss_presence":validation_profile_sample.get("boss_presence", is_instance_valid(boss)),
+		"weapon_ranks":validation_profile_sample.get("weapon_ranks", _profile_weapon_ranks()),
 		"sample_count":sorted.size(), "window_seconds":_profile_elapsed,
 		"frame_ms":{"p50":_percentile(sorted,0.50),"p95":_percentile(sorted,0.95),"p99":_percentile(sorted,0.99),"worst":sorted.back() if not sorted.is_empty() else 0.0},
+		"physics_ms":{"p50":_percentile(sorted_physics,0.50),"p95":_percentile(sorted_physics,0.95),"p99":_percentile(sorted_physics,0.99),"worst":sorted_physics.back() if not sorted_physics.is_empty() else 0.0},
 		"start_counts":_profile_start_counts.duplicate(true),
 		"end_counts":_profile_counts(), "counts":_profile_counts(),
 		"start_lifecycle":_profile_start_lifecycle.duplicate(true),
@@ -1245,8 +1286,9 @@ func _advance_profile_sample(delta: float) -> void:
 		"workload_end":_profile_workload_receipt(spawner.get_snapshot()),
 	}
 	validation_profile_sample["qualification"] = _profile_qualification(validation_profile_sample)
+	_record_profile_matrix_sample(validation_profile_sample)
 	_record_profile_cycle("advance", validation_profile_sample)
-	if _profile_origin == "diagnostic_prepared":
+	if _profile_origin.begins_with("diagnostic_"):
 		get_tree().paused = true
 	elif not bool((validation_profile_sample.get("qualification", {}) as Dictionary).get("density_qualified", false)) and run_state == "boss" and not result_committed:
 		_profile_rearm_count += 1
@@ -1336,6 +1378,7 @@ func _profile_cycle_comparison() -> Dictionary:
 				"sample_count":entry.get("sample_count", 0),
 				"window_seconds":entry.get("window_seconds", 0.0),
 				"frame_ms":(entry.get("frame_ms", {}) as Dictionary).duplicate(true),
+				"physics_ms":(entry.get("physics_ms", {}) as Dictionary).duplicate(true),
 				"renderer":(entry.get("renderer", {}) as Dictionary).duplicate(true),
 				"requested_enemy_workload":entry.get("requested_enemy_workload", -1),
 				"start_enemy_workload":entry.get("start_enemy_workload", -1),
@@ -1397,6 +1440,34 @@ func _profile_cycle_growth(completed: Array[Dictionary]) -> Dictionary:
 		"owned_signal_binding_growth":signal_growth,
 		"no_structural_growth":node_growth <= 0 and orphan_growth <= 0 and input_growth == 0 and signal_growth == 0,
 		"memory_observational_only":true,
+	}
+
+func _record_profile_matrix_sample(sample: Dictionary) -> void:
+	var entry := sample.duplicate(true)
+	entry["matrix_density"] = int(sample.get("requested_density", sample.get("requested_enemy_workload", 0)))
+	validation_profile_matrix_samples.append(entry)
+	while validation_profile_matrix_samples.size() > 10:
+		validation_profile_matrix_samples.pop_front()
+
+func _profile_matrix_snapshot() -> Dictionary:
+	var latest_by_density: Dictionary = {}
+	for sample in validation_profile_matrix_samples:
+		latest_by_density[int(sample.get("matrix_density", 0))] = sample.duplicate(true)
+	var missing: Array[int] = []
+	for required_density in [3, 5, 10, 18, 32]:
+		if not latest_by_density.has(required_density):
+			missing.append(required_density)
+	return {
+		"identity":"mournlight.native_dense_profile_matrix.v1",
+		"editor_only":OS.has_feature("editor"),
+		"release_export_available":false,
+		"required_densities":[3,5,10,18,32],
+		"latest_by_density":latest_by_density,
+		"missing_densities":missing,
+		"complete":missing.is_empty(),
+		"prepare_and_advance_separate":true,
+		"advance_generation":_profile_advance_generation,
+		"native_qualification_requires":{"minimum_viewport":[1920,1080],"non_software_renderer":true},
 	}
 
 func _counts_are_isolated(counts: Dictionary) -> bool:
@@ -1519,7 +1590,7 @@ func _profile_qualification(sample: Dictionary) -> Dictionary:
 		"required_density_range":{"minimum":25,"maximum":40,"boundary_target":32}}
 
 func _validation_controls_receipt() -> Dictionary:
-	var actions := [&"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_reset_density", &"validation_prepare_final_profile", &"validation_advance_final_profile", &"validation_reset_final_profile"]
+	var actions := [&"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_advance_density", &"validation_reset_density", &"validation_prepare_final_profile", &"validation_advance_final_profile", &"validation_reset_final_profile"]
 	var controls: Array[Dictionary] = []
 	for action in actions:
 		controls.append({"action":String(action), "registered":InputMap.has_action(action), "physical_binding_count":InputMap.action_get_events(action).size() if InputMap.has_action(action) else 0})
@@ -1568,6 +1639,7 @@ func _lifecycle_counters() -> Dictionary:
 	owned_signal_bindings += 1 if spawner.encounter_changed.is_connected(_on_encounter_changed) else 0
 	owned_signal_bindings += 1 if wave_director.phase_changed.is_connected(_on_wave_phase_changed) else 0
 	owned_signal_bindings += 1 if wave_director.boss_requested.is_connected(_spawn_bellkeeper) else 0
+	var counts := _profile_counts()
 	return {
 		"scene_tree_nodes":get_tree().get_node_count(),
 		"object_count":int(Performance.get_monitor(Performance.OBJECT_COUNT)),
@@ -1577,10 +1649,15 @@ func _lifecycle_counters() -> Dictionary:
 		"input_action_count":InputMap.get_actions().size(),
 		"owned_signal_bindings":owned_signal_bindings,
 		"audio_voices":audio_director.active_effect_voice_count(),
-		"enemy_active":int(_profile_counts().get("enemies", 0)),
-		"enemy_pooled":int(_profile_counts().get("pooled_enemies", 0)),
-		"light_count":int(_profile_counts().get("lights", 0)),
-		"telegraph_active":int(_profile_counts().get("telegraph_active", 0)),
+		"enemy_active":int(counts.get("enemies", 0)),
+		"enemy_pooled":int(counts.get("pooled_enemies", 0)),
+		"active_pools":int(counts.get("enemies", 0)),
+		"projectiles":int(counts.get("projectiles", 0)),
+		"pickups":int(counts.get("pickups", 0)),
+		"telegraph_active":int(counts.get("telegraph_active", 0)),
+		"light_count":int(counts.get("lights", 0)),
+		"wisp_hit_ledgers":int(counts.get("wisp_interval_targets", 0)),
+		"active_attack_ledgers":int(counts.get("active_attack_ledgers", 0)),
 		"input_owner_count":input_router.active_transactions.size(),
 		"input_context":input_router.context,
 		"terminal_commit_count":terminal_commit_count,
@@ -1663,12 +1740,15 @@ func _prepare_validation_density_checkpoint(target_live: int) -> void:
 	_last_health = health.current_health
 	experience = 0
 	experience_threshold = 9999
+	get_tree().paused = true
+	var build_receipt := inventory.prepare_legal_build("representative")
 	wave_director.prepare_test_wave(3)
-	_record_validation_density(target_live)
+	_record_validation_density(target_live, build_receipt)
 
-func _record_validation_density(target_live: int) -> void:
+func _record_validation_density(target_live: int, build_receipt: Dictionary = {}) -> void:
 	var before := spawner.get_snapshot()
 	var preparation := spawner.prepare_validation_density(target_live)
+	var seeded_pickups := _seed_profile_pickups(3)
 	_validation_setup_generation += 1
 	var after := spawner.get_snapshot()
 	validation_density_receipt = {
@@ -1677,6 +1757,15 @@ func _record_validation_density(target_live: int) -> void:
 		"resolved_density":int(after.get("live", 0)),
 		"run_serial":run_serial,
 		"setup_generation":_validation_setup_generation,
+		"route_kind":run_route_kind,
+		"requested_profile":"density_matrix_%d" % target_live,
+		"resolved_profile":"prepared_paused",
+		"preparation_paused":get_tree().paused,
+		"advance_action_required":true,
+		"build_receipt":build_receipt.duplicate(true),
+		"weapon_ranks":_profile_weapon_ranks(),
+		"boss_presence":is_instance_valid(boss),
+		"pickups_seeded":seeded_pickups,
 		"active":int(after.get("live", 0)), "pooled":int(after.get("pooled", 0)),
 		"before_active":int(before.get("live", 0)),
 		"light_budget":(after.get("ordinary_light_budget", {}) as Dictionary).duplicate(true),
@@ -1685,7 +1774,59 @@ func _record_validation_density(target_live: int) -> void:
 		"preparation":preparation.duplicate(true),
 		"attacks_advanced_by_preparation":false,
 		"terminal_state_advanced":false,
+		"work_caps":_dense_work_caps(after),
+		"workload":_profile_workload_receipt(after),
+		"lifecycle":_lifecycle_counters(),
+		"viewport":_profile_viewport_receipt(),
+		"renderer":_profile_renderer_receipt(),
 	}
+	validation_profile_receipt = validation_density_receipt.duplicate(true)
+	_record_profile_cycle("prepare", validation_profile_receipt)
+	_emit_snapshot()
+
+func _advance_validation_density_checkpoint() -> void:
+	if not OS.has_feature("editor") or _profile_active or not bool(validation_density_receipt.get("accepted", false)):
+		return
+	if int(validation_density_receipt.get("setup_generation", -1)) != _validation_setup_generation or int(validation_density_receipt.get("run_serial", -1)) != run_serial:
+		validation_density_receipt["advance_rejected"] = "stale_generation_or_run"
+		_emit_snapshot()
+		return
+	var requested := int(validation_density_receipt.get("requested_density", 0))
+	if requested not in [3, 5, 10, 18, 32]:
+		validation_density_receipt["advance_rejected"] = "density_not_in_matrix"
+		_emit_snapshot()
+		return
+	_profile_samples_ms.clear()
+	_profile_physics_samples_ms.clear()
+	_profile_elapsed = 0.0
+	_profile_active = true
+	_profile_origin = "diagnostic_density_matrix"
+	_profile_advance_generation += 1
+	_profile_start_counts = _profile_counts()
+	_profile_start_lifecycle = _lifecycle_counters()
+	var cohort := spawner.begin_validation_profile_cohort(requested, _validation_setup_generation)
+	validation_profile_sample = {
+		"status":"sampling",
+		"branch_id":"density_matrix_%d" % requested,
+		"sample_kind":_profile_origin,
+		"route_kind":run_route_kind,
+		"run_serial":run_serial,
+		"setup_generation":_validation_setup_generation,
+		"advance_generation":_profile_advance_generation,
+		"requested_density":requested,
+		"resolved_density":int(validation_density_receipt.get("resolved_density", 0)),
+		"boss_presence":is_instance_valid(boss),
+		"weapon_ranks":_profile_weapon_ranks(),
+		"window_seconds":_profile_duration,
+		"viewport":_profile_viewport_receipt(),
+		"renderer":_profile_renderer_receipt(),
+		"start_counts":_profile_start_counts.duplicate(true),
+		"start_lifecycle":_profile_start_lifecycle.duplicate(true),
+		"cohort_start":cohort,
+		"work_caps":_dense_work_caps(spawner.get_snapshot()),
+		"workload_start":_profile_workload_receipt(spawner.get_snapshot()),
+	}
+	get_tree().paused = false
 	_emit_snapshot()
 
 func _reset_validation_density() -> void:
@@ -1948,6 +2089,9 @@ func _mcp_state() -> Dictionary:
 		"validation_retry_baselines":validation_retry_baselines,
 		"ordinary_victory_receipt":ordinary_victory_receipt,
 		"ordinary_victory_transactions":ordinary_victory_transactions,
+		"warden_hat_isolation":warden.hat_isolation_receipt,
+		"complete_run_ledger":complete_run_ledger.get_snapshot(),
+		"validation_profile_matrix":_profile_matrix_snapshot(),
 		"tester_victory_fixture":tester_victory_fixture_receipt,
 		"reward_pickups":{"spawned_total":pickup_spawned_total,"collected_total":pickup_collected_total,"live":get_tree().get_nodes_in_group("reward_pickup").size()},
 		"shell_focus": String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none",
