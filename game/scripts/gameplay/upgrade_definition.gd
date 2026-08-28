@@ -92,7 +92,10 @@ func _project_weapon(projection: Dictionary, inventory: WeaponInventory) -> void
 		# Identity and unlock state live in the dominant silhouette/header. A new
 		# weapon therefore shows only defining tradeoffs, never a redundant
 		# LOCKED-to-EQUIPPED decision row or a numeric zero placeholder.
-		var current_value = before_stats.get(field, null) if current_rank > 0 else "NEW"
+		# New weapons have no numeric current value. Keep the CURRENT column
+		# honest with a neutral dash; identity and attack shape are carried by the
+		# dominant icon/title/consequence instead of a fake NEW placeholder.
+		var current_value = before_stats.get(field, null) if current_rank > 0 else null
 		var result_value = after_stats.get(field, null)
 		if result_value != null and (current_rank == 0 or not _values_equal(current_value, result_value)):
 			changes.append({"field":field, "label":STAT_LABELS[field], "current":current_value, "result":result_value})

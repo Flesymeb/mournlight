@@ -96,6 +96,7 @@ var _compositor_frame_count := 0
 var _tall_occluder_bindings: Array[Dictionary] = []
 var _direct_detection_active := false
 var _detection_source := "clear"
+var _compositor_allowed := false
 
 func _ready() -> void:
 	current = true
@@ -113,8 +114,23 @@ func _exit_tree() -> void:
 func set_movement_velocity(value: Vector3) -> void:
 	movement_velocity = Vector3(value.x, 0.0, value.z)
 
+func set_shell_state(run_state: String) -> void:
+	# The run controller is the authoritative owner of shell visibility. Draft,
+	# pause, settings, title, result, death, and victory never share the viewport
+	# with the private Warden compositor.
+	_compositor_allowed = run_state in ["active", "boss"]
+	if not _compositor_allowed:
+		occlusion_guard_active = false
+		_blocked_seconds = 0.0
+		_clear_seconds = 0.0
+		_apply_visibility_overlay(false)
+
 func _process(delta: float) -> void:
 	if not is_instance_valid(target):
+		return
+	if not _compositor_allowed:
+		if occlusion_guard_active or (is_instance_valid(_visibility_texture) and _visibility_texture.visible):
+			set_shell_state("modal")
 		return
 	var desired_lead := Vector3.ZERO
 	if movement_velocity.length_squared() > 0.04:
@@ -765,6 +781,7 @@ func _mcp_state() -> Dictionary:
 	return {
 		"binding_member_count": _binding_members.size(),
 		"compositor_updates": _visibility_viewport.render_target_update_mode == SubViewport.UPDATE_ALWAYS if is_instance_valid(_visibility_viewport) else false,
+		"compositor_allowed":_compositor_allowed,
 		"effect_visual_count": _effect_visuals.size(),
 		"framing_target": framing_target,
 		"safe_frame_ok":safe_frame_ok,

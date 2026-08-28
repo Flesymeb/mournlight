@@ -25,6 +25,7 @@ signal reward_collected(event: Dictionary)
 const BELLKEEPER_SCENE := preload("res://scenes/enemies/bellkeeper.tscn")
 const REWARD_PICKUP_SCENE := preload("res://scenes/gameplay/reward_pickup.tscn")
 const MAX_ACTIVE_PICKUPS := 16
+const PICKUP_POOL_CAP := MAX_ACTIVE_PICKUPS
 const MAX_PENDING_REWARDS := 16
 const VICTORY_PRESENTATION_HOLD_SECONDS := 2.6
 const PROFILE_DENSITY_MIN := 25
@@ -115,6 +116,8 @@ var _profile_advance_generation := 0
 var validation_profile_matrix_samples: Array[Dictionary] = []
 var density_matrix_contract_checks: Dictionary = {}
 var _active_pickups: Dictionary = {}
+var _pickup_pool: Array[RewardPickup] = []
+var _pickup_total := 0
 var _active_pickup_count := 0
 var _pending_reward_events: Array[Dictionary] = []
 var _reward_cap_deferrals := 0
@@ -705,8 +708,11 @@ func _on_reward_attraction_started(event: Dictionary) -> void:
 
 func _on_reward_pickup_retired(event: Dictionary) -> void:
 	var instance_id := int(event.get("instance_id", 0))
+	var retired_pickup: RewardPickup = _active_pickups.get(instance_id) as RewardPickup
 	if _active_pickups.erase(instance_id):
 		_active_pickup_count = _active_pickups.size()
+		if is_instance_valid(retired_pickup) and not _pickup_pool.has(retired_pickup):
+			_pickup_pool.append(retired_pickup)
 	if not _teardown_active and run_state in ["active", "boss", "draft"] and _active_pickup_count < MAX_ACTIVE_PICKUPS and not _pending_reward_events.is_empty():
 		var pending: Dictionary = _pending_reward_events.pop_front()
 		_spawn_reward_pickup(pending, false)
@@ -736,12 +742,23 @@ func _spawn_reward_pickup(event: Dictionary, allow_defer: bool = true) -> Reward
 			_reward_spawn_receipt["pending_count"] = _pending_reward_events.size()
 			_reward_spawn_receipt["active_after"] = _active_pickup_count
 		return null
-	var pickup := REWARD_PICKUP_SCENE.instantiate() as RewardPickup
-	world.add_child(pickup)
+	var pickup: RewardPickup
+	while not _pickup_pool.is_empty() and not is_instance_valid(_pickup_pool.back()):
+		_pickup_pool.pop_back()
+	if not _pickup_pool.is_empty():
+		pickup = _pickup_pool.pop_back()
+	else:
+		if _pickup_total >= PICKUP_POOL_CAP:
+			if allow_defer: _queue_pending_reward(event)
+			_reward_cap_deferrals += 1
+			return null
+		pickup = REWARD_PICKUP_SCENE.instantiate() as RewardPickup
+		world.add_child(pickup)
+		_pickup_total += 1
 	pickup.configure(warden, event)
-	pickup.collected.connect(_on_reward_pickup_collected)
-	pickup.attraction_started.connect(_on_reward_attraction_started)
-	pickup.retired.connect(_on_reward_pickup_retired)
+	if not pickup.collected.is_connected(_on_reward_pickup_collected): pickup.collected.connect(_on_reward_pickup_collected)
+	if not pickup.attraction_started.is_connected(_on_reward_attraction_started): pickup.attraction_started.connect(_on_reward_attraction_started)
+	if not pickup.retired.is_connected(_on_reward_pickup_retired): pickup.retired.connect(_on_reward_pickup_retired)
 	_active_pickups[pickup.get_instance_id()] = pickup
 	_active_pickup_count = _active_pickups.size()
 	pickup_spawned_total += 1
@@ -1253,7 +1270,12 @@ func _retire_transient_ownership(route: String, reason: String, generation: int)
 	var retired_attack_presentations := _retire_run_group("friendly_attack")
 	var pending_rewards_retired := _pending_reward_events.size()
 	_pending_reward_events.clear()
-	var retired_pickups := _retire_run_group("reward_pickup")
+	var retired_pickups := 0
+	for pickup_value in _active_pickups.values().duplicate():
+		var pickup := pickup_value as RewardPickup
+		if is_instance_valid(pickup):
+			retired_pickups += 1
+			pickup.retire_for_pool("run_teardown")
 	_active_pickups.clear()
 	_active_pickup_count = 0
 	var audio_retirement := audio_director.retire_run_ownership(route, generation)
@@ -1289,6 +1311,8 @@ func _transition(next_state: String) -> void:
 		return
 	var previous := run_state
 	run_state = next_state
+	if is_instance_valid(arena_camera):
+		arena_camera.set_shell_state(next_state)
 	state_history.append(next_state)
 	state_changed.emit(previous, next_state)
 
@@ -2178,6 +2202,7 @@ func _profile_counts() -> Dictionary:
 		"bosses":1 if is_instance_valid(boss) else 0,
 		"projectiles":projectile_count,
 		"pickups":_active_pickup_count,
+		"pooled_pickups":_pickup_pool.size(), "pickup_pool_total":_pickup_total, "pickup_pool_cap":PICKUP_POOL_CAP,
 		"pending_rewards":_pending_reward_events.size(),
 		"vitality_visible":int(encounter.get("vitality_visible", 0)),
 		"vitality_retired_total":int(encounter.get("vitality_retired_total", 0)),
@@ -2194,6 +2219,11 @@ func _profile_counts() -> Dictionary:
 		"total_target_queries":int(encounter.get("total_target_queries", 0)),
 		"total_target_candidate_visits":int(encounter.get("total_target_candidate_visits", 0)),
 		"wisp_handles":wisps_runtime.active_wisp_count,
+		"presentation_pools":{
+			"lantern":{"active":lantern_runtime.active_presentation_count,"available":lantern_runtime._presentation_pool.size(),"total":lantern_runtime._bolt_total,"cap":lantern_runtime.BOLT_POOL_CAP},
+			"gravespade":{"active":gravespade_runtime.active_presentation_count,"available":gravespade_runtime._presentation_pool.size(),"total":gravespade_runtime._sweep_total,"cap":gravespade_runtime.SWEEP_POOL_CAP},
+			"pickups":{"active":_active_pickup_count,"available":_pickup_pool.size(),"total":_pickup_total,"cap":PICKUP_POOL_CAP},
+		},
 		"wisp_interval_targets":wisps_runtime._target_next_hit_time.size(),
 		"active_attack_ledgers":world.attack_runtime._hit_ledgers.size(),
 		"counter_source":"lifecycle_owners",

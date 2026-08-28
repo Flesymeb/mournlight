@@ -35,6 +35,8 @@ const ATTRACTION_MAX_SPEED := 14.0
 const COLLECTION_FX_SECONDS := 0.24
 
 func configure(next_target: Node3D, event: Dictionary) -> void:
+	if not is_in_group(&"reward_pickup"):
+		add_to_group(&"reward_pickup")
 	_retired = false
 	target = next_target
 	pickup_event = event.duplicate(true)
@@ -106,8 +108,6 @@ func _process(delta: float) -> void:
 		glow.light_energy = 2.4 * (1.0 - progress)
 		if _collection_fx_remaining <= 0.0:
 			_retire("collected_fx_complete")
-			remove_from_group(&"reward_pickup")
-			queue_free()
 		return
 	presentation.rotation.y += delta * 1.8
 	presentation.position.y = sin(age * 3.1) * (0.035 if state == "attracting" else 0.08)
@@ -137,8 +137,6 @@ func _process(delta: float) -> void:
 				return
 	if age >= lifetime_seconds:
 		_retire("lifetime_expired")
-		remove_from_group(&"reward_pickup")
-		queue_free()
 
 func _commit_collection(distance: float, attraction_radius: float) -> void:
 	if _collection_committed:
@@ -175,7 +173,15 @@ func _retire(reason: String) -> void:
 	if _retired:
 		return
 	_retired = true
+	visible = false
+	set_process(false)
+	state = "pooled"
+	target = null
+	remove_from_group(&"reward_pickup")
 	retired.emit({"instance_id":get_instance_id(),"drop_id":pickup_event.get("drop_id", ""),"reason":reason})
+
+func retire_for_pool(reason: String = "run_teardown") -> void:
+	_retire(reason)
 
 func _mcp_state() -> Dictionary:
 	var warden := target as WardenController

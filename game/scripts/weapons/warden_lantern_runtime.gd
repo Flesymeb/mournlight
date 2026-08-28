@@ -3,6 +3,7 @@ extends Node3D
 
 const PITCH_VARIANTS: Array[float] = [0.92, 1.0, 1.08, 0.84]
 const TRAVEL_VARIANTS: Array[float] = [0.0, 0.025, -0.02, 0.04]
+const BOLT_POOL_CAP := 12
 
 @export var weapon_id := &"warden_lantern"
 @export var bolt_scene: PackedScene
@@ -23,6 +24,8 @@ var _emitting := false
 var _runtime_generation := 0
 var active_presentation_count := 0
 var _active_presentations: Dictionary = {}
+var _presentation_pool: Array[LanternBoltPresentation] = []
+var _bolt_total := 0
 
 func _ready() -> void:
 	audio_player.stop()
@@ -70,10 +73,14 @@ func _emit_attack(target: Node3D, stats: Dictionary) -> void:
 	presentation_variant = posmod(emitted_count - 1, 4)
 	attack_phase = "onset"
 	if bolt_scene:
-		var bolt := bolt_scene.instantiate()
-		get_tree().current_scene.add_child(bolt)
-		_track_presentation(bolt)
-		bolt.configure(global_position, target.global_position, event, presentation_variant)
+		var bolt := _acquire_bolt()
+		if not is_instance_valid(bolt):
+			# Deterministic exhaustion policy: the attack remains authoritative even
+			# when presentation capacity is saturated.
+			bolt = null
+		if is_instance_valid(bolt):
+			bolt.configure(global_position, target.global_position, event, presentation_variant)
+			_track_presentation(bolt)
 	await get_tree().create_timer(0.18 + TRAVEL_VARIANTS[presentation_variant]).timeout
 	if generation != _runtime_generation:
 		return
@@ -98,6 +105,9 @@ func retire_runtime(reason: String, generation: int) -> Dictionary:
 	selected_target_id = ""
 	last_attack_id = ""
 	_emitting = false
+	for presentation in _active_presentations.values().duplicate():
+		if is_instance_valid(presentation) and presentation.has_method("retire_for_pool"):
+			presentation.retire_for_pool()
 	_active_presentations.clear()
 	active_presentation_count = 0
 	return {"weapon_id": String(weapon_id), "reason": reason, "generation": generation, "before": before, "active": false, "complete": true}
@@ -106,7 +116,32 @@ func _track_presentation(presentation: Node) -> void:
 	var instance_id := presentation.get_instance_id()
 	_active_presentations[instance_id] = true
 	active_presentation_count = _active_presentations.size()
-	presentation.tree_exiting.connect(_on_presentation_exiting.bind(instance_id))
+	var exiting_cb := _on_presentation_exiting.bind(instance_id)
+	if not presentation.tree_exiting.is_connected(exiting_cb):
+		presentation.tree_exiting.connect(exiting_cb)
+	if presentation is LanternBoltPresentation and not (presentation as LanternBoltPresentation).retired.is_connected(_on_bolt_retired):
+		(presentation as LanternBoltPresentation).retired.connect(_on_bolt_retired)
+
+func _acquire_bolt() -> LanternBoltPresentation:
+	var bolt: LanternBoltPresentation
+	while not _presentation_pool.is_empty() and not is_instance_valid(_presentation_pool.back()):
+		_presentation_pool.pop_back()
+	if not _presentation_pool.is_empty():
+		bolt = _presentation_pool.pop_back()
+	else:
+		if _bolt_total >= BOLT_POOL_CAP or not bolt_scene:
+			return null
+		bolt = bolt_scene.instantiate() as LanternBoltPresentation
+		add_child(bolt)
+		_bolt_total += 1
+		bolt.retired.connect(_on_bolt_retired)
+	return bolt
+
+func _on_bolt_retired(bolt: LanternBoltPresentation) -> void:
+	var instance_id := bolt.get_instance_id()
+	_active_presentations.erase(instance_id)
+	active_presentation_count = _active_presentations.size()
+	if not _presentation_pool.has(bolt): _presentation_pool.append(bolt)
 
 func _on_presentation_exiting(instance_id: int) -> void:
 	if _active_presentations.erase(instance_id):
@@ -122,6 +157,7 @@ func reset_runtime() -> void:
 	presentation_variant = -1
 	last_attack_id = ""
 	_emitting = false
+	set_physics_process(true)
 
 func _mcp_state() -> Dictionary:
 	var stats := inventory.get_stats(weapon_id) if inventory else {}
@@ -131,4 +167,5 @@ func _mcp_state() -> Dictionary:
 		"emitted_count": emitted_count, "resolved_hit_count": resolved_hit_count, "presentation_variant": presentation_variant,
 		"last_attack_id": last_attack_id, "stats": stats,
 		"active_presentation_count":active_presentation_count,
+		"presentation_pool_active":active_presentation_count, "presentation_pool_available":_presentation_pool.size(), "presentation_pool_total":_bolt_total, "presentation_pool_cap":BOLT_POOL_CAP,
 	}

@@ -1,6 +1,8 @@
 class_name GravespadeRuntime
 extends Node3D
 
+const SWEEP_POOL_CAP := 12
+
 @export var weapon_id := &"gravespade"
 @export var sweep_scene: PackedScene
 @onready var owner_actor: Node3D = get_parent().get_parent()
@@ -17,6 +19,8 @@ var _emitting := false
 var _runtime_generation := 0
 var active_presentation_count := 0
 var _active_presentations: Dictionary = {}
+var _presentation_pool: Array[GravespadePresentation] = []
+var _sweep_total := 0
 
 func configure_target_registry(registry: EnemyNeighborRegistry) -> void:
 	target_registry = registry
@@ -64,8 +68,9 @@ func _emit_sweep(primary_target: Node3D, stats: Dictionary) -> void:
 	if sweep_scene:
 		var arc_count := int(stats.count)
 		for arc_index in arc_count:
-			var sweep: Node3D = sweep_scene.instantiate() as Node3D
-			add_child(sweep)
+			var sweep: GravespadePresentation = _acquire_sweep()
+			if not is_instance_valid(sweep):
+				continue
 			_track_presentation(sweep)
 			sweep.position.x = (float(arc_index) - float(arc_count - 1) * 0.5) * 0.38
 			if sweep.has_method("configure"):
@@ -92,6 +97,9 @@ func retire_runtime(reason: String, generation: int) -> Dictionary:
 	attack_phase = "retired"
 	last_target_id = ""
 	_emitting = false
+	for presentation in _active_presentations.values().duplicate():
+		if is_instance_valid(presentation) and presentation.has_method("retire_for_pool"):
+			presentation.retire_for_pool()
 	_active_presentations.clear()
 	active_presentation_count = 0
 	return {"weapon_id": String(weapon_id), "reason": reason, "generation": generation, "before": before, "active": false, "complete": true}
@@ -100,7 +108,31 @@ func _track_presentation(presentation: Node) -> void:
 	var instance_id := presentation.get_instance_id()
 	_active_presentations[instance_id] = true
 	active_presentation_count = _active_presentations.size()
-	presentation.tree_exiting.connect(_on_presentation_exiting.bind(instance_id))
+	var exiting_cb := _on_presentation_exiting.bind(instance_id)
+	if not presentation.tree_exiting.is_connected(exiting_cb):
+		presentation.tree_exiting.connect(exiting_cb)
+	if presentation is GravespadePresentation and not (presentation as GravespadePresentation).retired.is_connected(_on_sweep_retired):
+		(presentation as GravespadePresentation).retired.connect(_on_sweep_retired)
+
+func _acquire_sweep() -> GravespadePresentation:
+	var sweep: GravespadePresentation
+	while not _presentation_pool.is_empty() and not is_instance_valid(_presentation_pool.back()):
+		_presentation_pool.pop_back()
+	if not _presentation_pool.is_empty():
+		sweep = _presentation_pool.pop_back()
+	else:
+		if _sweep_total >= SWEEP_POOL_CAP or not sweep_scene:
+			return null
+		sweep = sweep_scene.instantiate() as GravespadePresentation
+		add_child(sweep)
+		_sweep_total += 1
+		sweep.retired.connect(_on_sweep_retired)
+	return sweep
+
+func _on_sweep_retired(sweep: GravespadePresentation) -> void:
+	_active_presentations.erase(sweep.get_instance_id())
+	active_presentation_count = _active_presentations.size()
+	if not _presentation_pool.has(sweep): _presentation_pool.append(sweep)
 
 func _on_presentation_exiting(instance_id: int) -> void:
 	if _active_presentations.erase(instance_id):
@@ -114,6 +146,7 @@ func reset_runtime() -> void:
 	presentation_variant = -1
 	last_target_id = ""
 	_emitting = false
+	set_physics_process(true)
 
 func _mcp_state() -> Dictionary:
 	return {
@@ -121,5 +154,6 @@ func _mcp_state() -> Dictionary:
 		"attack_phase": attack_phase, "cooldown_remaining": cooldown_remaining, "sweep_count": sweep_count,
 		"presentation_variant": presentation_variant, "last_target_id": last_target_id,
 		"active_presentation_count":active_presentation_count,
+		"presentation_pool_active":active_presentation_count, "presentation_pool_available":_presentation_pool.size(), "presentation_pool_total":_sweep_total, "presentation_pool_cap":SWEEP_POOL_CAP,
 		"stats": inventory.get_stats(weapon_id),
 	}
