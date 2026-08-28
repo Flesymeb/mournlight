@@ -1319,6 +1319,12 @@ func _reset_final_profile() -> void:
 	var retirement := _teardown_run("validation_profile_reset", "validation_profile_reset")
 	_next_baseline_reason = "validation_profile_reset"
 	_begin_run()
+	# _begin_run() has authoritatively restored the ordinary active state, but
+	# InputContextRouter normally observes that state on its next process tick.
+	# Qualification samples happen inside this same input dispatch, so synchronize
+	# the live router before serializing the immediate reset boundary.
+	input_router._sync_context()
+	var immediate_input_context := input_router.context
 	var counts := _profile_counts()
 	validation_profile_receipt = {
 		"accepted":true, "reset":true, "branch_id":"final_wave_bellkeeper_profile",
@@ -1329,6 +1335,7 @@ func _reset_final_profile() -> void:
 		"post_reset_counts":counts, "counts":counts,
 		"reset_isolation":_counts_are_isolated(counts),
 		"route_kind":run_route_kind,
+		"input_context":immediate_input_context,
 		"wave_route":_route_qualification(wave_director.get_snapshot()),
 		"viewport":_profile_viewport_receipt(),
 		"renderer":_profile_renderer_receipt(),
@@ -1344,10 +1351,16 @@ func _capture_profile_next_frame_isolation(setup_generation: int, expected_run_s
 	await get_tree().process_frame
 	if setup_generation != _validation_setup_generation or expected_run_serial != run_serial:
 		return
+	# The process-frame signal resumes before child _process callbacks. Sample the
+	# router only after explicitly reconciling it with this frame's authoritative
+	# run state, rather than inheriting the immediate receipt value.
+	input_router._sync_context()
+	var next_frame_input_context := input_router.context
 	var next_counts := _profile_counts()
 	validation_profile_receipt.next_frame_counts = next_counts
 	validation_profile_receipt.next_frame_isolation = _counts_are_isolated(next_counts)
 	validation_profile_receipt.next_frame_lifecycle = _lifecycle_counters()
+	validation_profile_receipt.next_frame_input_context = next_frame_input_context
 	validation_profile_receipt.next_frame_isolation_pending = false
 	validation_density_receipt = validation_profile_receipt.duplicate(true)
 	_record_profile_cycle("reset_next_frame", validation_profile_receipt)
@@ -1389,30 +1402,41 @@ func _profile_cycle_comparison() -> Dictionary:
 					"end_lifecycle":(entry.get("end_lifecycle", {}) as Dictionary).duplicate(true),
 			}
 		elif phase == "reset_immediate" and not current.is_empty():
+			var immediate_lifecycle: Dictionary = entry.get("lifecycle", {})
 			current["reset"] = {
 				"source_run_serial":entry.get("source_run_serial", -1),
 				"next_run_serial":entry.get("run_serial", -1),
 				"reset_setup_generation":entry.get("setup_generation", -1),
-					"immediate_isolation":entry.get("reset_isolation", false),
-					"immediate_lifecycle":(entry.get("lifecycle", {}) as Dictionary).duplicate(true),
+				"immediate_isolation":entry.get("reset_isolation", false),
+				"immediate_input_context":entry.get("input_context", immediate_lifecycle.get("input_context", "unavailable")),
+				"immediate_lifecycle":immediate_lifecycle.duplicate(true),
 			}
 		elif phase == "reset_next_frame" and not current.is_empty():
 			var reset: Dictionary = current.get("reset", {})
+			var next_frame_lifecycle: Dictionary = entry.get("next_frame_lifecycle", {})
 			reset["next_frame_isolation"] = entry.get("next_frame_isolation", false)
 			reset["next_frame_counts"] = (entry.get("next_frame_counts", {}) as Dictionary).duplicate(true)
-			reset["next_frame_lifecycle"] = (entry.get("next_frame_lifecycle", {}) as Dictionary).duplicate(true)
+			reset["next_frame_input_context"] = entry.get("next_frame_input_context", next_frame_lifecycle.get("input_context", "unavailable"))
+			reset["next_frame_lifecycle"] = next_frame_lifecycle.duplicate(true)
 			current["reset"] = reset
 			current["complete"] = true
 			completed.append(current.duplicate(true))
 			current.clear()
 	while completed.size() > 3:
 		completed.pop_front()
+	var stale_reset_context_cycle_count := 0
+	for cycle in completed:
+		var reset: Dictionary = cycle.get("reset", {})
+		if String(reset.get("immediate_input_context", "")) != "active" or String(reset.get("next_frame_input_context", "")) != "active":
+			stale_reset_context_cycle_count += 1
 	var growth := _profile_cycle_growth(completed)
 	return {
 		"required_cycle_count":3,
 		"completed_cycle_count":completed.size(),
 		"cycles":completed,
 		"three_cycle_ready":completed.size() == 3,
+		"stale_reset_context_cycle_count":stale_reset_context_cycle_count,
+		"three_cycle_context_truthful":completed.size() == 3 and stale_reset_context_cycle_count == 0,
 		"growth":growth,
 		"three_cycle_no_growth":completed.size() == 3 and bool(growth.get("no_structural_growth", false)),
 	}
@@ -2050,7 +2074,15 @@ func _mcp_state() -> Dictionary:
 		"profile_end_enemies":profile_cohort.get("end_live", validation_profile_sample.get("end_enemy_workload", 0)),
 		"profile_qualified":profile_qualification.get("qualified", false),
 		"profile_completed_cycles":cycle_comparison.get("completed_cycle_count", 0),
+		"profile_stale_reset_context_cycles":cycle_comparison.get("stale_reset_context_cycle_count", 0),
+		"profile_three_cycle_context_truthful":cycle_comparison.get("three_cycle_context_truthful", false),
 		"profile_three_cycle_no_growth":cycle_comparison.get("three_cycle_no_growth", false),
+		"profile_reset_contexts":{
+			"immediate":validation_profile_receipt.get("input_context", "unavailable"),
+			"next_frame":validation_profile_receipt.get("next_frame_input_context", "pending"),
+			"live":input_router.context,
+			"run_state":run_state,
+		},
 		"ordinary_wave_ids":wave_state.get("ordinary_route_wave_ids", []),
 		"ordinary_diagnostic_jumps":wave_state.get("diagnostic_jump_count", 0),
 		"ordinary_natural_progression_truthful":_ordinary_progression_truthful(),
