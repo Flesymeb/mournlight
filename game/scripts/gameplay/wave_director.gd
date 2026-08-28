@@ -120,6 +120,7 @@ func _definition(index: int) -> Dictionary:
 	var caps: PackedInt32Array = WAVE_SEQUENCE.get_meta("live_caps")
 	var cadences: PackedFloat32Array = WAVE_SEQUENCE.get_meta("cadences")
 	var budgets: PackedInt32Array = WAVE_SEQUENCE.get_meta("spawn_budgets")
+	var initial_spawns: PackedInt32Array = WAVE_SEQUENCE.get_meta("initial_spawns", PackedInt32Array([6, 6, 6, 6, 6]))
 	var warnings: PackedStringArray = WAVE_SEQUENCE.get_meta("warnings")
 	var elite_every: PackedInt32Array = WAVE_SEQUENCE.get_meta("elite_every")
 	var weights := {}
@@ -130,6 +131,7 @@ func _definition(index: int) -> Dictionary:
 		"id": ids[index], "index": index, "title": titles[index],
 		"duration": float(durations[index]), "cap": int(caps[index]),
 		"cadence": float(cadences[index]), "spawn_budget": int(budgets[index]),
+		"initial_spawns":int(initial_spawns[index]),
 		"composition_weights": weights, "elite_every": int(elite_every[index]),
 		"elite_enabled": int(elite_every[index]) > 0, "warning": warnings[index],
 		"boss_wave": index == _boss_wave_index(),

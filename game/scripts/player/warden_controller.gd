@@ -300,6 +300,10 @@ func begin_victory_presentation(duration: float, run_generation: int) -> Diction
 func _advance_victory_presentation(delta: float) -> void:
 	if not _victory_vfx_active:
 		return
+	# Dash phase cleanup and terminal combat retirement share this ring. Reassert
+	# defeat-owned visibility while the victory lease is held so the stable
+	# Tester checkpoint cannot report an active VFX whose rendered owner is hidden.
+	active_ring.visible = true
 	_victory_vfx_remaining = maxf(0.0, _victory_vfx_remaining - delta)
 	var progress := 1.0 - _victory_vfx_remaining / maxf(0.1, _victory_vfx_duration)
 	var pulse := 1.0 + 0.22 * sin(progress * TAU * 2.0)

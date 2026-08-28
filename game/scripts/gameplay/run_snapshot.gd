@@ -62,5 +62,11 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 		"validation_density":controller.validation_density_receipt.duplicate(true),
 		"validation_profile":controller.validation_profile_receipt.duplicate(true),
 		"validation_profile_sample":controller.validation_profile_sample.duplicate(true),
+		"validation_profile_cycles":controller.validation_profile_cycles.duplicate(true),
+		"validation_profile_cycle_comparison":controller._profile_cycle_comparison(),
+		"validation_retry_baselines":controller.validation_retry_baselines.duplicate(true),
+		"boss_transition_history":controller.boss_transition_history.duplicate(true),
+		"ordinary_victory_receipt":controller.ordinary_victory_receipt.duplicate(true),
+		"tester_victory_fixture":controller.tester_victory_fixture_receipt.duplicate(true),
 		"world_active": world.session_active if world else false,
 	}

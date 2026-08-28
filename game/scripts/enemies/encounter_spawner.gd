@@ -95,7 +95,8 @@ func begin_encounter() -> void:
 	active = true
 	encounter_id += 1
 	set_process(true)
-	for index in range(mini(6, mini(live_cap, _spawn_budget))):
+	var initial_spawns := clampi(int(get_meta("initial_spawn_count", 6)), 1, live_cap)
+	for index in range(mini(initial_spawns, mini(live_cap, _spawn_budget))):
 		_spawn_one(index)
 	_emit_snapshot()
 
@@ -114,6 +115,7 @@ func configure_pressure(definition: Dictionary) -> void:
 	var cadence := maxf(0.35, float(definition.get("cadence", 1.45)))
 	_spawn_cooldown = minf(_spawn_cooldown, cadence)
 	set_meta("spawn_cadence", cadence)
+	set_meta("initial_spawn_count", clampi(int(definition.get("initial_spawns", 6)), 1, live_cap))
 
 func stop_encounter() -> void:
 	end_validation_profile_cohort("encounter_stopped")
@@ -153,6 +155,7 @@ func reset_encounter(preserve_pressure: bool = false) -> void:
 		_composition_weights.clear()
 		_elite_every = 0
 		set_meta("spawn_cadence", 1.45)
+		set_meta("initial_spawn_count", 6)
 	retired_total = 0
 	last_reconciliation_receipt = {}
 	_telegraph_waiting.clear()
