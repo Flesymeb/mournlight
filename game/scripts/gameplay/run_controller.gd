@@ -940,7 +940,11 @@ func _prepare_final_profile() -> void:
 		"wispbat","mossling","bone_slinger","grave_brute","mossling","wispbat","mossling","bone_slinger",
 		"grave_brute","mossling","wispbat","mossling","bone_slinger","grave_brute","mossling","wispbat",
 	])
-	wave_director.prepare_test_wave(3)
+	# The representative profile is the authored fifth wave, not Wave 4 with a
+	# manually co-located boss. Preparation is still diagnostic and separate
+	# from advancement, but every workload receipt now truthfully names the
+	# Bellkeeper wave it is qualifying.
+	wave_director.prepare_test_wave(4)
 	var attack_count_before := world.attack_runtime.authorized_count
 	var preparation := spawner.prepare_validation_density(32)
 	var seeded_pickups := _seed_profile_pickups(6)
@@ -1320,11 +1324,22 @@ func _profile_qualification(sample: Dictionary) -> Dictionary:
 		reasons.append("renderer_identity_incomplete")
 	if not bool(renderer.get("hardware_backed", false)):
 		reasons.append("software_or_unknown_renderer")
-	if int(sample.get("requested_enemy_workload", -1)) != 32 or int(sample.get("start_enemy_workload", -1)) != 32 or int(sample.get("minimum_enemy_workload", -1)) != 32 or int(sample.get("end_enemy_workload", -1)) != 32:
-		reasons.append("enemy_cohort_not_32_throughout")
+	var requested_workload := int(sample.get("requested_enemy_workload", -1))
+	var start_workload := int(sample.get("start_enemy_workload", -1))
+	var minimum_workload := int(sample.get("minimum_enemy_workload", -1))
+	var end_workload := int(sample.get("end_enemy_workload", -1))
+	# Combat deaths are real work and can transiently lower the live cohort before
+	# the bounded pool replenishes it. The PRD qualifies 25-40 simultaneous
+	# enemies; require the authored 32 at both boundaries and never disguise an
+	# ordinary combat death as a profile failure.
+	if requested_workload != 32 or start_workload != 32 or end_workload != 32:
+		reasons.append("enemy_cohort_boundary_not_32")
+	if minimum_workload < 25 or minimum_workload > 40:
+		reasons.append("enemy_density_outside_25_40")
 	if float(frame_ms.get("p95", INF)) > 16.67:
 		reasons.append("p95_above_16_67ms")
-	return {"qualified":reasons.is_empty(), "reasons":reasons, "requires_hardware":true, "p95_limit_ms":16.67}
+	return {"qualified":reasons.is_empty(), "reasons":reasons, "requires_hardware":true, "p95_limit_ms":16.67,
+		"required_density_range":{"minimum":25,"maximum":40,"boundary_target":32}}
 
 func _validation_controls_receipt() -> Dictionary:
 	var actions := [&"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_reset_density", &"validation_prepare_final_profile", &"validation_advance_final_profile", &"validation_reset_final_profile"]

@@ -24,6 +24,7 @@ var phase_shift_count := 0
 var _telegraph_direction := Vector3.FORWARD
 var _retirement_receipt: Dictionary = {}
 var _death_tween: Tween
+var _authored_presentation_scale := Vector3.ONE
 
 func _ready() -> void:
 	add_to_group("combat_targets")
@@ -32,6 +33,7 @@ func _ready() -> void:
 	health.hurt.connect(_on_hurt)
 	health.died.connect(_on_died)
 	telegraph.visible = false
+	_authored_presentation_scale = presentation.scale
 	boss_changed.emit(get_snapshot())
 
 func configure(next_target: WardenController) -> void:
@@ -41,6 +43,9 @@ func configure(next_target: WardenController) -> void:
 	phase = 1
 	committed = false
 	_retirement_receipt.clear()
+	if is_instance_valid(_death_tween):
+		_death_tween.kill()
+	presentation.scale = _authored_presentation_scale
 	visible = true
 	collider.disabled = false
 	collision_layer = 1
@@ -140,7 +145,12 @@ func _on_died(event: Dictionary) -> void:
 	velocity = Vector3.ZERO
 	telegraph.visible = false
 	_death_tween = create_tween()
-	_death_tween.tween_property(presentation, "scale", Vector3(1.4, 0.15, 1.4), 0.75)
+	# The imported Bellkeeper is authored at 0.025 scale. The old absolute 1.4
+	# target enlarged X/Z by 56x and covered the shipped camera during Cheer.
+	# Keep the same readable squash/bloom idea, but express it relative to the
+	# intact authored instance and settle near that reference before the hold.
+	_death_tween.tween_property(presentation, "scale", _authored_presentation_scale * Vector3(1.30, 0.72, 1.30), 0.18)
+	_death_tween.tween_property(presentation, "scale", _authored_presentation_scale * Vector3(1.06, 0.94, 1.06), 0.34)
 	defeated.emit(event)
 	boss_changed.emit(get_snapshot())
 
@@ -189,7 +199,14 @@ func get_snapshot() -> Dictionary:
 	return {"active":not committed,"state":state,"phase":phase,"health":health.current_health,"health_maximum":health.maximum_health,
 		"attack_clock":attack_clock,"telegraph_kind":telegraph_kind,"vulnerable":vulnerable,
 		"bell_wave_count":bell_wave_count,"lane_pressure_count":lane_pressure_count,
-		"phase_shift_count":phase_shift_count,"defeat_committed":committed}
+		"phase_shift_count":phase_shift_count,"defeat_committed":committed,
+		"presentation_scale":presentation.scale,"authored_presentation_scale":_authored_presentation_scale,
+		"death_scale_relative":Vector3(
+			presentation.scale.x / maxf(_authored_presentation_scale.x, 0.0001),
+			presentation.scale.y / maxf(_authored_presentation_scale.y, 0.0001),
+			presentation.scale.z / maxf(_authored_presentation_scale.z, 0.0001)
+		),
+		"death_scale_policy":"authored_relative_bounded"}
 
 func _mcp_state() -> Dictionary:
 	return get_snapshot()

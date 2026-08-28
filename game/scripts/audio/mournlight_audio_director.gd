@@ -28,6 +28,7 @@ var terminal_audio_owner := ""
 var terminal_audio_semantic := ""
 var terminal_audio_generation := 0
 var terminal_audio_reset_generation := 0
+var last_terminal_audio_receipt: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -138,6 +139,21 @@ func _acquire_terminal_audio(semantic: String, owner: String) -> bool:
 	terminal_audio_generation += 1
 	terminal_audio_semantic = semantic
 	terminal_audio_owner = owner
+	var streams := _streams_for(semantic)
+	var source_paths: Array[String] = []
+	for stream in streams:
+		if stream is AudioStream:
+			source_paths.append((stream as AudioStream).resource_path)
+	var families: Dictionary = library.get_meta("semantic_families", {}) if library else {}
+	last_terminal_audio_receipt = {
+		"event_id":"terminal_audio.%s.g%04d" % [semantic, terminal_audio_generation],
+		"semantic":semantic,"owner":owner,"event_count":int(semantic_counts.get(semantic, 0)),
+		"source_paths":source_paths,"source_family":String(families.get(semantic, semantic)),
+		"playback_window_seconds":float((library.get_meta("playback_windows", {}) as Dictionary).get(semantic, 0.0)) if library else 0.0,
+		"source_receipt":String(library.get_meta("victory_source_receipt", "")) if semantic == "victory" and library else "",
+		"source_sha256":String(library.get_meta("victory_source_sha256", "")) if semantic == "victory" and library else "",
+		"acquired_process_frame":Engine.get_process_frames(),
+	}
 	return true
 
 func _set_music(state: String) -> void:
@@ -401,6 +417,7 @@ func reset_for_run() -> void:
 	last_footstep_rejection.clear()
 	terminal_audio_owner = ""
 	terminal_audio_semantic = ""
+	last_terminal_audio_receipt.clear()
 	terminal_audio_reset_generation += 1
 
 func retire_run_ownership(route: String, generation: int) -> Dictionary:
@@ -420,11 +437,15 @@ func retire_run_ownership(route: String, generation: int) -> Dictionary:
 	_footstep_clock = 0.0
 	_movement_was_active = false
 	var released_terminal := {"semantic":terminal_audio_semantic,"owner":terminal_audio_owner,"generation":terminal_audio_generation}
-	if route != "result":
+	# Victory owns a bounded hold and is fully evidenced before Result commits;
+	# its semantic lease must not survive that handoff. Preserve the established
+	# failure/death lease behavior, which is outside this terminal repair.
+	var preserve_terminal := route == "result" and terminal_audio_semantic == "death"
+	if not preserve_terminal:
 		terminal_audio_owner = ""
 		terminal_audio_semantic = ""
 		terminal_audio_reset_generation += 1
-	return {"route":route, "generation":generation, "stopped_effects":stopped_effects, "owners_before":owners_before, "movement_before":movement_before, "active_effect_voices":active_effect_voice_count(), "active_movement_voices":_active_movement_voice_count(), "music_state":music_state, "music_playing":music.playing, "released_terminal":released_terminal, "terminal_preserved":route == "result"}
+	return {"route":route, "generation":generation, "stopped_effects":stopped_effects, "owners_before":owners_before, "movement_before":movement_before, "active_effect_voices":active_effect_voice_count(), "active_movement_voices":_active_movement_voice_count(), "music_state":music_state, "music_playing":music.playing, "released_terminal":released_terminal, "terminal_preserved":preserve_terminal}
 
 func _mcp_state() -> Dictionary:
 	var playing := _active_movement_voice_count()
@@ -441,7 +462,7 @@ func _mcp_state() -> Dictionary:
 		"rejected_counts":rejected_counts,"missing_source_counts":missing_source_counts,
 		"bounded_drop_counts":bounded_drop_counts,"library_bound":library != null,
 		"owner_retire_counts":owner_retire_counts,"last_owner_retirement":last_owner_retirement,
-		"terminal_audio_lease":{"active":not terminal_audio_semantic.is_empty(),"semantic":terminal_audio_semantic,"owner":terminal_audio_owner,"generation":terminal_audio_generation,"reset_generation":terminal_audio_reset_generation},
+		"terminal_audio_lease":{"active":not terminal_audio_semantic.is_empty(),"semantic":terminal_audio_semantic,"owner":terminal_audio_owner,"generation":terminal_audio_generation,"reset_generation":terminal_audio_reset_generation,"receipt":last_terminal_audio_receipt},
 		"movement_voice_limit":movement_voices.size(),"active_movement_voices":_active_movement_voice_count(),
 		"footstep_sources":movement_voices.map(func(voice: AudioStreamPlayer) -> Dictionary: return {"path":String(voice.get_path()),"stream_path":voice.stream.resource_path if voice.stream else "","bus":String(voice.bus),"playing":voice.playing,"playback_position":voice.get_playback_position() if voice.playing else 0.0}),
 		"footstep_source_starts":footstep_source_starts,"footstep_source_retirements":footstep_source_retirements,"last_footstep_rejection":last_footstep_rejection,

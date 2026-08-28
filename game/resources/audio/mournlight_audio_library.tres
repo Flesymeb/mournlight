@@ -1,4 +1,4 @@
-[gd_resource type="Resource" load_steps=24 format=3]
+[gd_resource type="Resource" load_steps=25 format=3]
 
 [ext_resource type="AudioStream" path="res://assets/audio_library/Music/Marksmans_Mayhem.ogg" id="1_music"]
 [ext_resource type="AudioStream" path="res://assets/audio_library/SFX/163441__under7dude__man-getting-hit.wav" id="2_hurt"]
@@ -23,6 +23,7 @@
 [ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/wisps_onset.wav" id="21_wisps_onset"]
 [ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/wisps_impact.wav" id="22_wisps_impact"]
 [ext_resource type="AudioStream" path="res://assets/audio_semantic/cogito_footsteps/footstep_stone_02.ogg" id="23_footstep_stone"]
+[ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_terminal/victory_achievement.wav" id="24_victory_achievement"]
 
 [resource]
 resource_name = "Mournlight Semantic Audio Library"
@@ -39,7 +40,7 @@ metadata/impact = Array[AudioStream]([ExtResource("12_impact"), ExtResource("6_l
 metadata/warden_hurt = Array[AudioStream]([ExtResource("2_hurt")])
 metadata/footstep = Array[AudioStream]([ExtResource("23_footstep_stone")])
 metadata/playback_offsets = {"footstep":PackedFloat32Array(0.0)}
-metadata/playback_windows = {"footstep":0.28}
+metadata/playback_windows = {"footstep":0.28,"victory":1.5}
 metadata/dash = Array[AudioStream]([ExtResource("8_jump_a"), ExtResource("9_jump_b")])
 metadata/pickup = Array[AudioStream]([ExtResource("10_jump_c")])
 metadata/upgrade_open = Array[AudioStream]([ExtResource("14_ui_focus")])
@@ -51,10 +52,13 @@ metadata/enemy_warning = Array[AudioStream]([ExtResource("11_warning")])
 metadata/enemy_death = Array[AudioStream]([ExtResource("13_destroy")])
 metadata/boss_phase = Array[AudioStream]([ExtResource("11_warning"), ExtResource("13_destroy")])
 metadata/death = Array[AudioStream]([ExtResource("2_hurt"), ExtResource("13_destroy")])
-metadata/victory = Array[AudioStream]([ExtResource("8_jump_a"), ExtResource("9_jump_b"), ExtResource("10_jump_c")])
+metadata/victory = Array[AudioStream]([ExtResource("24_victory_achievement")])
+metadata/semantic_families = {"dash":"kenney_jump_movement","pickup":"kenney_jump_reward","victory":"ovani_achievement_terminal"}
+metadata/victory_source_receipt = "res://assets/audio_semantic/mournlight_terminal/victory_achievement.wav.receipt.json"
+metadata/victory_source_sha256 = "d74ddb69bed263cdafb4ce82e09fa218443690f049e92438e7821127a66284c8"
 metadata/owners = {"boss_phase":"critical","dash":"movement","death":"critical","enemy_death":"impacts","enemy_warning":"warnings","footstep":"movement","impact":"impacts","pickup":"rewards","ui_back":"ui","ui_confirm":"ui","ui_focus":"ui","upgrade_confirm":"critical","upgrade_open":"critical","victory":"critical","warden_hurt":"critical","weapon_gravespade_impact":"gravespade","weapon_gravespade_onset":"gravespade","weapon_warden_lantern_impact":"lantern","weapon_warden_lantern_onset":"lantern","weapon_wandering_wisps_impact":"wisps","weapon_wandering_wisps_onset":"wisps"}
 metadata/priorities = {"boss_phase":100,"dash":55,"death":100,"enemy_death":35,"enemy_warning":85,"footstep":10,"impact":20,"pickup":60,"ui_back":70,"ui_confirm":75,"ui_focus":45,"upgrade_confirm":95,"upgrade_open":90,"victory":100,"warden_hurt":100,"weapon_gravespade_impact":48,"weapon_gravespade_onset":52,"weapon_warden_lantern_impact":48,"weapon_warden_lantern_onset":52,"weapon_wandering_wisps_impact":42,"weapon_wandering_wisps_onset":46}
 metadata/volumes_db = {"boss_phase":-4.0,"dash":-10.0,"death":-3.0,"enemy_death":-13.0,"enemy_warning":-8.0,"footstep":-4.0,"impact":-17.0,"pickup":-11.0,"ui_back":-12.0,"ui_confirm":-10.0,"ui_focus":-18.0,"upgrade_confirm":-7.0,"upgrade_open":-10.0,"victory":-4.0,"warden_hurt":-5.0,"weapon_gravespade_impact":-10.0,"weapon_gravespade_onset":-9.0,"weapon_warden_lantern_impact":-12.0,"weapon_warden_lantern_onset":-11.0,"weapon_wandering_wisps_impact":-16.0,"weapon_wandering_wisps_onset":-15.0}
 metadata/owner_limits = {"critical":3,"gravespade":2,"impacts":3,"lantern":2,"movement":2,"rewards":2,"ui":2,"warnings":2,"wisps":2}
-metadata/source_revision = "cobra-fps-feel-kit@f87f4f1695f2165e1458af6ebee2ae158e804184 + gd-dialog@reference-pool-current + cogito@03943d34d097"
-metadata/source_license = "Pixabay Content License recordings; MIT source projects; CC0 footstep recording"
+metadata/source_revision = "cobra-fps-feel-kit@f87f4f1695f2165e1458af6ebee2ae158e804184 + gd-dialog@reference-pool-current + cogito@03943d34d097 + ovani-sound/sound-fx-starter-pack-vol@43fa5caea139"
+metadata/source_license = "Pixabay Content License recordings; MIT source projects; CC0 footstep recording; Ovanisound proprietary royalty-free commercial-use license"

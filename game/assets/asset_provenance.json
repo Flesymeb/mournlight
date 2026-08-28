@@ -145,6 +145,16 @@
         "wisps_onset.wav": "c19e786aa1c04dd1b8b29e007bbcb6ab7a43fb18331cb38748c10c6a9d6938ae",
         "wisps_impact.wav": "d41af74ffb4ed1be0a3900efaf9f6cddf38d7678625aef63f5dfb868a1f767e9"
       }
+    },
+    {
+      "title": "Sound FX Starter Pack Vol. 1 — Achievement",
+      "source": "https://store.godotengine.org/asset/ovani-sound/sound-fx-starter-pack-vol/",
+      "asset_id": "ovani-sound/sound-fx-starter-pack-vol",
+      "license": "Proprietary royalty-free license for commercial use",
+      "sha256": "d74ddb69bed263cdafb4ce82e09fa218443690f049e92438e7821127a66284c8",
+      "receipt": "res://assets/audio_semantic/mournlight_terminal/victory_achievement.wav.receipt.json",
+      "binding": "res://resources/audio/mournlight_audio_library.tres",
+      "integration": "One intact 1.43-second Achievement recording is bound exclusively to the event-owned victory semantic with a 1.5-second playback window. It is not shared with dash, jump, pickup, UI, weapon, or movement feedback."
     }
   ]
 }
