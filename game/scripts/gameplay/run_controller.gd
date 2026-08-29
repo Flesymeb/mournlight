@@ -2503,6 +2503,9 @@ func _dense_work_caps(encounter: Dictionary) -> Dictionary:
 	var neighbor_state: Dictionary = encounter.get("neighbor_registry", {})
 	var audio_state := audio_director._mcp_state()
 	var attack_state := world.attack_runtime._mcp_state()
+	var camera_budget: Dictionary = {}
+	if is_instance_valid(arena_camera):
+		camera_budget = (arena_camera._mcp_state().get("dense_render_budget", {}) as Dictionary).duplicate(true)
 	return {
 		"enemy_pool":spawner.pool_size, "enemy_live":spawner.live_cap,
 		"neighbor_candidates_per_query":int(neighbor_state.get("candidate_budget", 12)),
@@ -2514,6 +2517,7 @@ func _dense_work_caps(encounter: Dictionary) -> Dictionary:
 		"audio_effect_voices":int(audio_state.get("voice_limit", 0)),
 		"completed_attack_history":int(attack_state.get("history_limit", 0)),
 		"dense_presentation":(encounter.get("dense_presentation_budget", {}) as Dictionary).duplicate(true),
+		"secondary_visibility_compositor":camera_budget,
 		"steering_update_budget":{"bucket_count":DenseWaveProfileClass.STEERING_BUCKET_COUNT,"cached_separation":true,"query_policy":"staggered_deterministic_actor_buckets"},
 	}
 
@@ -2524,6 +2528,9 @@ func _profile_workload_receipt(encounter: Dictionary) -> Dictionary:
 	var counts := _profile_counts()
 	var neighbor_work: Dictionary = encounter.get("neighbor_registry", {})
 	var actor_work: Dictionary = encounter.get("actor_workload", {})
+	var camera_budget: Dictionary = {}
+	if is_instance_valid(arena_camera):
+		camera_budget = (arena_camera._mcp_state().get("dense_render_budget", {}) as Dictionary).duplicate(true)
 	return {
 		"role_composition":(encounter.get("roles", {}) as Dictionary).duplicate(true),
 		"active_and_pooled":{"active":encounter.get("live", 0),"pooled":encounter.get("pooled", 0)},
@@ -2538,6 +2545,7 @@ func _profile_workload_receipt(encounter: Dictionary) -> Dictionary:
 		"steering":{"steps":actor_work.get("steering_steps", 0),"neighbor_queries":neighbor_work.get("total_queries", 0),"candidate_visits":neighbor_work.get("total_candidate_visits", 0)},
 		"physics":{"actor_steps":actor_work.get("physics_steps", 0),"body_motion_steps":actor_work.get("body_motion_steps", 0),"explicit_space_queries":actor_work.get("explicit_space_queries", 0)},
 		"presentation_updates":(encounter.get("dense_presentation_budget", {}) as Dictionary).duplicate(true),
+		"secondary_visibility_compositor":camera_budget,
 		"light_owners":{"active":light_budget.get("active", 0),"role":(light_budget.get("role", {}) as Dictionary).duplicate(true),"hurt":(light_budget.get("hurt", {}) as Dictionary).duplicate(true)},
 		"telegraph_admission":(encounter.get("telegraph_admission", {}) as Dictionary).duplicate(true),
 	}

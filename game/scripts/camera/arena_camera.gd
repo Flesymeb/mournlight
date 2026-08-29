@@ -48,6 +48,11 @@ extends Camera3D
 @export var presentation_effects: Array[NodePath] = []
 @export var tall_occluders: Array[NodePath] = []
 @export var direct_sight_volume_radius := 0.9
+## Dense-wave secondary visibility is a safety compositor, not a second full
+## resolution camera. Keep its texture cheap and refresh it on a bounded cadence
+## while the primary shipped camera remains responsive every frame.
+@export_range(0.25, 1.0, 0.05) var dense_compositor_resolution_scale := 0.5
+@export var dense_compositor_refresh_seconds := 0.12
 
 const VISIBILITY_LAYER := 20
 
@@ -102,6 +107,9 @@ var _tall_occluder_bindings: Array[Dictionary] = []
 var _direct_detection_active := false
 var _detection_source := "clear"
 var _compositor_allowed := false
+var _compositor_refresh_remaining := 0.0
+var _compositor_requested_updates := 0
+var _compositor_skipped_updates := 0
 
 func _ready() -> void:
 	current = true
@@ -162,6 +170,7 @@ func _process(delta: float) -> void:
 		if occlusion_guard_active or (is_instance_valid(_visibility_texture) and _visibility_texture.visible):
 			set_shell_state("modal")
 		return
+	_compositor_refresh_remaining = maxf(0.0, _compositor_refresh_remaining - delta)
 	_coverage_members_refresh_remaining = maxf(0.0, _coverage_members_refresh_remaining - delta)
 	var desired_lead := Vector3.ZERO
 	if movement_velocity.length_squared() > 0.04:
@@ -630,7 +639,7 @@ func _build_visibility_compositor() -> void:
 	_visibility_viewport.world_3d = get_world_3d()
 	_visibility_viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_ALWAYS
 	_visibility_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	_visibility_viewport.size = get_viewport().get_visible_rect().size
+	_visibility_viewport.size = _secondary_viewport_size()
 	add_child(_visibility_viewport)
 	_visibility_camera = Camera3D.new()
 	_visibility_camera.name = "WardenVisibilityCamera"
@@ -657,9 +666,14 @@ func _resize_visibility_compositor() -> void:
 	if not is_instance_valid(_visibility_viewport) or not is_instance_valid(_visibility_texture):
 		return
 	var viewport_size := get_viewport().get_visible_rect().size
-	_visibility_viewport.size = Vector2i(maxi(1, int(viewport_size.x)), maxi(1, int(viewport_size.y)))
+	_visibility_viewport.size = _secondary_viewport_size()
 	_visibility_texture.position = Vector2.ZERO
 	_visibility_texture.size = viewport_size
+
+func _secondary_viewport_size() -> Vector2i:
+	var viewport_size := get_viewport().get_visible_rect().size
+	var scale := clampf(dense_compositor_resolution_scale, 0.25, 1.0)
+	return Vector2i(maxi(1, int(viewport_size.x * scale)), maxi(1, int(viewport_size.y * scale)))
 
 func _sync_visibility_camera() -> void:
 	if not is_instance_valid(_visibility_camera):
@@ -672,7 +686,16 @@ func _sync_visibility_camera() -> void:
 	_visibility_camera.far = far
 	_visibility_camera.frustum_offset = frustum_offset
 	if occlusion_guard_active:
-		_compositor_frame_count += 1
+		# UPDATE_ONCE renders a fresh occlusion sample and then idles. This avoids
+		# paying a full secondary visibility pass on every render frame while the
+		# primary camera and gameplay continue at native cadence.
+		if _compositor_refresh_remaining <= 0.0:
+			_visibility_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+			_compositor_refresh_remaining = maxf(0.04, dense_compositor_refresh_seconds)
+			_compositor_requested_updates += 1
+			_compositor_frame_count += 1
+		else:
+			_compositor_skipped_updates += 1
 
 func _update_visibility_isolation(delta: float) -> void:
 	_visibility_samples_blocked = 0
@@ -806,7 +829,8 @@ func _apply_visibility_overlay(active: bool) -> void:
 			(visual as GeometryInstance3D).material_overlay = _original_material_overlays.get(instance_id) as Material
 	set_cull_mask_value(VISIBILITY_LAYER, not active and _primary_camera_visibility_layer)
 	_visibility_texture.visible = active
-	_visibility_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED
+	_visibility_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE if active else SubViewport.UPDATE_DISABLED
+	_compositor_refresh_remaining = 0.0
 	if active:
 		_sync_visibility_camera()
 
@@ -850,7 +874,7 @@ func _coverage_occluders_restored() -> bool:
 func _mcp_state() -> Dictionary:
 	return {
 		"binding_member_count": _binding_members.size(),
-		"compositor_updates": _visibility_viewport.render_target_update_mode == SubViewport.UPDATE_ALWAYS if is_instance_valid(_visibility_viewport) else false,
+		"compositor_updates": _visibility_viewport.render_target_update_mode != SubViewport.UPDATE_DISABLED if is_instance_valid(_visibility_viewport) else false,
 		"compositor_allowed":_compositor_allowed,
 		"effect_visual_count": _effect_visuals.size(),
 		"framing_target": framing_target,
@@ -895,6 +919,13 @@ func _mcp_state() -> Dictionary:
 		"primary_camera_visibility_layer": get_cull_mask_value(VISIBILITY_LAYER),
 		"source_visual_count": _source_visuals.size(),
 		"visibility_strategy": "deterministic_multi_subject_arena_containment_with_secondary_private_layer_compositor",
+		"dense_render_budget": {
+			"secondary_resolution_scale": dense_compositor_resolution_scale,
+			"secondary_refresh_seconds": dense_compositor_refresh_seconds,
+			"requested_updates": _compositor_requested_updates,
+			"skipped_updates": _compositor_skipped_updates,
+			"policy": "half_resolution_update_once_cadence_with_primary_camera_native"
+		},
 		"tall_occluder_registry":{
 			"requested_count":tall_occluders.size(),
 			"bound_count":_tall_occluder_bindings.filter(func(binding: Dictionary) -> bool: return bool(binding.get("bound", false))).size(),
@@ -918,8 +949,12 @@ func _mcp_state() -> Dictionary:
 				"binding_members": _binding_members.duplicate(true),
 				"binding_complete": _binding_members.size() == 5 and _source_visuals.size() >= 2 and _effect_visuals.size() == 3,
 			"compositor_visible": _visibility_texture.visible if is_instance_valid(_visibility_texture) else false,
-			"compositor_updates": _visibility_viewport.render_target_update_mode == SubViewport.UPDATE_ALWAYS if is_instance_valid(_visibility_viewport) else false,
+			"compositor_updates": _visibility_viewport.render_target_update_mode != SubViewport.UPDATE_DISABLED if is_instance_valid(_visibility_viewport) else false,
 			"compositor_frame_count": _compositor_frame_count,
+			"compositor_requested_updates": _compositor_requested_updates,
+			"compositor_skipped_updates": _compositor_skipped_updates,
+			"compositor_resolution_scale": dense_compositor_resolution_scale,
+			"compositor_refresh_seconds": dense_compositor_refresh_seconds,
 			"primary_camera_visibility_layer": get_cull_mask_value(VISIBILITY_LAYER),
 			"probe_overscan": visibility_probe_overscan,
 		},

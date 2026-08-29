@@ -13,6 +13,8 @@ const SAMPLE_INTERVAL_SECONDS := 0.1
 const SAMPLE_HISTORY_CAP := 128
 const STEERING_BUCKET_COUNT := 2
 const PRESENTATION_UPDATE_BUDGET_SECONDS := 0.1
+const SECONDARY_COMPOSITOR_RESOLUTION_SCALE := 0.5
+const SECONDARY_COMPOSITOR_REFRESH_SECONDS := 0.12
 const NATIVE_STATUS := "qualified"
 const SOFTWARE_STATUS := "rejected_software_renderer"
 const UNKNOWN_STATUS := "pending_native_renderer"
@@ -39,6 +41,8 @@ static func contract() -> Dictionary:
 		"dense_update_budget": {
 			"steering_bucket_count": STEERING_BUCKET_COUNT,
 			"presentation_refresh_seconds": PRESENTATION_UPDATE_BUDGET_SECONDS,
+			"secondary_compositor_resolution_scale": SECONDARY_COMPOSITOR_RESOLUTION_SCALE,
+			"secondary_compositor_refresh_seconds": SECONDARY_COMPOSITOR_REFRESH_SECONDS,
 			"policy": "stable_actor_buckets_with_cached_separation_and_staggered_presentation",
 		},
 		"enemy_range": {"minimum": MIN_ENEMIES, "maximum": MAX_ENEMIES, "target": TARGET_ENEMIES},
