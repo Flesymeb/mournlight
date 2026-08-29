@@ -1431,6 +1431,7 @@ func _prepare_final_profile() -> void:
 	wave_director.prepare_test_wave(4)
 	var attack_count_before := world.attack_runtime.authorized_count
 	var preparation := spawner.prepare_validation_density(32)
+	var frontline := spawner.prepare_validation_frontline(6)
 	var seeded_pickups := _seed_profile_pickups(6)
 	if not is_instance_valid(boss):
 		_spawn_bellkeeper()
@@ -1447,6 +1448,7 @@ func _prepare_final_profile() -> void:
 		"setup_generation":_validation_setup_generation,
 		"requested_density":32,
 		"resolved_density":int(encounter.get("live",0)),
+		"frontline_positioning":frontline,
 		"enemy_roles":(encounter.get("roles",{}) as Dictionary).duplicate(true),
 		"boss_state":boss_snapshot.get("state","absent"),
 		"boss_phase":boss_snapshot.get("phase",0),
@@ -1538,6 +1540,13 @@ func _arm_passive_ordinary_profile(wave_snapshot: Dictionary) -> void:
 func _profile_cached_system_observation(live_density: int) -> Dictionary:
 	var counts := _profile_counts()
 	var vfx_active := int(counts.get("projectiles", 0)) > 0 or int(counts.get("effects", 0)) > 0 or int(counts.get("wisp_handles", 0)) > 0
+	var audio_snapshot := audio_director._mcp_state()
+	var semantic_counts: Dictionary = audio_snapshot.get("semantic_counts", {})
+	var weapon_audio_seen := false
+	for semantic in semantic_counts.keys():
+		if String(semantic).begins_with("weapon_") and int(semantic_counts[semantic]) > 0:
+			weapon_audio_seen = true
+			break
 	return {
 		"enemy_density":live_density >= PROFILE_DENSITY_MIN and live_density <= PROFILE_DENSITY_MAX,
 		"boss":is_instance_valid(boss) and bool(boss_snapshot.get("active", false)),
@@ -1553,7 +1562,10 @@ func _profile_cached_system_observation(live_density: int) -> Dictionary:
 		"animation":warden.animation_binding != null and warden.animation_binding.binding_valid,
 		"vfx":vfx_active,
 		"lights":int(counts.get("lights", 0)) > 0,
-		"audio":int(counts.get("audio_voices", 0)) > 0,
+		# Voice playback can be shorter than a sampler tick. Cumulative semantic
+		# receipts are authoritative for coverage; native WAV capture remains the
+		# Tester-owned sensory qualification.
+		"audio":int(counts.get("audio_voices", 0)) > 0 or weapon_audio_seen,
 		"vitality_indicators":int(counts.get("vitality_visible", 0)) > 0,
 	}
 

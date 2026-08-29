@@ -25,7 +25,7 @@ script = ExtResource("12_input_router")
 process_mode = 1
 
 [node name="BossAnchor" type="Node3D" parent="World"]
-position = Vector3(-5.0,0.05,2.0)
+position = Vector3(8.6,0.05,1.0)
 
 [node name="WaveDirector" type="Node" parent="." groups=["mcp_watch"]]
 process_mode = 1

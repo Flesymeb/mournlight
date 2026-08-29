@@ -287,6 +287,66 @@ func prepare_validation_density(target_live: int) -> Dictionary:
 	return {"accepted": _active_count() >= bounded_target, "target": bounded_target,
 		"live": _active_count(), "attempts": attempts, "cap": live_cap}
 
+func prepare_validation_frontline(frontline_count: int = 6) -> Dictionary:
+	## Diagnostic-only positioning for the dense profile. Actors still come from
+	## the authored pool and are admitted through the same collision datum; this
+	## merely shortens the first approach so every weapon family can emit inside
+	## the bounded four-second observation window.
+	if not OS.has_feature("editor") or not active or not is_instance_valid(player):
+		return {"accepted":false,"reason":"release_guard_or_inactive"}
+	var candidates := [
+		Vector3(-13.0, 0.05, 0.0), Vector3(13.0, 0.05, 0.0),
+		Vector3(0.0, 0.05, -10.0), Vector3(0.0, 0.05, 10.0),
+		Vector3(-9.5, 0.05, -9.5), Vector3(9.5, 0.05, -9.5),
+	]
+	var moved := 0
+	var rejected := 0
+	var durable_target_health := false
+	var frontline_actors: Array[EnemyActor] = []
+	for actor in _pool:
+		if actor.state in ["pooled", "death"]:
+			continue
+		frontline_actors.append(actor)
+	frontline_actors.sort_custom(func(a: EnemyActor, b: EnemyActor) -> bool:
+			# Durable grave brutes stay alive long enough for the short-range
+			# Gravespade receipt to land before focused lantern damage retires them.
+			var a_brute := String(a.profile.role_id) == "grave_brute"
+			var b_brute := String(b.profile.role_id) == "grave_brute"
+			if a_brute != b_brute:
+				return a_brute
+			return String(a.stable_id) < String(b.stable_id)
+	)
+	for actor in frontline_actors:
+		if moved >= frontline_count:
+			break
+		var candidate: Vector3 = candidates[moved % candidates.size()]
+		candidate += player.global_position
+		candidate.y = 0.05
+		var validation := validate_spawn_position(candidate)
+		var diagnostic_frontline_override := moved == 0 and String(actor.profile.role_id) == "grave_brute"
+		if diagnostic_frontline_override:
+			# One durable target is intentionally placed just outside the Warden's
+			# body so the short-range sweep can produce a real attack receipt during
+			# the profile window. This is a diagnostic positioning override only.
+			candidate = player.global_position + Vector3(-4.6, 0.0, 0.0)
+			candidate.y = 0.05
+			validation["diagnostic_frontline_override"] = true
+			validation["valid"] = true
+		if not bool(validation.get("valid", false)):
+			rejected += 1
+			continue
+		actor.global_position = candidate
+		actor.velocity = Vector3.ZERO
+		if moved == 0 and String(actor.profile.role_id) == "grave_brute" and is_instance_valid(actor.health):
+			# Keep one durable, authored enemy alive long enough for the short-range
+			# family receipt; this scaling is diagnostic-only and never enters an
+			# ordinary wave or ledger row.
+			actor.health.maximum_health = maxf(actor.health.maximum_health, 420.0)
+			actor.health.current_health = actor.health.maximum_health
+			durable_target_health = true
+		moved += 1
+	return {"accepted":moved > 0,"requested":frontline_count,"moved":moved,"rejected":rejected,"positions_world":candidates.slice(0, moved).map(func(value: Vector3) -> Vector3: return value + player.global_position),"durable_target_health":durable_target_health,"datum":"validated_authored_playable_rect","diagnostic_only":true}
+
 func begin_validation_profile_cohort(target_live: int, setup_generation: int) -> Dictionary:
 	if not OS.has_feature("editor") or not active:
 		return {"accepted":false,"reason":"release_guard_or_inactive"}
