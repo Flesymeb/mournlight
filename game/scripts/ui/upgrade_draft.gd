@@ -252,15 +252,14 @@ func _build_stat_row(change: Dictionary) -> Control:
 	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(label)
-	# A newly unlocked weapon has no truthful "current" value.  Keep the
-	# decision row compact and lead with a NEW badge instead of rendering a
-	# placeholder dash in a faux current column.
+	# A newly unlocked weapon has no truthful "current" value. Keep the
+	# current column visually empty; NEW belongs in the card state/header, never
+	# in a faux current-value cell.
 	var is_new := change.current == null
 	if is_new:
-		var new_badge := _value_label("NEW", false)
-		new_badge.custom_minimum_size = Vector2(62, 0)
-		new_badge.add_theme_color_override("font_color", VIOLET)
-		row.add_child(new_badge)
+		var empty_current := _value_label("", false)
+		empty_current.custom_minimum_size = Vector2(62, 0)
+		row.add_child(empty_current)
 	else:
 		row.add_child(_value_label(_format_value(change.current, String(change.field)), false))
 	var arrow := Label.new()

@@ -37,6 +37,7 @@ const PROFILE_COVERAGE_CELLS := [
 	"vitality_indicators",
 ]
 const CompleteRunLedgerClass := preload("res://scripts/gameplay/complete_run_ledger.gd")
+const DenseWaveProfileClass := preload("res://scripts/gameplay/dense_profile.gd")
 
 var run_state := "title"
 var run_serial := 0
@@ -1616,10 +1617,13 @@ func _advance_profile_sample(delta: float) -> void:
 		"missing_coverage":_missing_profile_coverage(_profile_coverage),
 		"density_threshold_crossing":sample_start.get("density_threshold_crossing", {}),
 		"sample_count":sorted.size(), "window_seconds":_profile_elapsed,
+		"timestamp_msec":Time.get_ticks_msec(),
+		"fps":{"p50":60000.0 / maxf(0.001, _percentile(sorted,0.50)), "p95":60000.0 / maxf(0.001, _percentile(sorted,0.95)), "worst":1000.0 / maxf(0.001, sorted.back() if not sorted.is_empty() else 0.0)},
 		"frame_ms":{"p50":_percentile(sorted,0.50),"p95":_percentile(sorted,0.95),"p99":_percentile(sorted,0.99),"worst":sorted.back() if not sorted.is_empty() else 0.0,"maximum":sorted.back() if not sorted.is_empty() else 0.0,"budget_ms":16.67,"over_budget_16_67_count":over_budget_count,"over_budget_ratio":float(over_budget_count) / float(sorted.size()) if not sorted.is_empty() else 0.0,"long_frame_33_33_count":long_frame_count},
 		"physics_ms":{"p50":_percentile(sorted_physics,0.50),"p95":_percentile(sorted_physics,0.95),"p99":_percentile(sorted_physics,0.99),"worst":sorted_physics.back() if not sorted_physics.is_empty() else 0.0,"maximum":sorted_physics.back() if not sorted_physics.is_empty() else 0.0},
 		"start_counts":_profile_start_counts.duplicate(true),
 		"end_counts":end_counts.duplicate(true), "counts":end_counts.duplicate(true),
+		"lifecycle_metrics":{"spawned_total":int(spawner.get_snapshot().get("spawned", 0)), "despawned_total":int(spawner.get_snapshot().get("retired", 0)), "runtime_error_count":0, "runtime_error_source":"godot_runtime_log"},
 		"start_lifecycle":_profile_start_lifecycle.duplicate(true),
 		"end_lifecycle":_lifecycle_counters(),
 		"cohort":cohort,
@@ -3070,6 +3074,7 @@ func _mcp_state() -> Dictionary:
 		"ordinary_profile_contract_checks":ordinary_profile_contract_checks,
 		"validation_profile_cycle_comparison":cycle_comparison,
 		"validation_controls":_validation_controls_receipt(),
+		"dense_profile_contract":DenseWaveProfileClass.contract(),
 		"validation_retry_baselines":validation_retry_baselines,
 		"ordinary_victory_receipt":ordinary_victory_receipt,
 		"ordinary_victory_transactions":ordinary_victory_transactions,

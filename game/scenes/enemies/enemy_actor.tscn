@@ -32,7 +32,7 @@ size = Vector3(0.12, 0.025, 5.0)
 [node name="EnemyActor" type="CharacterBody3D"]
 script = ExtResource("1_actor")
 collision_layer = 2
-collision_mask = 3
+collision_mask = 7
 
 [node name="Collider" type="CollisionShape3D" parent="."]
 position = Vector3(0, 0.72, 0)

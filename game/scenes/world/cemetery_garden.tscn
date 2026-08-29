@@ -1,4 +1,4 @@
-[gd_scene load_steps=19 format=3]
+[gd_scene load_steps=20 format=3]
 
 [ext_resource type="PackedScene" path="res://assets/authored/low_poly_graveyard.glb" id="1_cemetery"]
 [ext_resource type="PackedScene" path="res://assets/landmarks/keeper_post.glb" id="2_keeper_post"]
@@ -40,6 +40,12 @@ size = Vector3(2.8, 1.0, 1.5)
 [sub_resource type="BoxShape3D" id="GraveClusterShape"]
 size = Vector3(3.8, 1.2, 1.9)
 
+[sub_resource type="NavigationMesh" id="CemeteryNavigationMesh"]
+agent_height = 1.6
+agent_radius = 0.45
+cell_size = 0.25
+cell_height = 0.25
+
 
 [node name="CemeteryGarden" type="Node3D" groups=["authored_environment", "mcp_watch"]]
 script = ExtResource("4_spatial_contract")
@@ -53,8 +59,14 @@ position = Vector3(0.0, 0.0, -66.8727)
 
 [node name="OuterDatum" type="Node3D" parent="."]
 
+[node name="NativeNavigationRegion" type="NavigationRegion3D" parent="OuterDatum"]
+navigation_layers = 1
+navigation_mesh = SubResource("CemeteryNavigationMesh")
+metadata/_spatial_contract = "native_authored_streets"
+metadata/_authoritative_map_instance = "AuthoredCemeteryPackage"
+
 [node name="GroundCollision" type="StaticBody3D" parent="OuterDatum"]
-collision_layer = 1
+collision_layer = 4
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/GroundCollision"]
@@ -126,7 +138,7 @@ collision_mask = 1
 shape = SubResource("TreeShape")
 
 [node name="PlayerSpawn" type="Marker3D" parent="OuterDatum" groups=["spawn_anchor"]]
-position = Vector3(0, 0.05, 5.7)
+position = Vector3(0, 0.05, 2.5)
 
 [node name="SpawnLanes" type="Node3D" parent="OuterDatum"]
 
@@ -269,7 +281,7 @@ position = Vector3(-5.4, 0, -1.8)
 [node name="RouteCheckpoints" type="Node3D" parent="OuterDatum"]
 
 [node name="00_Spawn" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(0, 0.05, 5.7)
+position = Vector3(0, 0.05, 2.5)
 
 [node name="01_South" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
 position = Vector3(0, 0.05, 8.7)
@@ -305,4 +317,4 @@ position = Vector3(5.1, 0.05, -2.5)
 position = Vector3(5.8, 0.05, 3.6)
 
 [node name="12_Return" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(0, 0.05, 5.7)
+position = Vector3(0, 0.05, 2.5)

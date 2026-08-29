@@ -88,15 +88,10 @@ func get_authored_visual_rect() -> Rect2:
 	if is_instance_valid(package_root):
 		var package_transform := package_root.get_parent() as Node3D
 		if is_instance_valid(package_transform):
-			package_offset = Vector2(package_transform.position.x, package_transform.position.z)
+			# PackageTransform owns the native export translation. The authored
+			# package local bounds are already rebased around gameplay origin.
 			var nested_scale := package_transform.global_transform.basis.get_scale().abs()
 			package_scale = Vector2(nested_scale.x, nested_scale.z) / root_scale
-	# The bound Sketchfab package stores a large native export datum in its
-	# instance transform.  The integration wrapper keeps PackageTransform at the
-	# gameplay origin and applies that offset to the intact instance, so the
-	# export datum never poisons camera margins.
-	if package_offset.length() > 100.0:
-		package_offset = Vector2.ZERO
 	var minimum := (package_offset + Vector2(AUTHORED_LOCAL_MIN.x * package_scale.x, AUTHORED_LOCAL_MIN.y * package_scale.y)) * root_scale
 	var maximum := (package_offset + Vector2(AUTHORED_LOCAL_MAX.x * package_scale.x, AUTHORED_LOCAL_MAX.y * package_scale.y)) * root_scale
 	return Rect2(minimum, maximum - minimum)
@@ -207,9 +202,15 @@ func get_snapshot() -> Dictionary:
 		"world_scale":global_transform.basis.get_scale().abs(),
 		"package_transform":{
 			"position":package_root.position if is_instance_valid(package_root) else Vector3.ZERO,
+			"wrapper_position":package_root.get_parent().position if is_instance_valid(package_root) else Vector3.ZERO,
 			"scale":package_root.get_parent().scale if is_instance_valid(package_root) else Vector3.ONE,
 			"native_export_rebased":is_instance_valid(package_root) and package_root.position.length() > 50.0,
+			"authoritative_instance":"AuthoredCemeteryPackage",
+			"datum_owner":"PackageTransform",
 		},
+		"anchor_ids":["PlayerSpawn","KeeperLanternPostAnchor","SmallMausoleumAnchor","CrackedMoonBellAnchor","TargetAnchorA","TargetAnchorB"],
+		"collision_layers":{"ground":4,"perimeter":1,"landmarks":2,"navigation":0},
+		"navigation_region":{"path":"OuterDatum/NativeNavigationRegion","layers":1,"source":"native_authored_streets","enabled":is_instance_valid(get_node_or_null("OuterDatum/NativeNavigationRegion"))},
 		"playable_rect":playable,
 		"playable_area":playable.size.x * playable.size.y,
 		"authored_visual_rect":visual,
