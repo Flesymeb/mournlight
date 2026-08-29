@@ -75,6 +75,10 @@ var _vitality_retired_total := 0
 var _vitality_visibility_transitions := 0
 var _last_vitality_event: Dictionary = {}
 var _vitality_stale_generation_rejections := 0
+## Death retirement callbacks are transient ownership, not fire-and-forget work.
+## Keep their tweens cancellable so a dense profile reset cannot leave delayed
+## callbacks alive against a freshly reused actor pool.
+var _retirement_tweens: Array[Tween] = []
 
 const LIGHT_BUDGET_REFRESH_SECONDS := 0.1
 
@@ -99,6 +103,9 @@ func _ready() -> void:
 		actor.vitality_bar.visibility_state_changed.connect(_on_vitality_visibility_changed)
 		_pool.append(actor)
 	set_process(false)
+
+func _exit_tree() -> void:
+	_clear_retirement_tweens()
 
 func begin_encounter() -> void:
 	reset_encounter(true)
@@ -129,6 +136,7 @@ func configure_pressure(definition: Dictionary) -> void:
 
 func stop_encounter() -> void:
 	end_validation_profile_cohort("encounter_stopped")
+	_clear_retirement_tweens()
 	active = false
 	set_process(false)
 	for actor in _pool:
@@ -146,6 +154,7 @@ func stop_encounter() -> void:
 
 func reset_encounter(preserve_pressure: bool = false) -> void:
 	end_validation_profile_cohort("encounter_reset")
+	_clear_retirement_tweens()
 	active = false
 	set_process(false)
 	spawned_total = 0
@@ -199,6 +208,7 @@ func reset_encounter(preserve_pressure: bool = false) -> void:
 func _process(delta: float) -> void:
 	if not active:
 		return
+	_prune_retirement_tweens()
 	_resolve_telegraph_admissions()
 	_light_budget_refresh_remaining = maxf(0.0, _light_budget_refresh_remaining - delta)
 	if _light_budget_refresh_remaining <= 0.0:
@@ -637,8 +647,10 @@ func _on_enemy_defeated(actor: EnemyActor, event: Dictionary) -> void:
 	_emit_snapshot()
 	var defeated_generation := actor.spawn_generation
 	var tween := create_tween()
+	_retirement_tweens.append(tween)
 	tween.tween_interval(0.78)
 	tween.tween_callback(func() -> void:
+		_retirement_tweens.erase(tween)
 		if not is_instance_valid(actor) or actor.spawn_generation != defeated_generation or actor.state != "death":
 			return
 		actor.remove_from_group("active_enemies")
@@ -648,6 +660,18 @@ func _on_enemy_defeated(actor: EnemyActor, event: Dictionary) -> void:
 		_maintain_validation_profile_cohort()
 		_emit_snapshot()
 	)
+
+func _prune_retirement_tweens() -> void:
+	for index in range(_retirement_tweens.size() - 1, -1, -1):
+		var tween := _retirement_tweens[index]
+		if not is_instance_valid(tween) or not tween.is_valid():
+			_retirement_tweens.remove_at(index)
+
+func _clear_retirement_tweens() -> void:
+	for tween in _retirement_tweens:
+		if is_instance_valid(tween) and tween.is_valid():
+			tween.kill()
+	_retirement_tweens.clear()
 
 func _on_reward_dropped(event: Dictionary) -> void:
 	reward_dropped.emit(event)
@@ -701,6 +725,8 @@ func get_profile_counters() -> Dictionary:
 		"vitality_visible":_vitality_visible_owners.size(),
 		"vitality_retired_total":_vitality_retired_total,
 		"vitality_stale_generation_rejections":_vitality_stale_generation_rejections,
+		"retirement_tween_count":_retirement_tweens.size(),
+		"retirement_tween_cap":pool_size,
 	}
 
 func _emit_snapshot() -> void:
@@ -788,6 +814,8 @@ func get_snapshot() -> Dictionary:
 		"wave_id": _wave_id, "wave_spawned": _wave_spawned, "spawn_budget": _spawn_budget,
 		"composition_weights": _composition_weights, "elite_every": _elite_every,
 		"retired": retired_total, "last_reconciliation": last_reconciliation_receipt,
+		"retirement_tween_count": _retirement_tweens.size(),
+		"retirement_tween_policy": "owned_cancelled_on_stop_reset_and_actor_generation_guarded",
 		"neighbor_registry": neighbor_registry.get_snapshot() if is_instance_valid(neighbor_registry) else {},
 		"telegraph_admission": {
 			"cap":telegraph_cue_cap, "requested_total":_cue_requested_total,
