@@ -28,6 +28,7 @@ const MAX_ACTIVE_PICKUPS := 16
 const PICKUP_POOL_CAP := MAX_ACTIVE_PICKUPS
 const MAX_PENDING_REWARDS := 16
 const VICTORY_PRESENTATION_HOLD_SECONDS := 2.6
+const STARTING_HEALTH := 140.0
 const PROFILE_DENSITY_MIN := 25
 const PROFILE_DENSITY_MAX := 40
 const PROFILE_COVERAGE_CELLS := [
@@ -375,7 +376,7 @@ func _begin_run() -> void:
 	world.reset_session(true, "begin_run_%s" % _next_baseline_reason)
 	_guidance_attack_baseline = world.attack_runtime.authorized_count
 	_health_accounting_suspended = true
-	health.maximum_health = 100.0
+	health.maximum_health = STARTING_HEALTH
 	health.reset_warden_health()
 	warden.cooldown_duration = 0.72
 	warden.pickup_collection_radius = 1.75

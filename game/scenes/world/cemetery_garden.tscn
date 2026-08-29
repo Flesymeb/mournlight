@@ -52,12 +52,13 @@ script = ExtResource("4_spatial_contract")
 
 [node name="PackageTransform" type="Node3D" parent="."]
 position = Vector3(0.28, 0.02, 0.0)
-scale = Vector3(2.2, 2.2, 2.2)
+scale = Vector3(3.2, 3.2, 3.2)
 
 [node name="AuthoredCemeteryPackage" parent="PackageTransform" instance=ExtResource("1_cemetery")]
 position = Vector3(0.0, 0.0, -66.8727)
 
 [node name="OuterDatum" type="Node3D" parent="."]
+scale = Vector3(1.35, 1.0, 1.35)
 
 [node name="NativeNavigationRegion" type="NavigationRegion3D" parent="OuterDatum"]
 navigation_layers = 1

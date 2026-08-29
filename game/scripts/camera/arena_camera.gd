@@ -9,7 +9,7 @@ extends Camera3D
 @export var lead_distance := 2.4
 @export var lead_damping := 5.0
 @export var framing_bias := Vector3(0.0, 0.0, -3.0)
-@export var arena_limit := Vector2(10.5, 8.5)
+@export var arena_limit := Vector2(29.0, 27.0)
 @export var normal_fov := 48.0
 @export var safe_frame_fraction := Vector2(0.08, 0.10)
 @export var safe_frame_activation_buffer := 0.04
@@ -31,7 +31,7 @@ extends Camera3D
 @export var dense_fov_boost := 8.0
 @export var dense_fov_start_count := 16
 @export var dense_fov_full_count := 32
-@export var arena_fill_limit := Vector2(6.2, 4.6)
+@export var arena_fill_limit := Vector2(26.0, 23.0)
 @export var obstruction_inward_weight := 0.38
 @export var obstruction_lateral_bypass := 0.0
 @export var obstruction_height_boost := 0.8

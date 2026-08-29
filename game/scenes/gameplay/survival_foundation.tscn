@@ -79,7 +79,7 @@ shadow_enabled = false
 scale = Vector3(1.95, 1.95, 1.95)
 
 [node name="Warden" parent="." instance=ExtResource("2_warden")]
-position = Vector3(0, 0.05, 6)
+position = Vector3(0, 0.05, 7.8)
 
 [node name="EncounterSpawner" type="Node3D" parent="." groups=["mcp_watch"] node_paths=PackedStringArray("player", "arena_contract")]
 script = ExtResource("5_spawner")
@@ -96,12 +96,12 @@ target = NodePath("../Warden")
 arena_contract = NodePath("../CemeteryGarden")
 near = 0.15
 far = 180.0
-arena_limit = Vector2(20.5, 19.0)
+arena_limit = Vector2(29.0, 27.0)
 normal_fov = 58.0
 follow_height = 22.0
 follow_distance = 21.0
 framing_bias = Vector3(0, 0, -3.0)
-arena_fill_limit = Vector2(17.5, 15.5)
+arena_fill_limit = Vector2(26.0, 23.0)
 coverage_max_correction = 3.5
 presentation_body = NodePath("../Warden/PresentationRoot/ModelPivot/AssetTransform/AuthoredWardenMage")
 presentation_lantern = NodePath("../Warden/PresentationRoot/LanternPivot/AuthoredLantern")
