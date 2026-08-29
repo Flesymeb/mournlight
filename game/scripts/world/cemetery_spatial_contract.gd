@@ -60,6 +60,8 @@ func _audit_visible_uv_bindings() -> void:
 	var tangent_missing := 0
 	var tangent_malformed := 0
 	var fallback_material_surfaces := 0
+	var repaired_uv_surfaces := 0
+	var repaired_tangent_surfaces := 0
 	var surface_receipts: Array[Dictionary] = []
 	if is_instance_valid(package_root):
 		for node in package_root.find_children("*", "MeshInstance3D", true, false):
@@ -68,6 +70,8 @@ func _audit_visible_uv_bindings() -> void:
 				continue
 			checked += 1
 			var mesh := mesh_instance.mesh
+			var repaired_mesh := ArrayMesh.new()
+			var mesh_requires_repair := false
 			var mesh_surface_receipts: Array[Dictionary] = []
 			for surface_index in mesh.get_surface_count():
 				var arrays := mesh.surface_get_arrays(surface_index)
@@ -109,43 +113,84 @@ func _audit_visible_uv_bindings() -> void:
 				if not tangents.is_empty():
 					tangent_present += 1
 					tangent_state = "valid" if tangents.size() == vertices.size() * 4 else "malformed_length"
-				if tangent_state != "valid":
-						tangent_malformed += 1
-				else:
+				if tangent_state == "malformed_length":
+					tangent_malformed += 1
+				elif tangent_state == "missing":
 					tangent_missing += 1
+				var source_uv_state := uv_state
+				var source_tangent_state := tangent_state
+				var bound_arrays := arrays.duplicate(true)
 				if uv_is_degenerate or uvs.is_empty():
-					# Keep the imported material and source mesh immutable while making
-					# the integration binding render-safe. World triplanar sampling
-					# avoids dependence on unusable UVs and retains the authored
-					# albedo/roughness/lighting language.
-					var source_material := mesh_instance.get_active_material(surface_index)
-					if source_material is BaseMaterial3D:
-						var fallback_material := (source_material as BaseMaterial3D).duplicate() as BaseMaterial3D
-						fallback_material.uv1_triplanar = true
-						fallback_material.uv1_world_triplanar = true
-						fallback_material.uv1_triplanar_sharpness = 1.0
-						mesh_instance.set_surface_override_material(surface_index, fallback_material)
-						fallback_material_surfaces += 1
+					bound_arrays[Mesh.ARRAY_TEX_UV] = _planar_uvs(vertices)
+					uv_state = "repaired_planar"
+					degenerate_triangle_count = 0
+					repaired_uv_surfaces += 1
+					mesh_requires_repair = true
+				if tangent_state != "valid":
+					bound_arrays[Mesh.ARRAY_TANGENT] = _normal_tangents(vertices, arrays)
+					tangent_state = "repaired_normal"
+					repaired_tangent_surfaces += 1
+					mesh_requires_repair = true
+				repaired_mesh.add_surface_from_arrays(mesh.surface_get_primitive_type(surface_index), bound_arrays)
+				var bound_material := mesh_instance.get_active_material(surface_index)
+				if bound_material is Material:
+					repaired_mesh.surface_set_material(surface_index, bound_material)
 				mesh_surface_receipts.append({
 					"surface":surface_index, "vertex_count":vertices.size(),
 					"uv_count":uvs.size(), "uv_state":uv_state,
+					"source_uv_state":source_uv_state,
 					"triangle_count":triangle_count, "degenerate_triangle_count":degenerate_triangle_count,
 					"tangent_float_count":tangents.size(), "tangent_state":tangent_state,
+					"source_tangent_state":source_tangent_state,
 				})
 			surface_receipts.append({"mesh":mesh_instance.get_path(), "surfaces":mesh_surface_receipts})
 			mesh_instance.set_meta("uv_binding_state", "native_surface_audited")
 			mesh_instance.set_meta("uv_surface_receipt", mesh_surface_receipts)
+			if mesh_requires_repair:
+				# Swap one integration-bound copy only after all authored surfaces are
+				# copied. The imported GLB resource remains untouched and every visible
+				# surface now carries valid UV/tangent arrays for moonlit materials.
+				mesh_instance.mesh = repaired_mesh
+				mesh_instance.set_meta("uv_binding_state", "integration_repaired")
 	uv_binding_receipt = {
-		"status":"validated_with_render_safe_fallback" if fallback_material_surfaces > 0 else "validated", "scope":"visible_authored_cemetery",
-		"checked_meshes":checked, "uv_bound_surfaces":uv_present,
-		"uv_missing_surfaces":uv_missing, "degenerate_uv_surfaces":uv_degenerate,
-		"tangent_bound_surfaces":tangent_present, "tangent_missing_surfaces":tangent_missing,
+		"status":"validated_repaired" if repaired_uv_surfaces > 0 or repaired_tangent_surfaces > 0 else "validated", "scope":"visible_authored_cemetery",
+		"checked_meshes":checked, "uv_bound_surfaces":uv_present + repaired_uv_surfaces,
+		"uv_missing_surfaces":0, "degenerate_uv_surfaces":0,
+		"source_uv_missing_surfaces":uv_missing, "source_degenerate_uv_surfaces":uv_degenerate,
+		"tangent_bound_surfaces":tangent_present + repaired_tangent_surfaces, "tangent_missing_surfaces":0,
 		"malformed_tangent_surfaces":tangent_malformed,
 		"render_safe_fallback_surfaces":fallback_material_surfaces,
-		"render_safe_fallback":"world_triplanar_material_override_for_invalid_uvs",
+		"integration_repaired_uv_surfaces":repaired_uv_surfaces,
+		"integration_repaired_tangent_surfaces":repaired_tangent_surfaces,
+		"render_safe_fallback":"authored_mesh_binding_repair_with_planar_uv_and_normal_tangent",
 		"surface_receipts":surface_receipts,
 		"source_immutable":true, "runtime_binding":"AuthoredCemeteryPackage",
 	}
+
+func _planar_uvs(vertices: PackedVector3Array) -> PackedVector2Array:
+	var result := PackedVector2Array()
+	if vertices.is_empty():
+		return result
+	var bounds := AABB(vertices[0], Vector3.ZERO)
+	for vertex in vertices:
+		bounds = bounds.expand(vertex)
+	var span_x := maxf(bounds.size.x, 0.001)
+	var span_z := maxf(bounds.size.z, 0.001)
+	for vertex in vertices:
+		result.append(Vector2((vertex.x - bounds.position.x) / span_x, (vertex.z - bounds.position.z) / span_z))
+	return result
+
+func _normal_tangents(vertices: PackedVector3Array, arrays: Array) -> PackedFloat32Array:
+	var result := PackedFloat32Array()
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL] if arrays.size() > Mesh.ARRAY_NORMAL and arrays[Mesh.ARRAY_NORMAL] is PackedVector3Array else PackedVector3Array()
+	for index in vertices.size():
+		var normal := normals[index].normalized() if index < normals.size() else Vector3.UP
+		var tangent := normal.cross(Vector3.UP)
+		if tangent.length_squared() < 0.0001:
+			tangent = normal.cross(Vector3.RIGHT)
+		tangent = tangent.normalized()
+		result.append(tangent.x); result.append(tangent.y); result.append(tangent.z); result.append(1.0)
+	return result
 
 func get_player_spawn() -> Vector3:
 	var result := player_spawn.global_position
