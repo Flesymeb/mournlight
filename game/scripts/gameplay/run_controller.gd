@@ -987,7 +987,10 @@ func _on_draft_opened(cards: Array[Dictionary]) -> void:
 	_emit_snapshot()
 
 func _on_draft_choice(index: int) -> void:
-	if _upgrade_commit_in_progress or run_state != "draft" or not get_tree().paused:
+	# The authoritative modal owner is run_state. External tester freeze can
+	# temporarily virtualize SceneTree.paused while dispatching input; rejecting
+	# that valid release edge would leave a latched card with no applied choice.
+	if _upgrade_commit_in_progress or run_state != "draft":
 		return
 	_upgrade_commit_in_progress = true
 	upgrade_transaction_receipt["phase"] = "committing"
@@ -1316,7 +1319,10 @@ func _terminal_reset_invariants(destination: String) -> Dictionary:
 	var victory_vfx: Dictionary = warden_state.get("victory_vfx", {})
 	var audio_state := audio_director._mcp_state()
 	var counts := _profile_counts()
-	var reset_expected := destination in ["title", "retry", "fresh_start", "profile_reset"]
+	# The editor-only dense-profile reset is a first-class lifecycle reset just
+	# like Retry/fresh start.  Keep the invariant receipt explicit so host
+	# recapture can distinguish a verified baseline from an ordinary teardown.
+	var reset_expected := destination in ["title", "retry", "fresh_start", "profile_reset", "validation_profile_reset"]
 	var idle_complete := (
 		String(movement.get("locomotion_state", "")) == "idle"
 		and (movement.get("velocity", Vector3.ONE) as Vector3).length_squared() <= 0.0001

@@ -301,6 +301,8 @@ func prepare_validation_frontline(frontline_count: int = 6) -> Dictionary:
 	]
 	var moved := 0
 	var rejected := 0
+	var candidate_index := 0
+	var moved_positions: Array[Vector3] = []
 	var durable_target_health := false
 	var frontline_actors: Array[EnemyActor] = []
 	for actor in _pool:
@@ -319,7 +321,12 @@ func prepare_validation_frontline(frontline_count: int = 6) -> Dictionary:
 	for actor in frontline_actors:
 		if moved >= frontline_count:
 			break
-		var candidate: Vector3 = candidates[moved % candidates.size()]
+		# Advance the probe lane independently from the number of accepted
+		# placements.  A blocked lane must not be retried for every remaining
+		# actor, otherwise one authored coffin/landmark can collapse the whole
+		# diagnostic frontline to a single moved enemy.
+		var candidate: Vector3 = candidates[candidate_index % candidates.size()]
+		candidate_index += 1
 		candidate += player.global_position
 		candidate.y = 0.05
 		var validation := validate_spawn_position(candidate)
@@ -336,6 +343,7 @@ func prepare_validation_frontline(frontline_count: int = 6) -> Dictionary:
 			rejected += 1
 			continue
 		actor.global_position = candidate
+		moved_positions.append(candidate)
 		actor.velocity = Vector3.ZERO
 		if moved == 0 and String(actor.profile.role_id) == "grave_brute" and is_instance_valid(actor.health):
 			# Keep one durable, authored enemy alive long enough for the short-range
@@ -345,7 +353,7 @@ func prepare_validation_frontline(frontline_count: int = 6) -> Dictionary:
 			actor.health.current_health = actor.health.maximum_health
 			durable_target_health = true
 		moved += 1
-	return {"accepted":moved > 0,"requested":frontline_count,"moved":moved,"rejected":rejected,"positions_world":candidates.slice(0, moved).map(func(value: Vector3) -> Vector3: return value + player.global_position),"durable_target_health":durable_target_health,"datum":"validated_authored_playable_rect","diagnostic_only":true}
+	return {"accepted":moved > 0,"requested":frontline_count,"moved":moved,"rejected":rejected,"positions_world":moved_positions,"durable_target_health":durable_target_health,"datum":"validated_authored_playable_rect","diagnostic_only":true}
 
 func begin_validation_profile_cohort(target_live: int, setup_generation: int) -> Dictionary:
 	if not OS.has_feature("editor") or not active:

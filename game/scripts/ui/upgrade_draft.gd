@@ -127,7 +127,10 @@ func _choose(index: int) -> void:
 	for card_index in buttons.size():
 		buttons[card_index].disabled = card_index != index
 		_refresh_card_state(card_index)
-	await get_tree().create_timer(0.18, true, false, true).timeout
+	# Button.pressed is emitted on the debounced release edge. Commit directly
+	# instead of waiting on a scaled SceneTree timer: draft owns the pause, so a
+	# frozen/tester clock can otherwise hold the transaction forever and leave
+	# the world paused after a valid keyboard or gamepad choice.
 	if commit_serial != _presentation_serial or not visible:
 		return
 	choice_requested.emit(index)
