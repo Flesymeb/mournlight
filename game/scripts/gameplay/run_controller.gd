@@ -2312,6 +2312,8 @@ func _profile_counts() -> Dictionary:
 		"total_target_queries":int(encounter.get("total_target_queries", 0)),
 		"total_target_candidate_visits":int(encounter.get("total_target_candidate_visits", 0)),
 		"wisp_handles":wisps_runtime.active_wisp_count,
+		"wisp_pool_available":wisps_runtime._wisp_pool.size(),
+		"wisp_pool_total":wisps_runtime._wisp_pool.size() + wisps_runtime.active_wisp_count,
 		"presentation_pools":{
 			"lantern":{"active":lantern_runtime.active_presentation_count,"available":lantern_runtime._presentation_pool.size(),"total":lantern_runtime._bolt_total,"cap":lantern_runtime.BOLT_POOL_CAP},
 			"gravespade":{"active":gravespade_runtime.active_presentation_count,"available":gravespade_runtime._presentation_pool.size(),"total":gravespade_runtime._sweep_total,"cap":gravespade_runtime.SWEEP_POOL_CAP},

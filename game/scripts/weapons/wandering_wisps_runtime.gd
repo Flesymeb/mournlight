@@ -12,6 +12,7 @@ var orbit_phase := 0.0
 var contact_hit_count := 0
 var active_wisp_count := 0
 var _wisps: Array[Node3D] = []
+var _wisp_pool: Array[Node3D] = []
 var _target_next_hit_time: Dictionary = {}
 var _gameplay_time := 0.0
 var _retired := false
@@ -38,14 +39,25 @@ func _physics_process(delta: float) -> void:
 
 func _sync_wisp_count(count: int) -> void:
 	while _wisps.size() < count:
-		var wisp := wisp_scene.instantiate() if wisp_scene else Node3D.new()
-		add_child(wisp)
+		var wisp: Node3D
+		while not _wisp_pool.is_empty() and not is_instance_valid(_wisp_pool.back()):
+			_wisp_pool.pop_back()
+		if not _wisp_pool.is_empty():
+			wisp = _wisp_pool.pop_back()
+		else:
+			wisp = wisp_scene.instantiate() if wisp_scene else Node3D.new()
+			add_child(wisp)
 		if wisp.has_method("configure"):
 			wisp.configure(_wisps.size())
+		wisp.visible = true
+		wisp.add_to_group("friendly_attack")
 		_wisps.append(wisp)
 	while _wisps.size() > count:
 		var removed: Node3D = _wisps.pop_back()
-		removed.queue_free()
+		if is_instance_valid(removed):
+			removed.visible = false
+			removed.remove_from_group("friendly_attack")
+			_wisp_pool.append(removed)
 	active_wisp_count = _wisps.size()
 
 func _resolve_contacts(stats: Dictionary) -> void:
@@ -70,7 +82,9 @@ func _resolve_contacts(stats: Dictionary) -> void:
 func _clear_wisps() -> void:
 	for wisp in _wisps:
 		if is_instance_valid(wisp):
-			wisp.queue_free()
+			wisp.visible = false
+			wisp.remove_from_group("friendly_attack")
+			_wisp_pool.append(wisp)
 	_wisps.clear()
 	active_wisp_count = 0
 
@@ -97,6 +111,7 @@ func retire_runtime(reason: String, generation: int) -> Dictionary:
 		"weapon_id": String(weapon_id), "reason": reason,
 		"generation": _retirement_generation, "before": before,
 		"after": {"wisp_handles": _wisps.size(), "per_target_intervals": _target_next_hit_time.size(), "orbit_phase": orbit_phase},
+		"pool_available": _wisp_pool.size(),
 		"complete": true,
 	}
 
@@ -104,11 +119,16 @@ func reset_runtime() -> void:
 	retire_runtime("reset", _retirement_generation + 1)
 	contact_hit_count = 0
 	_retired = false
+	# retire_runtime disables processing while invalidating active handles;
+	# explicitly re-enable it for the next fresh run so pooled wisps can be
+	# reacquired and orbit again after Retry/Return-to-Title.
+	set_physics_process(true)
 
 func _mcp_state() -> Dictionary:
 	return {
 		"weapon_id": String(weapon_id), "equipped": inventory.is_equipped(weapon_id), "rank": inventory.get_rank(weapon_id),
 		"active_wisp_count": active_wisp_count, "contact_hit_count": contact_hit_count,
+		"wisp_pool_available": _wisp_pool.size(), "wisp_pool_total": _wisp_pool.size() + _wisps.size(),
 		"per_target_interval_count": _target_next_hit_time.size(), "orbit_phase": orbit_phase,
 		"gameplay_clock": _gameplay_time, "retired": _retired,
 		"retirement_generation": _retirement_generation,

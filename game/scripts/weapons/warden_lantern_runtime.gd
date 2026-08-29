@@ -53,6 +53,12 @@ func _emit_attack(target: Node3D, stats: Dictionary) -> void:
 	_emitting = true
 	attack_phase = "anticipation"
 	selected_target_id = String(target.get_stable_id())
+	# Focus is an explicit HUD affordance: the currently selected legal threat
+	# gets a short vitality reveal even before the bolt lands, so automatic
+	# targeting remains readable at dense-wave cadence.
+	var focused_bar := target.get_node_or_null("EnemyVitalityBar")
+	if focused_bar and focused_bar.has_method("reveal_focus"):
+		focused_bar.reveal_focus()
 	await get_tree().create_timer(0.11).timeout
 	if generation != _runtime_generation:
 		return

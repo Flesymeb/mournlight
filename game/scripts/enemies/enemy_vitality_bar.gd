@@ -3,8 +3,12 @@ extends Node3D
 
 signal visibility_state_changed(event: Dictionary)
 
-const USEFUL_PROXIMITY := 5.4
-const DAMAGE_HOLD_SECONDS := 2.8
+# Keep ordinary feedback available across the shipped high-angle camera.  The
+# indicator is still sparse (only engaged actors reveal it), but a threat that
+# has entered the player's attack envelope should not disappear between two
+# sampler frames before damage/focus evidence can observe it.
+const USEFUL_PROXIMITY := 12.5
+const DAMAGE_HOLD_SECONDS := 4.0
 
 @onready var background: MeshInstance3D = $Background
 @onready var fill: MeshInstance3D = $Fill
@@ -65,6 +69,15 @@ func reveal_damage() -> void:
 	alpha = maxf(alpha, 0.92)
 	_apply_alpha(alpha)
 	_set_visible(true, "damage")
+
+func reveal_focus() -> void:
+	if not _bound or not _actor_generation_matches() or current_health <= 0.0:
+		return
+	useful_reason = "focused"
+	damage_hold_remaining = maxf(damage_hold_remaining, 1.2)
+	alpha = maxf(alpha, 0.92)
+	_apply_alpha(alpha)
+	_set_visible(true, "focus")
 
 func advance(delta: float, target_distance: float, lifecycle_active: bool) -> void:
 	if not _bound or not lifecycle_active:
