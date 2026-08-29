@@ -35,10 +35,14 @@ var _presentation_updates := 0
 var _presentation_skips := 0
 var _priority_updates := 0
 var _manual_animation_enabled := false
+var binding_status := "unbound"
+var binding_error := ""
 
 func configure(next_role_id: String, _accent: Color, stable_id: StringName, generation: int, allocated_variant_index: int = -1) -> void:
 	role_id = next_role_id
 	_animation_bucket = posmod(String(stable_id).hash() + generation, DENSE_APPROACH_ANIMATION_BUCKETS)
+	binding_status = "binding"
+	binding_error = ""
 	_pending_animation_delta = 0.0
 	_presentation_updates = 0
 	_presentation_skips = 0
@@ -55,6 +59,8 @@ func reset_presenter() -> void:
 	_state_time = 0.0
 	_animation_player = null
 	_manual_animation_enabled = false
+	binding_status = "unbound"
+	binding_error = ""
 	_active_variant = null
 	_presentation = null
 	for child in get_children():
@@ -124,6 +130,7 @@ func _build_role(variant_index: int) -> void:
 		child.queue_free()
 	var packed: PackedScene = ROLE_SCENES.get(role_id)
 	if packed == null:
+		_fail_binding("missing_role_scene:%s" % role_id)
 		return
 	_presentation = packed.instantiate() as Node3D
 	_presentation.name = "AuthoredRolePresentation"
@@ -141,7 +148,9 @@ func _build_role(variant_index: int) -> void:
 			_presentation.remove_child(candidate)
 			candidate.free()
 	if not is_instance_valid(_active_variant):
+		_fail_binding("missing_authored_variant:%s" % role_id)
 		return
+	binding_status = "bound"
 	_base_position = _active_variant.position
 	_base_rotation = _active_variant.rotation
 	_base_scale = _active_variant.scale
@@ -152,6 +161,21 @@ func _build_role(variant_index: int) -> void:
 	if _animation_player:
 		_animation_player.set_process_callback(AnimationPlayer.ANIMATION_PROCESS_MANUAL)
 		_manual_animation_enabled = true
+
+func _fail_binding(reason: String) -> void:
+	# Development builds must make a missing authored role obvious.  There is no
+	# shared hostile-lantern fallback: the actor remains unbound and carries a
+	# visible red marker so QA can stop on the exact role/package mismatch.
+	binding_status = "error"
+	binding_error = reason
+	if OS.has_feature("editor"):
+		var marker := Label3D.new()
+		marker.name = "MissingRoleBinding"
+		marker.text = "MISSING ROLE\n%s" % role_id.to_upper()
+		marker.modulate = Color(1.0, 0.18, 0.16, 1.0)
+		marker.outline_size = 8
+		marker.position = Vector3(0.0, 1.4, 0.0)
+		add_child(marker)
 
 func _select_authored_clip(candidate: AnimationPlayer) -> StringName:
 	if candidate == null:
@@ -182,6 +206,8 @@ func presentation_budget_snapshot() -> Dictionary:
 		"skips":_presentation_skips,
 		"priority_updates":_priority_updates,
 		"update_ratio":float(_presentation_updates) / float(attempts) if attempts > 0 else 0.0,
+		"binding_status":binding_status,
+		"binding_error":binding_error,
 	}
 
 func _restore_pose() -> void:

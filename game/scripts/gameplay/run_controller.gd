@@ -1220,6 +1220,13 @@ func _commit_terminal_snapshot(terminal_outcome: String) -> void:
 	terminal_snapshot["natural_build_history"] = selected_upgrades.duplicate(true)
 	terminal_snapshot["boss_transition_history"] = boss_transition_history.duplicate(true)
 	terminal_snapshot["terminal_animation"] = warden.animation_binding.get_snapshot() if warden.animation_binding else {}
+	# Carry the renderer/build guards into the immutable terminal receipt.  The
+	# ledger can then reject llvmpipe/software rows without treating an ordinary
+	# run with no dense-profile sample as failed evidence.
+	var renderer_receipt: Dictionary = validation_profile_sample.get("renderer", {})
+	terminal_snapshot["renderer_classification"] = String(renderer_receipt.get("classification", validation_profile_sample.get("renderer_classification", "unknown")))
+	terminal_snapshot["renderer_gate_status"] = String(validation_profile_sample.get("renderer_gate_status", validation_profile_receipt.get("renderer_gate_status", "pending_native_renderer")))
+	terminal_snapshot["release_build_guard"] = run_route_kind == "ordinary" and int(wave_director.get_snapshot().get("diagnostic_jump_count", 0)) == 0
 	if terminal_outcome == "victory":
 		terminal_snapshot["victory_transaction"] = ordinary_victory_receipt.duplicate(true)
 	var wave_state := wave_director.get_snapshot()

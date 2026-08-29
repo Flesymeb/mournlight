@@ -97,25 +97,30 @@ shape = SubResource("EastWestShape")
 
 [node name="MausoleumCollision" type="StaticBody3D" parent="OuterDatum" unique_id=631849061]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.53, 1.9, -2.52)
-collision_layer = 1
+# Gameplay still collides through the Warden/enemy mask (7), while the
+# camera-coverage query excludes this tall landmark from sightline rays.
+collision_layer = 2
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/MausoleumCollision" unique_id=403615118]
 shape = SubResource("MausoleumShape")
 
 [node name="NortheastTreeCollision" type="StaticBody3D" parent="OuterDatum" unique_id=1768484639]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.85, 1.6, -5.46)
+collision_layer = 2
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/NortheastTreeCollision" unique_id=2136960841]
 shape = SubResource("TreeShape")
 
 [node name="NorthwestTreeCollision" type="StaticBody3D" parent="OuterDatum" unique_id=1610349841]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.9, 1.6, -6.42)
+collision_layer = 2
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/NorthwestTreeCollision" unique_id=55888550]
 shape = SubResource("TreeShape")
 
 [node name="SoutheastTreeCollision" type="StaticBody3D" parent="OuterDatum" unique_id=1909054674]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.28, 1.6, 8.94)
+collision_layer = 2
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/SoutheastTreeCollision" unique_id=1326067322]
 shape = SubResource("TreeShape")

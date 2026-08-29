@@ -304,6 +304,15 @@ func _victory_rejection_reasons(terminal: Dictionary) -> Array[String]:
 	if String(terminal.get("outcome", "")) != "victory": reasons.append("outcome_not_victory")
 	if String(terminal.get("route_kind", "")) != "ordinary": reasons.append("route_not_ordinary")
 	if int(terminal.get("diagnostic_jump_count", -1)) != 0: reasons.append("diagnostic_route")
+	# Software/llvmpipe captures are useful diagnostics but can never populate
+	# an ordinary release row or build-shape cell. Unknown renderer identity is
+	# left pending for the host; only an explicit software classification rejects.
+	var renderer_classification := String(terminal.get("renderer_classification", ""))
+	var renderer_gate_status := String(terminal.get("renderer_gate_status", ""))
+	if renderer_classification == "software" or renderer_gate_status == "rejected_software_renderer":
+		reasons.append("software_renderer_rejected")
+	if terminal.has("release_build_guard") and not bool(terminal.get("release_build_guard", false)):
+		reasons.append("release_build_guard_failed")
 	if Array(terminal.get("ordered_wave_ids", [])) != EXPECTED_WAVES: reasons.append("ordered_five_wave_route_incomplete")
 	var elapsed := float(terminal.get("elapsed", 0.0))
 	if elapsed < 420.0 or elapsed > 600.0: reasons.append("elapsed_outside_420_600")
