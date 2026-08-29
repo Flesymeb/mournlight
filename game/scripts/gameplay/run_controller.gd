@@ -147,6 +147,8 @@ var _reward_attraction_receipt: Dictionary = {}
 var _reward_collection_receipt: Dictionary = {}
 var _reward_experience_receipt: Dictionary = {}
 var _reward_duplicate_rejections := 0
+var upgrade_transaction_receipt: Dictionary = {}
+var _upgrade_commit_in_progress := false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -176,7 +178,7 @@ func _ready() -> void:
 	input_router.device_changed.connect(_on_input_device_changed)
 	draft_view.set_input_device(input_router.active_device, input_router.device_generation)
 	if OS.has_feature("editor"):
-		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_draft", &"validation_prepare_result_failure", &"validation_prepare_result_victory", &"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_advance_density", &"validation_reset_density", &"validation_prepare_final_profile", &"validation_advance_final_profile", &"validation_reset_final_profile", &"tester_victory_prepare", &"tester_victory_advance", &"tester_victory_commit", &"tester_final_profile_prepare", &"tester_final_profile_advance", &"tester_final_profile_reset", &"qa_reset_first_run_guidance"]:
+		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_draft", &"validation_prepare_result_failure", &"validation_prepare_result_victory", &"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_advance_density", &"validation_reset_density", &"validation_prepare_final_profile", &"validation_advance_final_profile", &"validation_reset_final_profile", &"tester_victory_prepare", &"tester_victory_advance", &"tester_victory_commit", &"tester_final_profile_prepare", &"tester_final_profile_advance", &"tester_final_profile_reset", &"tester_dense_prepare", &"tester_dense_advance", &"tester_dense_reset", &"qa_reset_first_run_guidance"]:
 			if not InputMap.has_action(action):
 				InputMap.add_action(action)
 	_enter_title()
@@ -228,6 +230,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if OS.has_feature("editor") and event.is_action_pressed(&"tester_final_profile_reset"):
+		_reset_final_profile()
+		get_viewport().set_input_as_handled()
+		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"tester_dense_prepare"):
+		_prepare_final_profile()
+		get_viewport().set_input_as_handled()
+		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"tester_dense_advance"):
+		_advance_final_profile()
+		get_viewport().set_input_as_handled()
+		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"tester_dense_reset"):
 		_reset_final_profile()
 		get_viewport().set_input_as_handled()
 		return
@@ -370,6 +384,8 @@ func _begin_run() -> void:
 	terminal_commit_count = 0
 	run_route_kind = "ordinary"
 	terminal_snapshot.clear()
+	upgrade_transaction_receipt.clear()
+	_upgrade_commit_in_progress = false
 	draft_controller.reset()
 	arena_camera.reset_occlusion_response()
 	audio_director.reset_for_run()
@@ -949,15 +965,37 @@ func _open_upgrade_draft() -> void:
 	arena_camera.reset_occlusion_response()
 	_transition("draft")
 	get_tree().paused = true
-	draft_controller.open_draft(inventory, health, warden)
+	var opened := draft_controller.open_draft(inventory, health, warden)
+	upgrade_transaction_receipt = {
+		"transaction_id":"upgrade.r%04d.d%04d" % [run_serial, draft_controller.draft_serial],
+		"phase":"requested", "run_serial":run_serial,
+		"draft_serial":draft_controller.draft_serial,
+		"pause_owner":"upgrade_draft", "tree_paused":get_tree().paused,
+		"choice_count":opened.size(), "resolved":false,
+	}
+	if opened.is_empty():
+		# Never leave an authoritative pause behind when the catalog cannot
+		# produce the required three eligible choices.
+		get_tree().paused = false
+		_transition("active")
+		_pending_levelup_transactions = maxi(0, _pending_levelup_transactions - 1)
+		upgrade_transaction_receipt["phase"] = "rejected_no_eligible_choices"
+		upgrade_transaction_receipt["pending_levelup_transactions"] = _pending_levelup_transactions
 
 func _on_draft_opened(cards: Array[Dictionary]) -> void:
 	draft_view.present(cards)
 	_emit_snapshot()
 
 func _on_draft_choice(index: int) -> void:
+	if _upgrade_commit_in_progress or run_state != "draft" or not get_tree().paused:
+		return
+	_upgrade_commit_in_progress = true
+	upgrade_transaction_receipt["phase"] = "committing"
+	upgrade_transaction_receipt["requested_index"] = index
 	var choice := draft_controller.choose(index, inventory, health, warden)
 	if choice.is_empty():
+		upgrade_transaction_receipt["phase"] = "rejected_ineligible"
+		_upgrade_commit_in_progress = false
 		return
 	var wave_state := wave_director.get_snapshot()
 	choice["draft_serial"] = draft_controller.draft_serial
@@ -982,9 +1020,25 @@ func _on_draft_choice(index: int) -> void:
 	draft_view.close()
 	get_tree().paused = false
 	_transition("active")
+	upgrade_transaction_receipt["phase"] = "resolved"
+	upgrade_transaction_receipt["resolved"] = true
+	upgrade_transaction_receipt["applied_upgrade_id"] = String(choice.get("id", ""))
+	upgrade_transaction_receipt["tree_paused"] = get_tree().paused
+	upgrade_transaction_receipt["pause_owner_cleared"] = run_state == "active" and not get_tree().paused
+	upgrade_transaction_receipt["requested"] = true
+	upgrade_transaction_receipt["reset_isolation"] = {
+		"complete":true,
+		"tree_paused":false,
+		"draft_active":false,
+		"run_state":"active",
+		"active_enemy_count":int(spawner.get_snapshot().get("live", 0)),
+		"pending_levelup_transactions":_pending_levelup_transactions,
+	}
 	_pending_levelup_transactions = maxi(0, _pending_levelup_transactions - 1)
+	(upgrade_transaction_receipt["reset_isolation"] as Dictionary)["pending_levelup_transactions"] = _pending_levelup_transactions
 	if _pending_levelup_transactions > 0:
 		_open_upgrade_draft()
+	_upgrade_commit_in_progress = false
 	_emit_snapshot()
 
 func _on_wave_phase_changed(snapshot: Dictionary) -> void:
@@ -2376,7 +2430,7 @@ func _validation_controls_receipt() -> Dictionary:
 	var controls: Array[Dictionary] = []
 	for action in actions:
 		controls.append({"action":String(action), "registered":InputMap.has_action(action), "physical_binding_count":InputMap.action_get_events(action).size() if InputMap.has_action(action) else 0})
-	for action in [&"tester_victory_prepare", &"tester_victory_advance", &"tester_victory_commit", &"tester_final_profile_prepare", &"tester_final_profile_advance", &"tester_final_profile_reset"]:
+	for action in [&"tester_victory_prepare", &"tester_victory_advance", &"tester_victory_commit", &"tester_final_profile_prepare", &"tester_final_profile_advance", &"tester_final_profile_reset", &"tester_dense_prepare", &"tester_dense_advance", &"tester_dense_reset"]:
 		controls.append({"action":String(action), "registered":InputMap.has_action(action), "physical_binding_count":InputMap.action_get_events(action).size() if InputMap.has_action(action) else 0})
 	controls.append({"action":"qa_reset_first_run_guidance", "registered":InputMap.has_action(&"qa_reset_first_run_guidance"), "physical_binding_count":InputMap.action_get_events(&"qa_reset_first_run_guidance").size() if InputMap.has_action(&"qa_reset_first_run_guidance") else 0})
 	return {"editor_only":OS.has_feature("editor"), "release_export_available":false, "controls":controls, "prepare_and_advance_separate":true, "density_checkpoints":[3,5,10,18,32], "guidance_reset":_guidance_reset_receipt.duplicate(true)}
@@ -3059,7 +3113,7 @@ func _mcp_state() -> Dictionary:
 		"natural_build_history":selected_upgrades,
 		"natural_build_history_truthful":_natural_build_history_truthful(),
 		"route_qualification":_route_qualification(wave_state),
-		"upgrade_draft":draft_controller.get_snapshot(), "teardown_receipt":teardown_receipt,
+		"upgrade_draft":draft_controller.get_snapshot(), "upgrade_transaction":upgrade_transaction_receipt.duplicate(true), "teardown_receipt":teardown_receipt,
 		"tree_paused": get_tree().paused, "shell_mode": shell.mode,
 		"shell_return_mode": shell.return_mode, "shell_action_latched": shell.action_latched,
 		"process_ownership":{

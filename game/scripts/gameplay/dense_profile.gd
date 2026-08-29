@@ -15,9 +15,10 @@ static func contract() -> Dictionary:
 		"contract_id": CONTRACT_ID,
 		"release_guard": "OS.has_feature(\"editor\")",
 		"entrypoints": {
-			"prepare": "validation_prepare_final_profile",
-			"advance": "validation_advance_final_profile",
-			"reset": "validation_reset_final_profile",
+			"prepare": "tester_dense_prepare",
+			"advance": "tester_dense_advance",
+			"reset": "tester_dense_reset",
+			"legacy_aliases": ["validation_prepare_final_profile", "validation_advance_final_profile", "validation_reset_final_profile"],
 		},
 		"window_seconds": WINDOW_SECONDS,
 		"enemy_range": {"minimum": MIN_ENEMIES, "maximum": MAX_ENEMIES, "target": TARGET_ENEMIES},
@@ -26,6 +27,6 @@ static func contract() -> Dictionary:
 			"active_pickups", "active_effects", "active_lights", "active_audio_voices",
 			"spawned_total", "despawned_total", "runtime_error_count",
 		],
+		"receipts": ["requested", "resolved", "reset_isolation"],
 		"ordinary_balance_untouched": true,
 	}
-
