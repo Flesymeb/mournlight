@@ -190,19 +190,19 @@ light_energy = 1.7
 omni_range = 5.5
 
 [node name="CrackedMoonBellAnchor" type="Marker3D" parent="OuterDatum" unique_id=855017616 groups=["landmark_anchor"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.2, 0, -8.6)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.9, 0, -2.6)
 
 [node name="CrackedBellAsset" parent="OuterDatum/CrackedMoonBellAnchor" unique_id=1563090568 groups=["cracked_bell_landmark"] instance=ExtResource("3_cracked_bell")]
-transform = Transform3D(-1.8248768, -0.8184283, -2.9627022e-06, 0, -7.2399803e-06, 2, -0.8184283, 1.8248768, 6.606036e-06, 3.7, 0, 6)
+transform = Transform3D(-1.8248768, -0.8184283, -2.9627022e-06, 0, -7.2399803e-06, 2, -0.8184283, 1.8248768, 6.606036e-06, 0, 0, 0)
 
 [node name="CrackedBellCollision" type="StaticBody3D" parent="OuterDatum/CrackedMoonBellAnchor" unique_id=787450712]
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision" unique_id=997783122]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.7, 0.9, 6)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 shape = SubResource("CrackedBellShape")
 
 [node name="BellLanternLight" type="OmniLight3D" parent="OuterDatum/CrackedMoonBellAnchor" unique_id=1665137444]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.7, 2.1, 6)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1, 0)
 light_color = Color(0.82, 0.25, 0.66, 1)
 light_energy = 1.65
 omni_range = 5.2
@@ -273,7 +273,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.4, 0.05, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.9, 0.05, 2.9)
 
 [node name="09_CrackedBell" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=507056088 groups=["arena_route_checkpoint"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.5, 0.05, -0.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.35, 0.05, -2.6)
 
 [node name="10_Mausoleum" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=1044815565 groups=["arena_route_checkpoint"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.1, 0.05, -2.5)

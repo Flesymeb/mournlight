@@ -129,6 +129,7 @@ var _profile_static_light_count := 0
 var _profile_setup_scene_scans := 0
 var _profile_sample_counter_reads := 0
 var _profile_gate_counter_reads := 0
+var _profile_sample_accumulator := 0.0
 var _profile_coverage: Dictionary = {}
 var _profile_coverage_first_seen: Dictionary = {}
 var _first_run_guidance_completed := false
@@ -149,6 +150,9 @@ var _reward_experience_receipt: Dictionary = {}
 var _reward_duplicate_rejections := 0
 var upgrade_transaction_receipt: Dictionary = {}
 var _upgrade_commit_in_progress := false
+
+const PROFILE_SAMPLE_INTERVAL_SECONDS := 0.1
+const PROFILE_MAX_SAMPLES := 128
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -325,6 +329,7 @@ func _begin_run() -> void:
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
 	_profile_elapsed = 0.0
+	_profile_sample_accumulator = 0.0
 	_profile_start_counts.clear()
 	_profile_armed = false
 	_profile_arm_receipt.clear()
@@ -1417,6 +1422,7 @@ func _prepare_final_profile() -> void:
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
 	_profile_elapsed = 0.0
+	_profile_sample_accumulator = 0.0
 	get_tree().paused = false
 	health.maximum_health = 5000.0
 	health.reset_warden_health()
@@ -1493,6 +1499,7 @@ func _advance_final_profile() -> void:
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
 	_profile_elapsed = 0.0
+	_profile_sample_accumulator = 0.0
 	_profile_sample_counter_reads = 0
 	_profile_active = true
 	_profile_origin = "diagnostic_prepared"
@@ -1612,6 +1619,7 @@ func _try_begin_passive_ordinary_profile() -> void:
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
 	_profile_elapsed = 0.0
+	_profile_sample_accumulator = 0.0
 	_profile_sample_counter_reads = 0
 	_profile_active = true
 	_profile_origin = "ordinary_final_wave_passive"
@@ -1648,6 +1656,14 @@ func _try_begin_passive_ordinary_profile() -> void:
 func _advance_profile_sample(delta: float) -> void:
 	if not _profile_active or get_tree().paused:
 		return
+	_profile_elapsed += delta
+	_profile_sample_accumulator += delta
+	# Dynamic counters and audio/lifecycle observations are sampled at a
+	# bounded cadence. The gameplay window still advances every frame, while
+	# history growth and recursive owner reads stay capped for dense qualification.
+	if _profile_sample_accumulator < PROFILE_SAMPLE_INTERVAL_SECONDS and _profile_elapsed < _profile_duration:
+		return
+	_profile_sample_accumulator = 0.0
 	_profile_sample_counter_reads += 1
 	var live_density := int(spawner.get_profile_counters().get("live", 0))
 	_accumulate_profile_coverage(_profile_cached_system_observation(live_density))
@@ -1657,10 +1673,16 @@ func _advance_profile_sample(delta: float) -> void:
 	else:
 		_profile_minimum_enemy_workload = mini(_profile_minimum_enemy_workload, live_density)
 		_profile_maximum_enemy_workload = maxi(_profile_maximum_enemy_workload, live_density)
-	var frame_ms := maxf(0.0,delta*1000.0)
-	_profile_samples_ms.append(frame_ms)
-	_profile_physics_samples_ms.append(maxf(0.0, float(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)) * 1000.0))
-	_profile_elapsed += delta
+	# Use the engine's measured process time rather than the synthetic game-time
+	# step delta. Runtime recapture may advance several frames per tool call, so
+	# delta would report the bridge window (e.g. 133 ms) instead of real frame
+	# cost and falsely reject an otherwise healthy native profile.
+	var measured_process_ms := float(Performance.get_monitor(Performance.TIME_PROCESS)) * 1000.0
+	var frame_ms := measured_process_ms if measured_process_ms > 0.0 else maxf(0.0, delta * 1000.0)
+	if _profile_samples_ms.size() < PROFILE_MAX_SAMPLES:
+		_profile_samples_ms.append(frame_ms)
+	if _profile_physics_samples_ms.size() < PROFILE_MAX_SAMPLES:
+		_profile_physics_samples_ms.append(maxf(0.0, float(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)) * 1000.0))
 	if _profile_elapsed < _profile_duration:
 		return
 	_profile_active = false
@@ -1696,7 +1718,8 @@ func _advance_profile_sample(delta: float) -> void:
 		"coverage_first_seen":_profile_coverage_first_seen.duplicate(true),
 		"missing_coverage":_missing_profile_coverage(_profile_coverage),
 		"density_threshold_crossing":sample_start.get("density_threshold_crossing", {}),
-		"sample_count":sorted.size(), "window_seconds":_profile_elapsed,
+		"sample_count":sorted.size(), "sample_cadence_seconds":PROFILE_SAMPLE_INTERVAL_SECONDS,
+		"sample_history_cap":PROFILE_MAX_SAMPLES, "window_seconds":_profile_elapsed,
 		"timestamp_msec":Time.get_ticks_msec(),
 		"fps":{"p50":60000.0 / maxf(0.001, _percentile(sorted,0.50)), "p95":60000.0 / maxf(0.001, _percentile(sorted,0.95)), "worst":1000.0 / maxf(0.001, sorted.back() if not sorted.is_empty() else 0.0)},
 		"frame_ms":{"p50":_percentile(sorted,0.50),"p95":_percentile(sorted,0.95),"p99":_percentile(sorted,0.99),"worst":sorted.back() if not sorted.is_empty() else 0.0,"maximum":sorted.back() if not sorted.is_empty() else 0.0,"budget_ms":16.67,"over_budget_16_67_count":over_budget_count,"over_budget_ratio":float(over_budget_count) / float(sorted.size()) if not sorted.is_empty() else 0.0,"long_frame_33_33_count":long_frame_count},
@@ -1775,6 +1798,7 @@ func _reset_final_profile() -> void:
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
 	_profile_elapsed = 0.0
+	_profile_sample_accumulator = 0.0
 	spawner.end_validation_profile_cohort("profile_reset")
 	get_tree().paused = false
 	var requested_counts := _profile_counts()
@@ -2373,6 +2397,8 @@ func _profile_observation_work_receipt() -> Dictionary:
 		"target_candidate_visits":int(target_work.get("total_target_candidate_visits", 0)),
 		"target_registry_members":int(target_work.get("registered_count", 0)),
 		"sampled_frame_counter_read_count":_profile_sample_counter_reads,
+		"sample_cadence_seconds":PROFILE_SAMPLE_INTERVAL_SECONDS,
+		"sample_history_cap":PROFILE_MAX_SAMPLES,
 		"arming_gate_counter_read_count":_profile_gate_counter_reads,
 		"counter_sources":["encounter_lifecycle_owners","encounter_target_registry","weapon_presentation_owners","reward_pickup_owners","audio_fixed_voice_pool","wisp_runtime_owners"],
 		"setup_and_finalization_excluded_from_frame_samples":true,
@@ -2839,6 +2865,7 @@ func _advance_validation_density_checkpoint() -> void:
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
 	_profile_elapsed = 0.0
+	_profile_sample_accumulator = 0.0
 	_profile_sample_counter_reads = 0
 	_profile_active = true
 	_profile_origin = "diagnostic_density_matrix"

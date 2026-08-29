@@ -9,6 +9,8 @@ const MIN_ENEMIES := 25
 const MAX_ENEMIES := 40
 const TARGET_ENEMIES := 32
 const WINDOW_SECONDS := 4.0
+const SAMPLE_INTERVAL_SECONDS := 0.1
+const SAMPLE_HISTORY_CAP := 128
 const NATIVE_STATUS := "qualified"
 const SOFTWARE_STATUS := "rejected_software_renderer"
 const UNKNOWN_STATUS := "pending_native_renderer"
@@ -30,9 +32,11 @@ static func contract() -> Dictionary:
 			"legacy_aliases": ["validation_prepare_final_profile", "validation_advance_final_profile", "validation_reset_final_profile"],
 		},
 		"window_seconds": WINDOW_SECONDS,
+		"sample_interval_seconds": SAMPLE_INTERVAL_SECONDS,
+		"sample_history_cap": SAMPLE_HISTORY_CAP,
 		"enemy_range": {"minimum": MIN_ENEMIES, "maximum": MAX_ENEMIES, "target": TARGET_ENEMIES},
 		"metrics": [
-			"timestamp_msec", "frame_ms", "fps", "active_enemies", "active_projectiles",
+			"timestamp_msec", "frame_ms", "physics_ms", "fps", "active_enemies", "active_projectiles",
 			"active_pickups", "active_effects", "active_lights", "active_audio_voices",
 			"spawned_total", "despawned_total", "runtime_error_count",
 		],
