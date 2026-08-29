@@ -8,6 +8,7 @@ extends Camera3D
 @export var follow_damping := 8.5
 @export var lead_distance := 2.4
 @export var lead_damping := 5.0
+@export var framing_bias := Vector3(0.0, 0.0, -3.0)
 @export var arena_limit := Vector2(10.5, 8.5)
 @export var normal_fov := 48.0
 @export var safe_frame_fraction := Vector2(0.08, 0.10)
@@ -136,7 +137,10 @@ func _process(delta: float) -> void:
 	if movement_velocity.length_squared() > 0.04:
 		desired_lead = movement_velocity.normalized() * lead_distance
 	_lead = _lead.lerp(desired_lead, 1.0 - exp(-lead_damping * delta))
-	var requested_target := target.global_position + _lead
+	# Bias the shipped high-angle composition slightly toward the authored
+	# north route. This keeps the Warden in the lower-safe lane while bringing
+	# the mausoleum/bell landmarks into the same readable frame at spawn.
+	var requested_target := target.global_position + _lead + framing_bias
 	var subjects := _select_coverage_subjects()
 	var arena_target := _compose_arena_target(requested_target, subjects)
 	var desired_obstruction_strength := 1.0 if _coverage_obstructed_count > 0 else 0.0
@@ -638,6 +642,10 @@ func _update_visibility_isolation(delta: float) -> void:
 		# authored occluders are owned by the explicit conservative volume above,
 		# so activation no longer depends on overscanning this short ray.
 		query.to = target_point
+		# Perimeter bodies constrain the player but sit between an exterior camera
+		# sample and the actor when the camera follows near an edge. Only authored
+		# landmark occluders participate in the fallback sight test.
+		query.collision_mask = 2
 		query.exclude = exclude
 		query.collide_with_areas = false
 		var hit := space_state.intersect_ray(query)

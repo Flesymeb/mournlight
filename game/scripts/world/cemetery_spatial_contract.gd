@@ -25,6 +25,12 @@ func _ready() -> void:
 	var authored_scale := maxf(1.0, native_map_scale)
 	if not is_equal_approx(scale.x, authored_scale):
 		scale = Vector3.ONE * authored_scale
+	# Reassert the package's authored wrapper scale after instantiation. The GLB
+	# keeps its native export translation intact below this one product binding.
+	if is_instance_valid(package_root):
+		var package_transform := package_root.get_parent() as Node3D
+		if is_instance_valid(package_transform):
+			package_transform.scale = Vector3.ONE * 2.2
 	_calibrate_authored_visibility()
 
 func _calibrate_authored_visibility() -> void:
@@ -77,24 +83,32 @@ func get_playable_rect() -> Rect2:
 	return Rect2(Vector2(west, north), Vector2(east - west, south - north))
 
 func get_authored_visual_rect() -> Rect2:
-	# Include the authored package's nested transform in the visual datum.  The
-	# previous contract measured only the outer node, so a scaled package (or a
-	# package rebase) could report a camera fill rect that disagreed with the
-	# actual cemetery geometry and leave a visible outer void.
+	# Measure the actual imported mesh bounds in world space.  The cemetery GLB
+	# contains a large native-export translation inside its hierarchy, so a
+	# constant local AABB can disagree with the rendered ground by dozens of
+	# metres and make the camera accept a false fill region.  Mesh.get_aabb()
+	# plus each node's global transform is the authoritative rendered datum.
+	if is_instance_valid(package_root):
+		var merged := AABB()
+		var has_bounds := false
+		for node in package_root.find_children("*", "MeshInstance3D", true, false):
+			var mesh_instance := node as MeshInstance3D
+			if not is_instance_valid(mesh_instance) or not is_instance_valid(mesh_instance.mesh):
+				continue
+			var local_aabb := mesh_instance.mesh.get_aabb()
+			for corner in range(8):
+				var world_point := mesh_instance.global_transform * local_aabb.get_endpoint(corner)
+				if not has_bounds:
+					merged = AABB(world_point, Vector3.ZERO)
+					has_bounds = true
+				else:
+					merged = merged.expand(world_point)
+		if has_bounds:
+			return Rect2(Vector2(merged.position.x, merged.position.z), Vector2(merged.size.x, merged.size.z))
+	# Editor/import fallback before the package has instantiated meshes.
 	var world_scale := global_transform.basis.get_scale().abs()
 	var root_scale := Vector2(world_scale.x, world_scale.z)
-	var package_offset := Vector2.ZERO
-	var package_scale := Vector2.ONE
-	if is_instance_valid(package_root):
-		var package_transform := package_root.get_parent() as Node3D
-		if is_instance_valid(package_transform):
-			# PackageTransform owns the native export translation. The authored
-			# package local bounds are already rebased around gameplay origin.
-			var nested_scale := package_transform.global_transform.basis.get_scale().abs()
-			package_scale = Vector2(nested_scale.x, nested_scale.z) / root_scale
-	var minimum := (package_offset + Vector2(AUTHORED_LOCAL_MIN.x * package_scale.x, AUTHORED_LOCAL_MIN.y * package_scale.y)) * root_scale
-	var maximum := (package_offset + Vector2(AUTHORED_LOCAL_MAX.x * package_scale.x, AUTHORED_LOCAL_MAX.y * package_scale.y)) * root_scale
-	return Rect2(minimum, maximum - minimum)
+	return Rect2(Vector2(AUTHORED_LOCAL_MIN.x, AUTHORED_LOCAL_MIN.y) * root_scale, Vector2(AUTHORED_LOCAL_MAX.x - AUTHORED_LOCAL_MIN.x, AUTHORED_LOCAL_MAX.y - AUTHORED_LOCAL_MIN.y) * root_scale)
 
 func get_camera_fill_rect() -> Rect2:
 	var visual := get_authored_visual_rect()
