@@ -3,14 +3,14 @@ extends Camera3D
 
 @export var target: Node3D
 @export var arena_contract: CemeterySpatialContract
-@export var follow_height := 10.8
-@export var follow_distance := 8.6
+@export var follow_height := 18.0
+@export var follow_distance := 17.0
 @export var follow_damping := 8.5
 @export var lead_distance := 2.4
 @export var lead_damping := 5.0
-@export var framing_bias := Vector3(0.0, 0.0, -3.0)
-@export var arena_limit := Vector2(29.0, 27.0)
-@export var normal_fov := 48.0
+@export var framing_bias := Vector3(0.0, 0.0, -5.5)
+@export var arena_limit := Vector2(34.0, 32.0)
+@export var normal_fov := 62.0
 @export var safe_frame_fraction := Vector2(0.08, 0.10)
 @export var safe_frame_activation_buffer := 0.04
 @export var safe_frame_correction_damping := 11.0
@@ -31,7 +31,7 @@ extends Camera3D
 @export var dense_fov_boost := 8.0
 @export var dense_fov_start_count := 16
 @export var dense_fov_full_count := 32
-@export var arena_fill_limit := Vector2(26.0, 23.0)
+@export var arena_fill_limit := Vector2(33.0, 30.5)
 @export var obstruction_inward_weight := 0.38
 @export var obstruction_lateral_bypass := 0.0
 @export var obstruction_height_boost := 0.8

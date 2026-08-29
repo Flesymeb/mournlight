@@ -17,6 +17,7 @@ var warmup_remaining := 4.0
 var total_elapsed := 0.0
 var boss_spawned := false
 var terminated := false
+var terminal_transition_count := 0
 var ordinary_route_wave_ids: Array[String] = []
 var diagnostic_jump_count := 0
 
@@ -28,6 +29,7 @@ func reset() -> void:
 	total_elapsed = 0.0
 	boss_spawned = false
 	terminated = false
+	terminal_transition_count = 0
 	ordinary_route_wave_ids.clear()
 	diagnostic_jump_count = 0
 	set_process(false)
@@ -39,7 +41,13 @@ func begin() -> void:
 	_emit()
 
 func terminate(outcome: String) -> void:
+	# Terminal ownership is single-shot. Repeated victory/failure callbacks can
+	# arrive during deferred teardown; keep the first authoritative outcome and
+	# do not emit duplicate phase transitions into the run controller.
+	if terminated:
+		return
 	terminated = true
+	terminal_transition_count += 1
 	phase = outcome
 	set_process(false)
 	_emit()
@@ -95,6 +103,7 @@ func get_snapshot() -> Dictionary:
 		"ordinary_route_complete":route_complete,
 		"ordinary_route_eligible":route_complete and diagnostic_jump_count == 0,
 		"diagnostic_jump_count":diagnostic_jump_count,
+		"terminal_transition_count":terminal_transition_count,
 		"sequence_resource":"res://resources/waves/mournlight_wave_sequence.tres"}
 
 func _wave_count() -> int:

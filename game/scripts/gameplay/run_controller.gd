@@ -1487,8 +1487,12 @@ func _profile_cached_system_observation(live_density: int) -> Dictionary:
 	return {
 		"enemy_density":live_density >= PROFILE_DENSITY_MIN and live_density <= PROFILE_DENSITY_MAX,
 		"boss":is_instance_valid(boss) and bool(boss_snapshot.get("active", false)),
-		"warden_lantern":inventory.is_equipped(&"warden_lantern") and (lantern_runtime.active_presentation_count > 0 or lantern_runtime.attack_phase in ["anticipation", "onset", "impact", "recovery"]),
-		"gravespade":inventory.is_equipped(&"gravespade") and (gravespade_runtime.active_presentation_count > 0 or gravespade_runtime.attack_phase in ["anticipation", "active", "impact", "recovery"]),
+		# Coverage is a window-level contract, so a short sample must retain a
+		# truthful proof once an automatic attack has already completed.  The
+		# cumulative emission counters avoid false negatives when a sweep lands
+		# between two sampler ticks while still requiring the weapon to be equipped.
+		"warden_lantern":inventory.is_equipped(&"warden_lantern") and (lantern_runtime.active_presentation_count > 0 or lantern_runtime.emitted_count > 0 or lantern_runtime.attack_phase in ["anticipation", "onset", "impact", "recovery"]),
+		"gravespade":inventory.is_equipped(&"gravespade") and (gravespade_runtime.active_presentation_count > 0 or gravespade_runtime.sweep_count > 0 or gravespade_runtime.attack_phase in ["anticipation", "active", "impact", "recovery"]),
 		"wandering_wisps":inventory.is_equipped(&"wandering_wisps") and wisps_runtime.active_wisp_count > 0,
 		"pickups":int(counts.get("pickups", 0)) > 0,
 		"hud":hud.visible,
