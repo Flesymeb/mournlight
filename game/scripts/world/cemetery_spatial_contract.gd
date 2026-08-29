@@ -223,10 +223,10 @@ func get_snapshot() -> Dictionary:
 			"datum_owner":"PackageTransform",
 		},
 		"anchor_ids":["PlayerSpawn","KeeperLanternPostAnchor","SmallMausoleumAnchor","CrackedMoonBellAnchor","TargetAnchorA","TargetAnchorB"],
-		# Landmark bodies share the player collision layer so they remain solid in
-		# ordinary traversal; camera occlusion probes use layer 2 and therefore
-		# never mistake gameplay collision for a visual blocker.
-		"collision_layers":{"ground":4,"perimeter":1,"landmarks":1,"camera_query_excluded":2,"navigation":0},
+		# Landmark bodies share layer 1 while the perimeter uses layer 2.  Warden
+		# and enemy masks include both layers, but camera coverage can query layer 1
+		# without treating the outer wall as a visual occluder at the boundary.
+		"collision_layers":{"ground":4,"perimeter":2,"landmarks":1,"camera_query_excluded":2,"navigation":0},
 		"navigation_region":{"path":"OuterDatum/NativeNavigationRegion","layers":1,"source":"native_authored_streets","enabled":is_instance_valid(get_node_or_null("OuterDatum/NativeNavigationRegion"))},
 		"playable_rect":playable,
 		"playable_area":playable.size.x * playable.size.y,

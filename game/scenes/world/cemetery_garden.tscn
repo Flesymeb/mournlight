@@ -6,13 +6,13 @@
 [ext_resource type="Script" path="res://scripts/world/cemetery_spatial_contract.gd" id="4_spatial_contract"]
 
 [sub_resource type="BoxShape3D" id="GroundShape"]
-size = Vector3(21.0, 0.7, 20.1)
+size = Vector3(30.0, 0.7, 30.0)
 
 [sub_resource type="BoxShape3D" id="NorthSouthShape"]
-size = Vector3(21.0, 2.2, 0.7)
+size = Vector3(30.0, 2.2, 0.7)
 
 [sub_resource type="BoxShape3D" id="EastWestShape"]
-size = Vector3(0.7, 2.2, 20.1)
+size = Vector3(0.7, 2.2, 30.0)
 
 [sub_resource type="BoxShape3D" id="MausoleumShape"]
 size = Vector3(6.9, 3.8, 11.0)
@@ -78,32 +78,32 @@ position = Vector3(0, -0.38, 0)
 shape = SubResource("GroundShape")
 
 [node name="NorthBoundary" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(0.5, 1.1, -9.82)
-collision_layer = 1
+position = Vector3(0.5, 1.1, -15.18)
+collision_layer = 2
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/NorthBoundary"]
 shape = SubResource("NorthSouthShape")
 
 [node name="SouthBoundary" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(0.5, 1.1, 10.2)
-collision_layer = 1
+position = Vector3(0.5, 1.1, 15.18)
+collision_layer = 2
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/SouthBoundary"]
 shape = SubResource("NorthSouthShape")
 
 [node name="EastBoundary" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(10.98, 1.1, 0.18)
-collision_layer = 1
+position = Vector3(15.18, 1.1, 0.18)
+collision_layer = 2
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/EastBoundary"]
 shape = SubResource("EastWestShape")
 
 [node name="WestBoundary" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(-9.8, 1.1, 0.18)
-collision_layer = 1
+position = Vector3(-14.68, 1.1, 0.18)
+collision_layer = 2
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/WestBoundary"]

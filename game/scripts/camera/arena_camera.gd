@@ -179,6 +179,16 @@ func _process(delta: float) -> void:
 	var effective_distance := follow_distance - obstruction_distance_reduction * _obstruction_response_strength
 	var desired_position := framing_target + Vector3(0.0, effective_height, effective_distance)
 	desired_position.x += _obstruction_bypass_sign * obstruction_lateral_bypass * _obstruction_response_strength
+	# Keep the shipped camera inside the intact authored world.  At the outer
+	# perimeter the follow offset can otherwise place the camera beyond the GLB
+	# footprint, which renders an empty black half-frame even though the Warden
+	# itself is still inside the collision datum.  This clamp only affects the
+	# camera rig; it does not resize or duplicate the authored package.
+	if is_instance_valid(arena_contract):
+		var visual_rect := arena_contract.get_authored_visual_rect()
+		var camera_margin := 3.0
+		desired_position.x = clampf(desired_position.x, visual_rect.position.x + camera_margin, visual_rect.end.x - camera_margin)
+		desired_position.z = clampf(desired_position.z, visual_rect.position.y + camera_margin, visual_rect.end.y - camera_margin)
 	global_position = global_position.lerp(desired_position, 1.0 - exp(-follow_damping * delta))
 	look_at(framing_target + Vector3(0.0, 0.65, 0.0), Vector3.UP)
 	var warden_after := _measure_projected_safe_frame()
@@ -232,6 +242,14 @@ func _compose_arena_target(requested_target: Vector3, subjects: Array[Node3D]) -
 	if not is_instance_valid(arena_contract):
 		composed.x = clampf(composed.x, -arena_fill_limit.x, arena_fill_limit.x)
 		composed.z = clampf(composed.z, -arena_fill_limit.y, arena_fill_limit.y)
+	else:
+		# Leave a small inward look-ahead band at each visual edge.  Without this
+		# the camera can be forced to look almost straight down at a perimeter
+		# wall, exposing the non-playable underside of the authored GLB.
+		var fill := arena_contract.get_camera_fill_rect()
+		var edge_inset := 3.0
+		composed.x = clampf(composed.x, fill.position.x + edge_inset, fill.end.x - edge_inset)
+		composed.z = clampf(composed.z, fill.position.y + edge_inset, fill.end.y - edge_inset)
 	_arena_containment_active = not is_equal_approx(composed.x, requested_target.x) or not is_equal_approx(composed.z, requested_target.z)
 	if subjects.size() > 1:
 		var threat_center := Vector3.ZERO
