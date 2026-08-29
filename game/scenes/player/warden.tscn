@@ -95,7 +95,7 @@ mesh = SubResource("WardenHaloMesh")
 cast_shadow = 0
 
 [node name="PresentationRoot" type="Node3D" parent="."]
-scale = Vector3(0.58, 0.58, 0.58)
+scale = Vector3(0.78, 0.78, 0.78)
 
 [node name="ModelPivot" type="Node3D" parent="PresentationRoot"]
 
@@ -108,7 +108,7 @@ position = Vector3(0, 0.02, 0)
 position = Vector3(0.52, 0.62, 0.18)
 
 [node name="AuthoredLantern" parent="PresentationRoot/LanternPivot" instance=ExtResource("3_lantern")]
-scale = Vector3(0.15, 0.15, 0.15)
+scale = Vector3(0.18, 0.18, 0.18)
 
 [node name="WarmLight" type="OmniLight3D" parent="PresentationRoot/LanternPivot"]
 position = Vector3(0, 0.15, 0)

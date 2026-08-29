@@ -1,8 +1,8 @@
 class_name CemeterySpatialContract
 extends Node3D
 
-@export var camera_world_margin := Vector2(11.2, 10.8)
-@export var protected_camera_half_extents := Vector2(7.2, 5.4)
+@export var camera_world_margin := Vector2(7.0, 6.6)
+@export var protected_camera_half_extents := Vector2(8.4, 6.2)
 @export var minimum_player_safe_radius := 8.2
 @export var spawn_clearance := 0.6
 
@@ -156,7 +156,13 @@ func get_snapshot() -> Dictionary:
 	var visual := get_authored_visual_rect()
 	var fill := get_camera_fill_rect()
 	return {
-		"contract_id":"cemetery_spatial_integrity_v45",
+		"contract_id":"cemetery_spatial_integrity_v46",
+		"authored_bounds_contract":{
+			"minimum":visual.position,
+			"maximum":visual.end,
+			"external_world_required":true,
+			"playable_inside_authored":playable.position.x > visual.position.x and playable.end.x < visual.end.x and playable.position.y > visual.position.y and playable.end.y < visual.end.y,
+		},
 		"world_scale":global_transform.basis.get_scale().abs(),
 		"playable_rect":playable,
 		"playable_area":playable.size.x * playable.size.y,

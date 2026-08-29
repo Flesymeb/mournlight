@@ -40,6 +40,7 @@ size = Vector3(2.8, 1.0, 1.5)
 [sub_resource type="BoxShape3D" id="GraveClusterShape"]
 size = Vector3(3.8, 1.2, 1.9)
 
+
 [node name="CemeteryGarden" type="Node3D" groups=["authored_environment", "mcp_watch"]]
 script = ExtResource("4_spatial_contract")
 
