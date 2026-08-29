@@ -52,7 +52,16 @@ func _input(event: InputEvent) -> void:
 		elif event.is_action_released(action_name):
 			_movement_actions[action_name] = false
 			_recompute_movement_vector()
-	if event.is_action_pressed(&"dash") and context in ["active", "boss"]:
+	# Some embedded runners deliver raw keyboard events with a keycode but
+	# without the physical-key metadata used by InputMap. Keep a second,
+	# edge-backed mapping so WASD remains authoritative even when polling
+	# (Input.is_physical_key_pressed/Input.get_vector) never sees the event.
+	var raw_movement := _raw_keyboard_movement_action(event)
+	if raw_movement != &"":
+		_movement_actions[raw_movement] = (event as InputEventKey).pressed
+		_recompute_movement_vector()
+	var dash_pressed := event.is_action_pressed(&"dash") or _raw_keyboard_is(event, KEY_SPACE)
+	if dash_pressed and context in ["active", "boss"]:
 		_dispatch_press("confirm", &"dash")
 		get_viewport().set_input_as_handled()
 		return
@@ -74,6 +83,25 @@ func _recompute_movement_vector() -> void:
 		float(_movement_actions[&"move_right"]) - float(_movement_actions[&"move_left"]),
 		float(_movement_actions[&"move_back"]) - float(_movement_actions[&"move_forward"])
 	).limit_length(1.0)
+
+func _raw_keyboard_movement_action(event: InputEvent) -> StringName:
+	if not event is InputEventKey:
+		return &""
+	var key_event := event as InputEventKey
+	var keycode := key_event.physical_keycode if key_event.physical_keycode != KEY_NONE else key_event.keycode
+	match keycode:
+		KEY_A: return &"move_left"
+		KEY_D: return &"move_right"
+		KEY_W: return &"move_forward"
+		KEY_S: return &"move_back"
+	return &""
+
+func _raw_keyboard_is(event: InputEvent, keycode: int) -> bool:
+	if not event is InputEventKey:
+		return false
+	var key_event := event as InputEventKey
+	var observed := key_event.physical_keycode if key_event.physical_keycode != KEY_NONE else key_event.keycode
+	return observed == keycode and key_event.pressed
 
 func get_movement_vector() -> Vector2:
 	return movement_vector

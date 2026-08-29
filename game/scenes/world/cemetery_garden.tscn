@@ -138,7 +138,7 @@ collision_mask = 1
 shape = SubResource("TreeShape")
 
 [node name="PlayerSpawn" type="Marker3D" parent="OuterDatum" groups=["spawn_anchor"]]
-position = Vector3(0, 0.05, 2.5)
+position = Vector3(0, 0.05, 5.8)
 
 [node name="SpawnLanes" type="Node3D" parent="OuterDatum"]
 
@@ -281,7 +281,7 @@ position = Vector3(-5.4, 0, -1.8)
 [node name="RouteCheckpoints" type="Node3D" parent="OuterDatum"]
 
 [node name="00_Spawn" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(0, 0.05, 2.5)
+position = Vector3(0, 0.05, 5.8)
 
 [node name="01_South" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
 position = Vector3(0, 0.05, 8.7)
@@ -317,4 +317,4 @@ position = Vector3(5.1, 0.05, -2.5)
 position = Vector3(5.8, 0.05, 3.6)
 
 [node name="12_Return" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(0, 0.05, 2.5)
+position = Vector3(0, 0.05, 5.8)
