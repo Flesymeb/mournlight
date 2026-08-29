@@ -12,7 +12,7 @@ billboard_keep_scale = true
 
 [sub_resource type="QuadMesh" id="BackgroundMesh"]
 material = SubResource("BackgroundMaterial")
-size = Vector2(1.34, 0.16)
+size = Vector2(1.52, 0.18)
 
 [sub_resource type="StandardMaterial3D" id="FillMaterial"]
 resource_local_to_scene = true
@@ -27,7 +27,7 @@ billboard_keep_scale = true
 
 [sub_resource type="QuadMesh" id="FillMesh"]
 material = SubResource("FillMaterial")
-size = Vector2(1.16, 0.075)
+size = Vector2(1.32, 0.09)
 
 [sub_resource type="StandardMaterial3D" id="BrassMaterial"]
 resource_local_to_scene = true
@@ -39,10 +39,10 @@ billboard_keep_scale = true
 
 [sub_resource type="QuadMesh" id="BrassMesh"]
 material = SubResource("BrassMaterial")
-size = Vector2(1.34, 0.018)
+size = Vector2(1.52, 0.02)
 
 [node name="EnemyVitalityBar" type="Node3D" groups=["mcp_watch", "enemy_vitality"]]
-position = Vector3(0, 2.18, 0)
+position = Vector3(0, 2.42, 0)
 script = ExtResource("1_script")
 
 [node name="Background" type="MeshInstance3D" parent="."]
@@ -55,6 +55,6 @@ mesh = SubResource("FillMesh")
 cast_shadow = 0
 
 [node name="BrassEdge" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.089, 0.012)
+position = Vector3(0, 0.101, 0.012)
 mesh = SubResource("BrassMesh")
 cast_shadow = 0
