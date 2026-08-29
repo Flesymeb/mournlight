@@ -18,12 +18,14 @@ const SECONDARY_COMPOSITOR_REFRESH_SECONDS := 0.12
 const NATIVE_STATUS := "qualified"
 const SOFTWARE_STATUS := "rejected_software_renderer"
 const UNKNOWN_STATUS := "pending_native_renderer"
+const QUALIFICATION_MODE := "native_renderer_three_cycle"
 
 static func contract() -> Dictionary:
 	return {
 		"contract_id": CONTRACT_ID,
 		"release_guard": "OS.has_feature(\"editor\")",
 		"renderer_gate": "hardware_qualification_eligible == true",
+		"qualification_mode": QUALIFICATION_MODE,
 		"qualification_statuses": {
 			"hardware": NATIVE_STATUS,
 			"software": SOFTWARE_STATUS,
@@ -52,6 +54,12 @@ static func contract() -> Dictionary:
 			"spawned_total", "despawned_total", "runtime_error_count",
 		],
 		"receipts": ["requested", "resolved", "reset_isolation"],
+		"cycle_aggregation": {
+			"identity":"mournlight.native_dense_three_cycle.v1",
+			"required_complete_cycles":3,
+			"aggregation_owner":"RunController",
+			"software_sessions":"retained_as_rejected_evidence",
+		},
 		"ordinary_balance_untouched": true,
 	}
 
@@ -63,3 +71,14 @@ static func renderer_status(classification: String, hardware_eligible: bool) -> 
 	if classification == "software":
 		return SOFTWARE_STATUS
 	return UNKNOWN_STATUS
+
+static func qualification_contract() -> Dictionary:
+	return {
+		"mode": QUALIFICATION_MODE,
+		"renderer_policy":"native_hardware_only",
+		"software_policy":"reject_and_surface_status",
+		"required_cycles":3,
+		"target_resolution":Vector2i(1920, 1080),
+		"target_density":TARGET_ENEMIES,
+		"reset_isolation_required":true,
+	}

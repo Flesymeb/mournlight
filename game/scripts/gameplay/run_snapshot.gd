@@ -85,6 +85,7 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 		"validation_profile_cycles":controller.validation_profile_cycles.duplicate(true),
 		"ordinary_profile_cycles":controller.ordinary_profile_cycles.duplicate(true),
 		"validation_profile_cycle_comparison":controller._profile_cycle_comparison(),
+		"dense_profile_cycle_comparison":controller._dense_profile_cycle_comparison(),
 		"ordinary_profile_contract_checks":controller.ordinary_profile_contract_checks.duplicate(true),
 		"density_matrix_contract_checks":controller.density_matrix_contract_checks.duplicate(true),
 		"validation_retry_baselines":controller.validation_retry_baselines.duplicate(true),

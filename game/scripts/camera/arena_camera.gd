@@ -264,7 +264,7 @@ func _select_coverage_subjects() -> Array[Node3D]:
 		_coverage_members_scan_skips += 1
 	_coverage_active_count = active_members.size()
 	for member in active_members:
-		if not member is Node3D or not is_instance_valid(member) or member == target:
+		if not is_instance_valid(member) or not member is Node3D or member == target:
 			continue
 		var actor := member as Node3D
 		var distance_squared := actor.global_position.distance_squared_to(target.global_position)
@@ -548,7 +548,7 @@ func _bind_coverage_occluder_visuals() -> void:
 		var bound_visuals: Array[GeometryInstance3D] = []
 		var source := get_node_or_null(source_path)
 		for member in _collect_visuals(source):
-			if not member is GeometryInstance3D:
+			if not is_instance_valid(member) or not member is GeometryInstance3D:
 				continue
 			var visual := member as GeometryInstance3D
 			if _coverage_occluder_visual_bindings.has(visual):
@@ -613,7 +613,7 @@ func _collect_visuals(root: Node) -> Array[VisualInstance3D]:
 	if root is VisualInstance3D:
 		result.append(root as VisualInstance3D)
 	for child in root.find_children("*", "VisualInstance3D", true, false):
-		if child is VisualInstance3D:
+		if is_instance_valid(child) and child is VisualInstance3D:
 			result.append(child as VisualInstance3D)
 	return result
 

@@ -87,6 +87,15 @@ guidance_help={
 ]
 }
 
+[mournlight]
+
+dense_profile/qualification_mode="native_renderer_three_cycle"
+dense_profile/native_renderer_required=true
+dense_profile/target_width=1920
+dense_profile/target_height=1080
+dense_profile/target_enemy_count=32
+dense_profile/required_cycles=3
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"

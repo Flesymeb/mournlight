@@ -404,7 +404,7 @@ func _resolve_and_apply_shipped_camera_hat_isolation(reason: String) -> bool:
 	# Presentation policy lives at the accepted wrapper. The imported GLB,
 	# skeleton, animation tracks, transforms and lantern socket stay untouched.
 	var resolved := authored_character.find_child(SHIPPED_CAMERA_HAT_NODE_NAME, true, false)
-	if not resolved is MeshInstance3D or not authored_character.is_ancestor_of(resolved):
+	if not is_instance_valid(resolved) or not resolved is MeshInstance3D or not authored_character.is_ancestor_of(resolved):
 		hat_isolation_receipt = {
 			"policy":"shipped_camera_self_costume_isolation",
 			"resolved":false,
