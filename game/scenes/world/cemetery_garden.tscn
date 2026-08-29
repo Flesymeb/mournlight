@@ -121,7 +121,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.28, 1.6, 8.94)
 shape = SubResource("TreeShape")
 
 [node name="PlayerSpawn" type="Marker3D" parent="OuterDatum" unique_id=108365110 groups=["spawn_anchor"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 5.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 3.6)
 
 [node name="SpawnLanes" type="Node3D" parent="OuterDatum" unique_id=1734080278]
 
@@ -254,7 +254,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.4, 0, -1.8)
 [node name="RouteCheckpoints" type="Node3D" parent="OuterDatum" unique_id=720758724]
 
 [node name="00_Spawn" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=193680995 groups=["arena_route_checkpoint"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 5.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 3.6)
 
 [node name="01_South" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=912956288 groups=["arena_route_checkpoint"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 8.7)
@@ -290,4 +290,4 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.1, 0.05, -2.5)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.8, 0.05, 3.6)
 
 [node name="12_Return" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=556009249 groups=["arena_route_checkpoint"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 5.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 3.6)

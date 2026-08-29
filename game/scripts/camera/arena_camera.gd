@@ -225,7 +225,12 @@ func _process(delta: float) -> void:
 	# camera rig; it does not resize or duplicate the authored package.
 	if is_instance_valid(arena_contract):
 		var visual_rect := arena_contract.get_authored_visual_rect()
-		var camera_margin := 3.0
+		# Keep the rig materially inside the authored terrain footprint.  A small
+		# three-metre inset still lets the high-angle lens see past the native
+		# southern/northern edge at the spawn lane, which reads as a black datum
+		# void in shipped captures.  The larger inset preserves external depth in
+		# frame while keeping the visible street network authoritative.
+		var camera_margin := 8.0
 		desired_position.x = clampf(desired_position.x, visual_rect.position.x + camera_margin, visual_rect.end.x - camera_margin)
 		desired_position.z = clampf(desired_position.z, visual_rect.position.y + camera_margin, visual_rect.end.y - camera_margin)
 	global_position = global_position.lerp(desired_position, 1.0 - exp(-follow_damping * delta))
