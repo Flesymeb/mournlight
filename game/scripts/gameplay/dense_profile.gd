@@ -11,6 +11,8 @@ const TARGET_ENEMIES := 32
 const WINDOW_SECONDS := 4.0
 const SAMPLE_INTERVAL_SECONDS := 0.1
 const SAMPLE_HISTORY_CAP := 128
+const STEERING_BUCKET_COUNT := 2
+const PRESENTATION_UPDATE_BUDGET_SECONDS := 0.1
 const NATIVE_STATUS := "qualified"
 const SOFTWARE_STATUS := "rejected_software_renderer"
 const UNKNOWN_STATUS := "pending_native_renderer"
@@ -34,6 +36,11 @@ static func contract() -> Dictionary:
 		"window_seconds": WINDOW_SECONDS,
 		"sample_interval_seconds": SAMPLE_INTERVAL_SECONDS,
 		"sample_history_cap": SAMPLE_HISTORY_CAP,
+		"dense_update_budget": {
+			"steering_bucket_count": STEERING_BUCKET_COUNT,
+			"presentation_refresh_seconds": PRESENTATION_UPDATE_BUDGET_SECONDS,
+			"policy": "stable_actor_buckets_with_cached_separation_and_staggered_presentation",
+		},
 		"enemy_range": {"minimum": MIN_ENEMIES, "maximum": MAX_ENEMIES, "target": TARGET_ENEMIES},
 		"metrics": [
 			"timestamp_msec", "frame_ms", "physics_ms", "fps", "active_enemies", "active_projectiles",

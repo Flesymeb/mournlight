@@ -64,6 +64,10 @@ var _coverage_offset := Vector3.ZERO
 var _coverage_screen_shift := Vector2.ZERO
 var _coverage_subject_paths: Array[String] = []
 var _coverage_active_count := 0
+var _coverage_members_cache: Array[Node] = []
+var _coverage_members_refresh_remaining := 0.0
+var _coverage_members_scan_count := 0
+var _coverage_members_scan_skips := 0
 var _coverage_receipt: Dictionary = {}
 var _coverage_response_source := "spawn"
 var _coverage_settled_seconds := 0.0
@@ -158,6 +162,7 @@ func _process(delta: float) -> void:
 		if occlusion_guard_active or (is_instance_valid(_visibility_texture) and _visibility_texture.visible):
 			set_shell_state("modal")
 		return
+	_coverage_members_refresh_remaining = maxf(0.0, _coverage_members_refresh_remaining - delta)
 	var desired_lead := Vector3.ZERO
 	if movement_velocity.length_squared() > 0.04:
 		desired_lead = movement_velocity.normalized() * lead_distance
@@ -236,7 +241,18 @@ func _select_coverage_subjects() -> Array[Node3D]:
 	if is_instance_valid(target):
 		subjects.append(target)
 	var candidates: Array[Dictionary] = []
-	var active_members := get_tree().get_nodes_in_group(coverage_group)
+	# Cache the bounded active-enemy membership at the same cadence as other
+	# dense presentation budgets. Camera framing remains responsive because
+	# transforms are read every frame; only the scene-wide group inventory is
+	# staggered, avoiding a 32-enemy allocation/scan on every render tick.
+	var active_members: Array[Node] = _coverage_members_cache
+	if _coverage_members_refresh_remaining <= 0.0:
+		active_members = get_tree().get_nodes_in_group(coverage_group)
+		_coverage_members_cache = active_members.duplicate()
+		_coverage_members_refresh_remaining = 0.1
+		_coverage_members_scan_count += 1
+	else:
+		_coverage_members_scan_skips += 1
 	_coverage_active_count = active_members.size()
 	for member in active_members:
 		if not member is Node3D or not is_instance_valid(member) or member == target:
@@ -396,6 +412,9 @@ func _update_coverage_receipt(after: Dictionary, warden_inside: bool, coverage_i
 		"response_source":_coverage_response_source,
 		"settled":_coverage_settled_seconds >= coverage_settle_seconds,
 		"settled_seconds":_coverage_settled_seconds,
+		"membership_scan_count":_coverage_members_scan_count,
+		"membership_scan_skips":_coverage_members_scan_skips,
+		"membership_refresh_seconds":0.1,
 		"classifications":(after.get("classifications", []) as Array).duplicate(true),
 		"projected_margins":(after.get("margins", {}) as Dictionary).duplicate(true),
 	}

@@ -42,6 +42,11 @@ var _facing_skips := 0
 var _physics_steps_total := 0
 var _steering_steps_total := 0
 var _body_motion_steps_total := 0
+var _steering_query_skips := 0
+var _cached_separation := Vector3.ZERO
+var _steering_bucket := 0
+
+const DENSE_STEERING_BUCKETS := 2
 
 func _ready() -> void:
 	add_to_group("mcp_watch")
@@ -72,6 +77,9 @@ func activate(next_profile: EnemyProfile, next_target: WardenController, at_posi
 	_facing_bucket = posmod(String(stable_id).hash() + generation, EnemySemanticPresenter.DENSE_APPROACH_ANIMATION_BUCKETS)
 	_facing_updates = 0
 	_facing_skips = 0
+	_steering_query_skips = 0
+	_cached_separation = Vector3.ZERO
+	_steering_bucket = posmod(String(stable_id).hash() + generation, DENSE_STEERING_BUCKETS)
 	health.actor_id = stable_id
 	health.maximum_health = profile.maximum_health
 	health.current_health = profile.maximum_health
@@ -190,15 +198,25 @@ func _steer_approach(delta: float) -> void:
 	var target_distance_squared := to_target.length_squared()
 	if profile.attack_kind == "flank" and target_distance_squared > 5.76:
 		desired = (desired + Vector3(-desired.z, 0.0, desired.x) * _flank_sign * 0.62).normalized()
-	var separation := Vector3.ZERO
-	var neighbors: Array[EnemyActor] = neighbor_registry.query_neighbors(self, profile.separation_radius) if is_instance_valid(neighbor_registry) else []
-	for other in neighbors:
-		var away: Vector3 = global_position - other.global_position
-		away.y = 0.0
-		var distance_squared := away.length_squared()
-		if distance_squared > 0.0001 and distance_squared < profile.separation_radius * profile.separation_radius:
-			var distance := sqrt(distance_squared)
-			separation += away.normalized() * (profile.separation_radius - distance) / profile.separation_radius
+	# Neighbor broad-phase queries are the dominant dense-wave CPU cost. Keep
+	# steering deterministic while staggering the expensive query across two
+	# stable actor buckets; the cached vector is blended into every frame's
+	# desired velocity so actors never stop or teleport between query ticks.
+	var separation := _cached_separation
+	var query_due := posmod(Engine.get_physics_frames(), DENSE_STEERING_BUCKETS) == _steering_bucket
+	if query_due:
+		separation = Vector3.ZERO
+		var neighbors: Array[EnemyActor] = neighbor_registry.query_neighbors(self, profile.separation_radius) if is_instance_valid(neighbor_registry) else []
+		for other in neighbors:
+			var away: Vector3 = global_position - other.global_position
+			away.y = 0.0
+			var distance_squared := away.length_squared()
+			if distance_squared > 0.0001 and distance_squared < profile.separation_radius * profile.separation_radius:
+				var distance := sqrt(distance_squared)
+				separation += away.normalized() * (profile.separation_radius - distance) / profile.separation_radius
+		_cached_separation = separation
+	else:
+		_steering_query_skips += 1
 	var target_velocity := (desired + separation * 0.72).normalized() * profile.movement_speed
 	velocity = velocity.move_toward(target_velocity, 9.0 * delta)
 
@@ -385,12 +403,15 @@ func reset_workload_counters() -> void:
 	_physics_steps_total = 0
 	_steering_steps_total = 0
 	_body_motion_steps_total = 0
+	_steering_query_skips = 0
 
 func get_workload_counters() -> Dictionary:
 	return {
 		"physics_steps":_physics_steps_total,
 		"steering_steps":_steering_steps_total,
 		"body_motion_steps":_body_motion_steps_total,
+		"steering_query_skips":_steering_query_skips,
+		"steering_query_bucket_count":DENSE_STEERING_BUCKETS,
 		"explicit_space_queries":0,
 		"space_query_policy":"registry_neighbors_and_move_and_slide_only",
 	}

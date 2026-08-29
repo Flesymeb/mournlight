@@ -2514,6 +2514,7 @@ func _dense_work_caps(encounter: Dictionary) -> Dictionary:
 		"audio_effect_voices":int(audio_state.get("voice_limit", 0)),
 		"completed_attack_history":int(attack_state.get("history_limit", 0)),
 		"dense_presentation":(encounter.get("dense_presentation_budget", {}) as Dictionary).duplicate(true),
+		"steering_update_budget":{"bucket_count":DenseWaveProfileClass.STEERING_BUCKET_COUNT,"cached_separation":true,"query_policy":"staggered_deterministic_actor_buckets"},
 	}
 
 func _profile_workload_receipt(encounter: Dictionary) -> Dictionary:

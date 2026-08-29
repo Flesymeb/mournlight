@@ -722,12 +722,14 @@ func get_snapshot() -> Dictionary:
 	var manual_animation_players := 0
 	var actor_physics_steps := 0
 	var actor_steering_steps := 0
+	var actor_steering_query_skips := 0
 	var actor_body_motion_steps := 0
 	var explicit_space_queries := 0
 	for actor in _pool:
 		var actor_work := actor.get_workload_counters()
 		actor_physics_steps += int(actor_work.get("physics_steps", 0))
 		actor_steering_steps += int(actor_work.get("steering_steps", 0))
+		actor_steering_query_skips += int(actor_work.get("steering_query_skips", 0))
 		actor_body_motion_steps += int(actor_work.get("body_motion_steps", 0))
 		explicit_space_queries += int(actor_work.get("explicit_space_queries", 0))
 		if actor.state == "pooled" or not actor.profile:
@@ -801,6 +803,7 @@ func get_snapshot() -> Dictionary:
 		"dense_presentation_budget": {
 			"family":"staggered_authored_animation",
 			"approach_bucket_count":EnemySemanticPresenter.DENSE_APPROACH_ANIMATION_BUCKETS,
+			"steering_bucket_count":EnemyActor.DENSE_STEERING_BUCKETS,
 			"manual_animation_players":manual_animation_players,
 			"updates":presentation_updates,
 			"skips":presentation_skips,
@@ -815,6 +818,7 @@ func get_snapshot() -> Dictionary:
 		"actor_workload":{
 			"physics_steps":actor_physics_steps,
 			"steering_steps":actor_steering_steps,
+			"steering_query_skips":actor_steering_query_skips,
 			"body_motion_steps":actor_body_motion_steps,
 			"explicit_space_queries":explicit_space_queries,
 			"neighbor_query_owner":"EnemyNeighborRegistry",
