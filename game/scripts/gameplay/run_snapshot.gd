@@ -8,6 +8,8 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 	var wave_definition: Dictionary = wave_snapshot.get("definition", {})
 	var ledger_snapshot: Dictionary = controller.complete_run_ledger.get_snapshot() if controller.complete_run_ledger else {}
 	var ledger_matrix: Dictionary = ledger_snapshot.get("matrix", {})
+	var ledger_current: Dictionary = ledger_snapshot.get("current_run", {})
+	var terminal: Dictionary = controller.terminal_snapshot if controller.terminal_snapshot is Dictionary else {}
 	return {
 		"serial": int(controller.run_serial),
 		"state": String(controller.run_state),
@@ -16,6 +18,7 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 		"health_maximum": health_maximum,
 		"experience": int(controller.experience),
 		"experience_threshold": int(controller.experience_threshold),
+		"pending_levelup_transactions": int(controller._pending_levelup_transactions),
 		"level": int(controller.level),
 		"defeated": int(controller.defeated_enemies),
 		"damage_taken": int(controller.damage_taken),
@@ -45,6 +48,19 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 		"boss_state": String(controller.boss_snapshot.get("state","inactive")),
 		"boss_vulnerable": bool(controller.boss_snapshot.get("vulnerable",false)),
 		"outcome": String(controller.outcome),
+		"completion_reason": String(terminal.get("completion_reason", "")),
+		"terminal_commit_count": int(controller.terminal_commit_count),
+		"reset_generation": int((controller.teardown_receipt as Dictionary).get("completion_generation", 0)),
+		"replay_status": {
+			"observed": bool(ledger_current.get("replay_observed", false)),
+			"observed_count": int(ledger_current.get("replay_observed_count", 0)),
+			"victory_result_replay": bool(ledger_matrix.get("victory_result_replay", false)),
+		},
+		"build_shape_qualification": {
+			"shape": String(terminal.get("build_shape", "unclassified")),
+			"ordinary_build_eligible": bool(terminal.get("ordinary_build_eligible", false)),
+			"ordinary_route_eligible": bool(terminal.get("ordinary_route_eligible", false)),
+		},
 		"damage_dealt": int(controller.damage_dealt),
 		"selected_upgrades": controller.selected_upgrades.duplicate(true),
 		"first_run_guidance":controller._first_run_guidance_snapshot(),

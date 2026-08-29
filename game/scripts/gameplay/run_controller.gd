@@ -43,6 +43,7 @@ var run_serial := 0
 var run_elapsed := 0.0
 var experience := 0
 var experience_threshold := 5
+var _pending_levelup_transactions := 0
 var level := 1
 var defeated_enemies := 0
 var damage_taken := 0
@@ -342,6 +343,7 @@ func _begin_run() -> void:
 	run_elapsed = 0.0
 	experience = 0
 	experience_threshold = 5
+	_pending_levelup_transactions = 0
 	level = 1
 	defeated_enemies = 0
 	damage_taken = 0
@@ -679,10 +681,16 @@ func _on_reward_pickup_collected(event: Dictionary) -> void:
 	var level_before := level
 	var threshold_before := experience_threshold
 	experience += resolved_reward
-	if experience >= experience_threshold:
+	# Consume every crossed threshold, but serialize the resulting drafts.  A
+	# merged pickup can legitimately carry enough XP for multiple levels; one
+	# draft is presented at a time so held confirm cannot skip a transaction and
+	# overflow remains authoritative for the next threshold.
+	while experience >= experience_threshold:
 		experience -= experience_threshold
 		level += 1
 		experience_threshold = 5 + (level - 1) * 2
+		_pending_levelup_transactions += 1
+	if _pending_levelup_transactions > 0:
 		_open_upgrade_draft()
 	_reward_collection_receipt = event.duplicate(true)
 	_reward_collection_receipt.merge({
@@ -954,6 +962,9 @@ func _on_draft_choice(index: int) -> void:
 	draft_view.close()
 	get_tree().paused = false
 	_transition("active")
+	_pending_levelup_transactions = maxi(0, _pending_levelup_transactions - 1)
+	if _pending_levelup_transactions > 0:
+		_open_upgrade_draft()
 	_emit_snapshot()
 
 func _on_wave_phase_changed(snapshot: Dictionary) -> void:
@@ -1119,6 +1130,7 @@ func _commit_terminal_snapshot(terminal_outcome: String) -> void:
 	terminal_snapshot = RunSnapshot.make(self,world,warden,health,spawner,inventory)
 	terminal_snapshot.outcome = terminal_outcome
 	terminal_snapshot.state = "result"
+	terminal_snapshot["completion_reason"] = "bellkeeper_defeated" if terminal_outcome == "victory" else "warden_health_depleted"
 	terminal_snapshot["committed"] = true
 	terminal_snapshot["commit_run_serial"] = run_serial
 	terminal_snapshot["commit_count"] = terminal_commit_count
@@ -3008,7 +3020,7 @@ func _mcp_state() -> Dictionary:
 		"ledger_credits_traversed":ledger_matrix.get("credits_traversed", false),
 		"ledger_missing_rows":ledger_matrix.get("remaining_matrix_cells", ledger_matrix.get("missing_rows", [])),
 		"authoritative_teardown":teardown_receipt,
-		"experience": experience, "experience_threshold": experience_threshold, "level": level,
+		"experience": experience, "experience_threshold": experience_threshold, "pending_levelup_transactions": _pending_levelup_transactions, "level": level,
 		"defeated_enemies": defeated_enemies, "damage_taken": damage_taken,
 		"damage_dealt":damage_dealt,"outcome":outcome,"selected_upgrade_count":selected_upgrades.size(),
 		"wave":{"wave":wave_state.get("wave",0),"wave_count":wave_state.get("wave_count",5),"phase":wave_state.get("phase","idle"),"title":wave_state.get("title","")},
