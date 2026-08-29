@@ -392,13 +392,19 @@ func get_snapshot() -> Dictionary:
 	var playable := get_playable_rect()
 	var visual := get_authored_visual_rect()
 	var fill := get_camera_fill_rect()
+	var landmark_alignment := _landmark_alignment_receipt()
+	var playable_inside_authored := playable.position.x > visual.position.x and playable.end.x < visual.end.x and playable.position.y > visual.position.y and playable.end.y < visual.end.y
+	var perimeter_present := is_instance_valid(north_boundary) and is_instance_valid(south_boundary) and is_instance_valid(east_boundary) and is_instance_valid(west_boundary)
+	var landmarks_aligned := true
+	for landmark in landmark_alignment.values():
+		landmarks_aligned = landmarks_aligned and bool((landmark as Dictionary).get("aligned", false))
 	return {
 		"contract_id":"cemetery_spatial_integrity_v47",
 		"authored_bounds_contract":{
 			"minimum":visual.position,
 			"maximum":visual.end,
 			"external_world_required":true,
-			"playable_inside_authored":playable.position.x > visual.position.x and playable.end.x < visual.end.x and playable.position.y > visual.position.y and playable.end.y < visual.end.y,
+			"playable_inside_authored":playable_inside_authored,
 		},
 		"world_scale":global_transform.basis.get_scale().abs(),
 		"package_transform":{
@@ -438,6 +444,13 @@ func get_snapshot() -> Dictionary:
 		"landmark_collision":{"keeper_post":is_instance_valid(get_node_or_null("OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision")), "small_mausoleum":is_instance_valid(get_node_or_null("OuterDatum/MausoleumCollision")), "cracked_bell":is_instance_valid(get_node_or_null("OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision"))},
 		"landmark_collision_alignment":_landmark_alignment_receipt(),
 		"perimeter_collision":{"north":is_instance_valid(north_boundary), "south":is_instance_valid(south_boundary), "east":is_instance_valid(east_boundary), "west":is_instance_valid(west_boundary)},
+		"boundary_visibility_alignment":{
+			"perimeter_bodies_present":perimeter_present,
+			"playable_inside_authored":playable_inside_authored,
+			"external_depth_on_all_edges":playable_inside_authored and visual.position.x < playable.position.x and visual.end.x > playable.end.x and visual.position.y < playable.position.y and visual.end.y > playable.end.y,
+			"landmarks_grounded_and_aligned":landmarks_aligned,
+			"ordinary_route_safe":perimeter_present and playable_inside_authored and landmarks_aligned,
+		},
 	}
 
 func _mcp_state() -> Dictionary:

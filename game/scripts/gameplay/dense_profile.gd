@@ -5,6 +5,7 @@ extends RefCounted
 ## RunController owns the live sampling lifecycle; this value object documents
 ## the entrypoint and metric names consumed by host recapture.
 const CONTRACT_ID := "mournlight.release_convergence_dense_window.v1"
+const CONTRACT_VERSION := 1
 const MIN_ENEMIES := 25
 const MAX_ENEMIES := 40
 const TARGET_ENEMIES := 32
@@ -23,6 +24,8 @@ const QUALIFICATION_MODE := "native_renderer_three_cycle"
 static func contract() -> Dictionary:
 	return {
 		"contract_id": CONTRACT_ID,
+		"contract_version": CONTRACT_VERSION,
+		"sampling_renderer_independent": true,
 		"release_guard": "OS.has_feature(\"editor\")",
 		"default_enabled": false,
 		"editor_opt_in": true,
@@ -52,7 +55,7 @@ static func contract() -> Dictionary:
 		},
 		"enemy_range": {"minimum": MIN_ENEMIES, "maximum": MAX_ENEMIES, "target": TARGET_ENEMIES},
 		"metrics": [
-			"timestamp_msec", "frame_ms", "physics_ms", "fps", "active_enemies", "active_projectiles",
+			"timestamp_msec", "frame_ms", "physics_ms", "fps", "sample_count", "physics_sample_count", "sample_availability", "active_enemies", "active_projectiles",
 			"active_pickups", "active_effects", "active_lights", "active_audio_voices",
 			"spawned_total", "despawned_total", "runtime_error_count",
 		],
@@ -65,6 +68,7 @@ static func contract() -> Dictionary:
 			"software_sessions":"retained_as_rejected_evidence",
 		},
 		"ordinary_balance_untouched": true,
+		"sample_availability_policy": "record_nonzero_samples_when_frames_run; renderer_gate_does_not_suppress_measurement",
 	}
 
 static func renderer_status(classification: String, hardware_eligible: bool) -> String:

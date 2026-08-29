@@ -1573,6 +1573,7 @@ func _advance_final_profile() -> void:
 		"boss_presence":is_instance_valid(boss),
 		"weapon_ranks":_profile_weapon_ranks(),
 		"window_seconds":_profile_duration,
+		"process_frame_start":Engine.get_process_frames(),
 		"viewport":_profile_viewport_receipt(),
 		"renderer":_profile_renderer_receipt(),
 		"start_counts":_profile_start_counts.duplicate(true),
@@ -1688,6 +1689,7 @@ func _try_begin_passive_ordinary_profile() -> void:
 		"passive":true, "diagnostic_mutation":false,
 		"run_serial":run_serial, "setup_generation":_validation_setup_generation,
 		"window_seconds":_profile_duration,
+		"process_frame_start":Engine.get_process_frames(),
 		"viewport":_profile_viewport_receipt(),
 		"renderer":_profile_renderer_receipt(),
 		"start_counts":_profile_start_counts.duplicate(true),
@@ -1771,6 +1773,14 @@ func _advance_profile_sample(delta: float) -> void:
 		"density_threshold_crossing":sample_start.get("density_threshold_crossing", {}),
 		"sample_count":sorted.size(), "sample_cadence_seconds":PROFILE_SAMPLE_INTERVAL_SECONDS,
 		"sample_history_cap":PROFILE_MAX_SAMPLES, "window_seconds":_profile_elapsed,
+		"sampling_renderer_independent":true,
+		"physics_sample_count":sorted_physics.size(),
+		"sample_availability":{
+			"frames_ran":Engine.get_process_frames() > int(sample_start.get("process_frame_start", Engine.get_process_frames())),
+			"frame_samples_nonzero":not sorted.is_empty(),
+			"physics_samples_nonzero":not sorted_physics.is_empty(),
+			"renderer_gate_applied_after_sampling":true,
+		},
 		"timestamp_msec":Time.get_ticks_msec(),
 		"fps":{"p50":60000.0 / maxf(0.001, _percentile(sorted,0.50)), "p95":60000.0 / maxf(0.001, _percentile(sorted,0.95)), "worst":1000.0 / maxf(0.001, sorted.back() if not sorted.is_empty() else 0.0)},
 		"frame_ms":{"p50":_percentile(sorted,0.50),"p95":_percentile(sorted,0.95),"p99":_percentile(sorted,0.99),"worst":sorted.back() if not sorted.is_empty() else 0.0,"maximum":sorted.back() if not sorted.is_empty() else 0.0,"budget_ms":16.67,"over_budget_16_67_count":over_budget_count,"over_budget_ratio":float(over_budget_count) / float(sorted.size()) if not sorted.is_empty() else 0.0,"long_frame_33_33_count":long_frame_count},
@@ -1881,6 +1891,7 @@ func _reset_final_profile() -> void:
 		"wave_route":_route_qualification(wave_director.get_snapshot()),
 		"viewport":_profile_viewport_receipt(),
 		"renderer":_profile_renderer_receipt(),
+		"renderer_gate_status":DenseWaveProfileClass.renderer_status(String((_profile_renderer_receipt()).get("classification", "unknown")), bool((_profile_renderer_receipt()).get("hardware_qualification_eligible", false))),
 		"lifecycle":_lifecycle_counters(),
 		"next_frame_isolation_pending": true,
 	}
@@ -2080,6 +2091,9 @@ func _contract_ordinary_profile_sample(renderer_classification: String, viewport
 		"minimum_enemy_workload":30,
 		"maximum_enemy_workload":34,
 		"end_enemy_workload":31,
+		"sample_count":30,
+		"physics_sample_count":30,
+		"sample_availability":{"frames_ran":true,"frame_samples_nonzero":true,"physics_samples_nonzero":true,"renderer_gate_applied_after_sampling":true},
 		"frame_ms":{"p95":12.0},
 		"viewport":{"width":viewport_width,"height":viewport_height,"resolution_qualified":viewport_width >= 1920 and viewport_height >= 1080},
 		"renderer":{"classification":renderer_classification,"identity_complete":true,"hardware_backed":hardware,"hardware_qualification_eligible":hardware},
@@ -2213,6 +2227,7 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 				"native_renderer":gate == DenseWaveProfileClass.NATIVE_STATUS,
 				"renderer_gate_status":gate,
 				"density_boundary":int(current.get("requested_density", -1)) == DenseWaveProfileClass.TARGET_ENEMIES and int(current.get("resolved_density", -1)) == DenseWaveProfileClass.TARGET_ENEMIES,
+				"sample_available":int((current.get("sample", {}) as Dictionary).get("sample_count", 0)) > 0 and int((current.get("sample", {}) as Dictionary).get("physics_sample_count", 0)) > 0,
 				"reset_isolation":bool(reset.get("next_frame_isolation", false)) and String(reset.get("next_frame_input_context", "")) == "active",
 			}
 			current["complete"] = true
@@ -2225,7 +2240,7 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 	var renderer_statuses: Array[String] = []
 	for cycle in completed:
 		var qualification: Dictionary = cycle.get("qualification", {})
-		reset_ready = reset_ready and bool(qualification.get("reset_isolation", false))
+		reset_ready = reset_ready and bool(qualification.get("reset_isolation", false)) and bool(qualification.get("sample_available", false))
 		renderer_statuses.append(String(qualification.get("renderer_gate_status", DenseWaveProfileClass.UNKNOWN_STATUS)))
 	var renderer_consistent := renderer_statuses.size() == 3 and renderer_statuses.all(func(value: String) -> bool: return value == renderer_statuses[0])
 	return {
@@ -2569,6 +2584,15 @@ func _profile_qualification(sample: Dictionary) -> Dictionary:
 	var renderer: Dictionary = sample.get("renderer", {})
 	var viewport: Dictionary = sample.get("viewport", {})
 	var frame_ms: Dictionary = sample.get("frame_ms", {})
+	var sample_count := int(sample.get("sample_count", 0))
+	var physics_sample_count := int(sample.get("physics_sample_count", 0))
+	var sample_availability: Dictionary = sample.get("sample_availability", {})
+	if sample_count <= 0:
+		reasons.append("frame_samples_unavailable")
+	if physics_sample_count <= 0:
+		reasons.append("physics_samples_unavailable")
+	if not sample_availability.is_empty() and not bool(sample_availability.get("frame_samples_nonzero", false)):
+		reasons.append("frame_sample_availability_false")
 	if not bool(viewport.get("resolution_qualified", false)):
 		reasons.append("viewport_below_1920x1080")
 	if not bool(renderer.get("identity_complete", false)):
@@ -2607,7 +2631,7 @@ func _profile_qualification(sample: Dictionary) -> Dictionary:
 	var renderer_classification := String(renderer.get("classification", "unknown"))
 	var renderer_eligible := bool(renderer.get("hardware_qualification_eligible", false))
 	var gate_status := DenseWaveProfileClass.renderer_status(renderer_classification, renderer_eligible)
-	return {"qualified":reasons.is_empty(), "ordinary_route_qualified":passive_ordinary and reasons.is_empty(), "density_qualified":density_qualified, "reasons":reasons, "requires_hardware":true, "renderer_gate_status":gate_status, "p95_limit_ms":16.67,
+	return {"qualified":reasons.is_empty(), "ordinary_route_qualified":passive_ordinary and reasons.is_empty(), "density_qualified":density_qualified, "sample_available":sample_count > 0 and physics_sample_count > 0, "reasons":reasons, "requires_hardware":true, "renderer_gate_status":gate_status, "p95_limit_ms":16.67,
 		"required_density_range":{"minimum":25,"maximum":40,"boundary_target":32}}
 
 func _validation_controls_receipt() -> Dictionary:
@@ -3258,6 +3282,9 @@ func _mcp_state() -> Dictionary:
 		"profile_p99_ms":profile_frame_ms.get("p99", 0.0),
 		"profile_worst_ms":profile_frame_ms.get("worst", 0.0),
 		"profile_frame_sample_count":validation_profile_sample.get("sample_count", 0),
+		"profile_physics_sample_count":validation_profile_sample.get("physics_sample_count", 0),
+		"profile_sample_availability":validation_profile_sample.get("sample_availability", {}),
+		"profile_sampling_renderer_independent":validation_profile_sample.get("sampling_renderer_independent", true),
 		"profile_frame_duration_seconds":validation_profile_sample.get("window_seconds", 0.0),
 		"profile_frames_over_budget":profile_frame_ms.get("over_budget_16_67_count", 0),
 		"profile_subsystem_window":validation_profile_sample.get("subsystem_window", {}),
