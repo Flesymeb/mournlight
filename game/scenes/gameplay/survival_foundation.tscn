@@ -28,21 +28,21 @@ sky_material = SubResource("ProceduralSky_mournlight")
 [sub_resource type="Environment" id="Environment_moonlit"]
 background_mode = 2
 background_color = Color(0.012, 0.018, 0.055, 1)
-background_energy_multiplier = 0.72
+background_energy_multiplier = 0.82
 sky = SubResource("Sky_mournlight")
 ambient_light_source = 2
-ambient_light_color = Color(0.28, 0.34, 0.62, 1)
-ambient_light_energy = 1.78
+ambient_light_color = Color(0.31, 0.38, 0.68, 1)
+ambient_light_energy = 2.08
 reflected_light_source = 2
 tonemap_mode = 2
 glow_enabled = true
 glow_intensity = 0.58
 bloom = 0.08
 fog_enabled = true
-fog_light_color = Color(0.075, 0.09, 0.19, 1)
-fog_light_energy = 0.38
-fog_density = 0.016
-fog_sky_affect = 0.88
+fog_light_color = Color(0.09, 0.105, 0.22, 1)
+fog_light_energy = 0.46
+fog_density = 0.011
+fog_sky_affect = 0.78
 fog_aerial_perspective = 0.2
 fog_depth_begin = 8.0
 fog_depth_end = 64.0
@@ -60,14 +60,14 @@ environment = SubResource("Environment_moonlit")
 [node name="MoonKey" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-54, -32, 0)
 light_color = Color(0.62, 0.72, 1, 1)
-light_energy = 1.78
+light_energy = 1.62
 shadow_enabled = true
 directional_shadow_max_distance = 42.0
 
 [node name="ShadowLift" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-38, 148, 0)
 light_color = Color(0.28, 0.32, 0.58, 1)
-light_energy = 0.72
+light_energy = 1.08
 light_specular = 0.0
 shadow_enabled = false
 

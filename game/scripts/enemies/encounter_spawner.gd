@@ -725,6 +725,8 @@ func get_snapshot() -> Dictionary:
 	var actor_steering_query_skips := 0
 	var actor_body_motion_steps := 0
 	var explicit_space_queries := 0
+	var vitality_updates := 0
+	var vitality_skips := 0
 	for actor in _pool:
 		var actor_work := actor.get_workload_counters()
 		actor_physics_steps += int(actor_work.get("physics_steps", 0))
@@ -732,6 +734,8 @@ func get_snapshot() -> Dictionary:
 		actor_steering_query_skips += int(actor_work.get("steering_query_skips", 0))
 		actor_body_motion_steps += int(actor_work.get("body_motion_steps", 0))
 		explicit_space_queries += int(actor_work.get("explicit_space_queries", 0))
+		vitality_updates += int(actor_work.get("vitality_updates", 0))
+		vitality_skips += int(actor_work.get("vitality_skips", 0))
 		if actor.state == "pooled" or not actor.profile:
 			continue
 		var role := String(actor.profile.role_id)
@@ -821,6 +825,9 @@ func get_snapshot() -> Dictionary:
 			"steering_query_skips":actor_steering_query_skips,
 			"body_motion_steps":actor_body_motion_steps,
 			"explicit_space_queries":explicit_space_queries,
+			"vitality_updates":vitality_updates,
+			"vitality_skips":vitality_skips,
+			"vitality_refresh_seconds":EnemyActor.DENSE_VITALITY_REFRESH_SECONDS,
 			"neighbor_query_owner":"EnemyNeighborRegistry",
 			"counter_reset_scope":"ordinary_run",
 		},
