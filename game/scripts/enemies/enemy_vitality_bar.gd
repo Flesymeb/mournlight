@@ -46,13 +46,25 @@ func bind_actor(health: HealthComponent, next_actor_id: StringName, generation: 
 	current_health = health.current_health
 	maximum_health = maxf(1.0, health.maximum_health)
 	_set_ratio(current_health / maximum_health)
+	_apply_alpha(0.0)
 	_set_visible(false, "bind")
 
 func reveal_damage() -> void:
 	if not _bound:
 		return
+	if not _actor_generation_matches():
+		generation_mismatch_retirements += 1
+		retire("generation_mismatch")
+		return
 	damage_hold_remaining = DAMAGE_HOLD_SECONDS
 	useful_reason = "damaged"
+	# Health signals are emitted synchronously by HealthComponent.  Reveal the
+	# indicator immediately instead of waiting for the actor's next physics tick;
+	# this keeps a same-frame damage probe truthful and prevents a one-frame
+	# invisible bar at dense-wave cadence.
+	alpha = maxf(alpha, 0.92)
+	_apply_alpha(alpha)
+	_set_visible(true, "damage")
 
 func advance(delta: float, target_distance: float, lifecycle_active: bool) -> void:
 	if not _bound or not lifecycle_active:
@@ -75,10 +87,7 @@ func advance(delta: float, target_distance: float, lifecycle_active: bool) -> vo
 		useful_reason = "fading"
 	alpha = move_toward(alpha, 1.0 if should_show else 0.0, delta * (5.5 if should_show else 1.8))
 	_set_visible(alpha > 0.025, useful_reason)
-	var inverse_alpha := 1.0 - clampf(alpha, 0.0, 0.86)
-	background.transparency = inverse_alpha
-	fill.transparency = inverse_alpha
-	brass_edge.transparency = inverse_alpha
+	_apply_alpha(alpha)
 	if not visible:
 		useful_reason = "hidden"
 
@@ -94,6 +103,7 @@ func retire(reason: String) -> void:
 	spawn_generation = -1
 	damage_hold_remaining = 0.0
 	alpha = 0.0
+	_apply_alpha(0.0)
 	useful_reason = "retired_%s" % reason
 	last_retirement_reason = reason
 
@@ -129,6 +139,12 @@ func _set_ratio(next_ratio: float) -> void:
 	display_ratio = clampf(next_ratio, 0.0, 1.0)
 	fill.scale.x = maxf(0.001, display_ratio)
 	fill.position.x = -0.58 * (1.0 - display_ratio)
+
+func _apply_alpha(value: float) -> void:
+	var inverse_alpha := 1.0 - clampf(value, 0.0, 0.86)
+	background.transparency = inverse_alpha
+	fill.transparency = inverse_alpha
+	brass_edge.transparency = inverse_alpha
 
 func _disconnect_health() -> void:
 	if is_instance_valid(_bound_health) and _bound_health.health_changed.is_connected(_on_health_changed):
