@@ -97,7 +97,7 @@ shape = SubResource("EastWestShape")
 
 [node name="MausoleumCollision" type="StaticBody3D" parent="OuterDatum" unique_id=631849061]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.53, 1.9, -2.52)
-collision_layer = 4
+collision_layer = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/MausoleumCollision" unique_id=403615118]
 shape = SubResource("MausoleumShape")
@@ -188,6 +188,14 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.4, 0)
 light_color = Color(0.27, 0.68, 0.9, 1)
 light_energy = 1.7
 omni_range = 5.5
+
+[node name="RouteMoonFill" type="OmniLight3D" parent="OuterDatum" unique_id=1774219321]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.6, 6.8)
+light_color = Color(0.32, 0.48, 0.9, 1)
+light_energy = 1.05
+light_specular = 0.2
+shadow_enabled = false
+omni_range = 10.0
 
 [node name="CrackedMoonBellAnchor" type="Marker3D" parent="OuterDatum" unique_id=855017616 groups=["landmark_anchor"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.9, 0, -2.6)

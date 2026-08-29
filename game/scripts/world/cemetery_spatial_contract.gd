@@ -267,7 +267,7 @@ func get_snapshot() -> Dictionary:
 		# Landmark bodies use layer 1 for authored props; the central mausoleum's
 		# larger gameplay volume uses layer 4 so camera diagnostics do not report
 		# the landmark itself as an occluder while the Warden still collides with it.
-		"collision_layers":{"ground":4,"perimeter":2,"landmarks":1,"mausoleum_gameplay":4,"camera_query_excluded":2,"navigation":0},
+		"collision_layers":{"ground":4,"perimeter":2,"landmarks":1,"mausoleum_gameplay":1,"camera_query_excluded":2,"navigation":0},
 		"navigation_region":{"path":"OuterDatum/NativeNavigationRegion","layers":1,"source":"native_authored_streets","enabled":is_instance_valid(get_node_or_null("OuterDatum/NativeNavigationRegion"))},
 		"playable_rect":playable,
 		"playable_area":playable.size.x * playable.size.y,
