@@ -223,7 +223,10 @@ func get_snapshot() -> Dictionary:
 			"datum_owner":"PackageTransform",
 		},
 		"anchor_ids":["PlayerSpawn","KeeperLanternPostAnchor","SmallMausoleumAnchor","CrackedMoonBellAnchor","TargetAnchorA","TargetAnchorB"],
-		"collision_layers":{"ground":4,"perimeter":1,"landmarks":2,"navigation":0},
+		# Landmark bodies share the player collision layer so they remain solid in
+		# ordinary traversal; camera occlusion probes use layer 2 and therefore
+		# never mistake gameplay collision for a visual blocker.
+		"collision_layers":{"ground":4,"perimeter":1,"landmarks":1,"camera_query_excluded":2,"navigation":0},
 		"navigation_region":{"path":"OuterDatum/NativeNavigationRegion","layers":1,"source":"native_authored_streets","enabled":is_instance_valid(get_node_or_null("OuterDatum/NativeNavigationRegion"))},
 		"playable_rect":playable,
 		"playable_area":playable.size.x * playable.size.y,
@@ -241,7 +244,7 @@ func get_snapshot() -> Dictionary:
 		"protected_camera_half_extents":protected_camera_half_extents,
 		"minimum_player_safe_radius":minimum_player_safe_radius,
 		"authored_package_instances":1 if is_instance_valid(package_root) else 0,
-		"collision_source":"scaled_outer_datum_static_bodies",
+		"collision_source":"scaled_outer_datum_static_bodies_with_camera_query_split",
 		"background_mode":"single_intact_authored_cemetery_with_restrained_fog",
 		"external_world":{"source":"intact_authored_package_native_terrain_and_perimeter", "procedural_scenery":false, "primitive_meshes":0, "opaque":true, "non_playable_depth_beyond_all_edges":true},
 		"landmark_collision":{"keeper_post":is_instance_valid(get_node_or_null("OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision")), "small_mausoleum":is_instance_valid(get_node_or_null("OuterDatum/MausoleumCollision")), "cracked_bell":is_instance_valid(get_node_or_null("OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision"))},
