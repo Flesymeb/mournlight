@@ -37,6 +37,7 @@ var _priority_updates := 0
 var _manual_animation_enabled := false
 var binding_status := "unbound"
 var binding_error := ""
+var motion_signature := "none"
 
 func configure(next_role_id: String, _accent: Color, stable_id: StringName, generation: int, allocated_variant_index: int = -1) -> void:
 	role_id = next_role_id
@@ -48,6 +49,7 @@ func configure(next_role_id: String, _accent: Color, stable_id: StringName, gene
 	_presentation_skips = 0
 	_priority_updates = 0
 	var variant_index := clampi(allocated_variant_index, 0, 1) if allocated_variant_index >= 0 else posmod(String(stable_id).hash() + generation * 17, 2)
+	motion_signature = "%s:%s" % [next_role_id, variant_index]
 	variant_id = "%s.variant_%s" % [ROLE_DESCRIPTORS.get(role_id, "unknown"), ["a", "b"][variant_index]]
 	_build_role(variant_index)
 	set_semantic("spawn")
@@ -63,6 +65,7 @@ func reset_presenter() -> void:
 	binding_error = ""
 	_active_variant = null
 	_presentation = null
+	motion_signature = "none"
 	for child in get_children():
 		child.queue_free()
 
@@ -97,15 +100,36 @@ func advance(delta: float, planar_velocity: Vector3, remaining: float = 0.0, dur
 			var settle := clampf(_state_time / 0.28, 0.0, 1.0)
 			_active_variant.scale = _base_scale * lerpf(0.82, 1.0, settle)
 		"approach":
-			if role_id == "wispbat":
-				_active_variant.position.y += sin(_time * (5.0 + speed)) * 0.08
+			# Every role has a distinct, velocity-driven locomotion cue. These are
+			# additive to the authored clip and never replace the imported rig.
+			var stride := sin(_time * (5.0 + speed * 0.7))
+			match role_id:
+				"mossling":
+					_active_variant.position.y += absf(stride) * 0.045
+					_active_variant.rotation.z = _base_rotation.z + stride * 0.028
+				"wispbat":
+					_active_variant.position.y += sin(_time * (5.0 + speed)) * 0.12
+					_active_variant.rotation.y = _base_rotation.y + sin(_time * 3.5) * 0.11
+				"bone_slinger":
+					_active_variant.rotation.x = _base_rotation.x + stride * 0.055
+					_active_variant.position.y += absf(stride) * 0.028
+				"grave_brute":
+					_active_variant.position.y += absf(stride) * 0.06
+					_active_variant.scale = _base_scale * (1.0 + absf(stride) * 0.018)
 		"telegraph":
 			var charge := 1.0 - clampf(remaining / maxf(duration, 0.01), 0.0, 1.0)
-			_active_variant.rotation.x = _base_rotation.x - charge * 0.16
-			_active_variant.scale = _base_scale * Vector3(1.0 + charge * 0.05, 1.0 - charge * 0.04, 1.0 + charge * 0.05)
+			var telegraph_axis := -0.16
+			if role_id == "wispbat": telegraph_axis = -0.24
+			elif role_id == "bone_slinger": telegraph_axis = 0.18
+			elif role_id == "grave_brute": telegraph_axis = -0.1
+			_active_variant.rotation.x = _base_rotation.x + charge * telegraph_axis
+			_active_variant.scale = _base_scale * Vector3(1.0 + charge * (0.05 if role_id != "grave_brute" else 0.08), 1.0 - charge * 0.04, 1.0 + charge * 0.05)
 		"damage":
 			var strike := sin(clampf(_state_time / 0.22, 0.0, 1.0) * PI)
-			_active_variant.rotation.x = _base_rotation.x + strike * 0.32
+			var strike_axis := 0.32 if role_id in ["mossling", "grave_brute"] else 0.22
+			_active_variant.rotation.x = _base_rotation.x + strike * strike_axis
+			if role_id == "bone_slinger": _active_variant.rotation.z = _base_rotation.z - strike * 0.2
+			elif role_id == "wispbat": _active_variant.position.y += strike * 0.14
 		"recovery":
 			_active_variant.rotation.z = _base_rotation.z + sin(_state_time * 8.0) * 0.035
 		"hurt":
@@ -113,7 +137,8 @@ func advance(delta: float, planar_velocity: Vector3, remaining: float = 0.0, dur
 			_active_variant.rotation.z = _base_rotation.z + recoil * 0.18
 		"death":
 			var fall := ease(clampf(_state_time / 0.52, 0.0, 1.0), 0.65)
-			_active_variant.rotation.z = _base_rotation.z + fall * 1.42
+			var fall_axis := 1.42 if role_id != "wispbat" else 0.9
+			_active_variant.rotation.z = _base_rotation.z + fall * fall_axis
 			_active_variant.position.y -= fall * 0.26
 
 func presentation_descriptor() -> String:
@@ -208,6 +233,8 @@ func presentation_budget_snapshot() -> Dictionary:
 		"update_ratio":float(_presentation_updates) / float(attempts) if attempts > 0 else 0.0,
 		"binding_status":binding_status,
 		"binding_error":binding_error,
+		"motion_signature":motion_signature,
+		"role_motion_profile":role_id,
 	}
 
 func _restore_pose() -> void:
