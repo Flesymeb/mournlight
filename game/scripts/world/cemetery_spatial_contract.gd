@@ -1,7 +1,7 @@
 class_name CemeterySpatialContract
 extends Node3D
 
-@export var camera_world_margin := Vector2(6.0, 5.6)
+@export var camera_world_margin := Vector2(5.2, 4.8)
 @export var protected_camera_half_extents := Vector2(9.2, 6.8)
 @export var minimum_player_safe_radius := 8.8
 @export var spawn_clearance := 0.6
@@ -92,8 +92,9 @@ func get_authored_visual_rect() -> Rect2:
 			var nested_scale := package_transform.global_transform.basis.get_scale().abs()
 			package_scale = Vector2(nested_scale.x, nested_scale.z) / root_scale
 	# The bound Sketchfab package stores a large native export datum in its
-	# child transforms.  PackageTransform intentionally rebases that datum onto
-	# the gameplay origin; do not let the export offset poison camera margins.
+	# instance transform.  The integration wrapper keeps PackageTransform at the
+	# gameplay origin and applies that offset to the intact instance, so the
+	# export datum never poisons camera margins.
 	if package_offset.length() > 100.0:
 		package_offset = Vector2.ZERO
 	var minimum := (package_offset + Vector2(AUTHORED_LOCAL_MIN.x * package_scale.x, AUTHORED_LOCAL_MIN.y * package_scale.y)) * root_scale
@@ -205,9 +206,9 @@ func get_snapshot() -> Dictionary:
 		},
 		"world_scale":global_transform.basis.get_scale().abs(),
 		"package_transform":{
-			"position":package_root.get_parent().position if is_instance_valid(package_root) else Vector3.ZERO,
+			"position":package_root.position if is_instance_valid(package_root) else Vector3.ZERO,
 			"scale":package_root.get_parent().scale if is_instance_valid(package_root) else Vector3.ONE,
-			"native_export_rebased":is_instance_valid(package_root) and package_root.get_parent().position.length() > 100.0,
+			"native_export_rebased":is_instance_valid(package_root) and package_root.position.length() > 50.0,
 		},
 		"playable_rect":playable,
 		"playable_area":playable.size.x * playable.size.y,

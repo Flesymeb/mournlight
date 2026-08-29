@@ -429,7 +429,7 @@ func _inside_authored_collision(position: Vector3) -> bool:
 	for tree_center in [Vector2(6.85, -5.46), Vector2(-6.9, -6.42), Vector2(9.28, 8.94)]:
 		if point.distance_to(tree_center) < 1.35:
 			return true
-	if point.distance_to(Vector2(-4.8, 1.8)) < 0.45 or point.distance_to(Vector2(-6.5, -1.5)) < 1.2:
+	if point.distance_to(Vector2(-4.8, 1.8)) < 0.45 or point.distance_to(Vector2(7.9, -2.6)) < 1.2:
 		return true
 	for obstacle in [
 		{"center":Vector2(9.83, -8.72), "half":Vector2(1.0, 1.0)},

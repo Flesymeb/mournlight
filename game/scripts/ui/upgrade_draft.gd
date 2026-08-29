@@ -13,6 +13,7 @@ const STAT_ICON_PATHS := {
 	"health":"res://assets/ui/upgrades/stats/health.svg", "health_maximum":"res://assets/ui/upgrades/stats/health.svg",
 	"experience_yield_multiplier":"res://assets/ui/upgrades/stats/experience.svg",
 }
+const VIOLET := Color("c27cff")
 
 var cards: Array[Dictionary] = []
 var latched := false
@@ -251,7 +252,17 @@ func _build_stat_row(change: Dictionary) -> Control:
 	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(label)
-	row.add_child(_value_label(_format_value(change.current, String(change.field)), false))
+	# A newly unlocked weapon has no truthful "current" value.  Keep the
+	# decision row compact and lead with a NEW badge instead of rendering a
+	# placeholder dash in a faux current column.
+	var is_new := change.current == null
+	if is_new:
+		var new_badge := _value_label("NEW", false)
+		new_badge.custom_minimum_size = Vector2(62, 0)
+		new_badge.add_theme_color_override("font_color", VIOLET)
+		row.add_child(new_badge)
+	else:
+		row.add_child(_value_label(_format_value(change.current, String(change.field)), false))
 	var arrow := Label.new()
 	arrow.text = "›"
 	arrow.custom_minimum_size = Vector2(10, 0)

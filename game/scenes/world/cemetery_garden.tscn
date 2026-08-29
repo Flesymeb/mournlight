@@ -45,10 +45,11 @@ size = Vector3(3.8, 1.2, 1.9)
 script = ExtResource("4_spatial_contract")
 
 [node name="PackageTransform" type="Node3D" parent="."]
-position = Vector3(0.28, 0.02, -147.12)
+position = Vector3(0.28, 0.02, 0.0)
 scale = Vector3(2.2, 2.2, 2.2)
 
 [node name="AuthoredCemeteryPackage" parent="PackageTransform" instance=ExtResource("1_cemetery")]
+position = Vector3(0.0, 0.0, -66.8727)
 
 [node name="OuterDatum" type="Node3D" parent="."]
 
@@ -94,7 +95,7 @@ shape = SubResource("EastWestShape")
 
 [node name="MausoleumCollision" type="StaticBody3D" parent="OuterDatum"]
 position = Vector3(0.53, 1.9, -2.52)
-collision_layer = 1
+collision_layer = 2
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/MausoleumCollision"]
@@ -102,7 +103,7 @@ shape = SubResource("MausoleumShape")
 
 [node name="NortheastTreeCollision" type="StaticBody3D" parent="OuterDatum"]
 position = Vector3(6.85, 1.6, -5.46)
-collision_layer = 1
+collision_layer = 2
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/NortheastTreeCollision"]
@@ -110,7 +111,7 @@ shape = SubResource("TreeShape")
 
 [node name="NorthwestTreeCollision" type="StaticBody3D" parent="OuterDatum"]
 position = Vector3(-6.9, 1.6, -6.42)
-collision_layer = 1
+collision_layer = 2
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/NorthwestTreeCollision"]
@@ -118,7 +119,7 @@ shape = SubResource("TreeShape")
 
 [node name="SoutheastTreeCollision" type="StaticBody3D" parent="OuterDatum"]
 position = Vector3(9.28, 1.6, 8.94)
-collision_layer = 1
+collision_layer = 2
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/SoutheastTreeCollision"]
@@ -172,7 +173,7 @@ position = Vector3(-4.8, 0, 1.8)
 scale = Vector3(0.3, 0.3, 0.3)
 
 [node name="KeeperPostCollision" type="StaticBody3D" parent="OuterDatum/KeeperLanternPostAnchor"]
-collision_layer = 1
+collision_layer = 2
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision"]
@@ -197,7 +198,7 @@ omni_range = 5.5
 shadow_enabled = false
 
 [node name="CrackedMoonBellAnchor" type="Marker3D" parent="OuterDatum" groups=["landmark_anchor"]]
-position = Vector3(-10.2, 0, -7.5)
+position = Vector3(4.2, 0, -8.6)
 
 [node name="CrackedBellAsset" parent="OuterDatum/CrackedMoonBellAnchor" groups=["cracked_bell_landmark"] instance=ExtResource("3_cracked_bell")]
 position = Vector3(3.7, 0.0, 6.0)
@@ -205,7 +206,7 @@ rotation = Vector3(-1.5708, 2.72, 0)
 scale = Vector3(2, 2, 2)
 
 [node name="CrackedBellCollision" type="StaticBody3D" parent="OuterDatum/CrackedMoonBellAnchor"]
-collision_layer = 1
+collision_layer = 2
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision"]
@@ -221,7 +222,7 @@ shadow_enabled = false
 
 [node name="StandingCoffinCollision" type="StaticBody3D" parent="OuterDatum"]
 position = Vector3(9.83, 1.4, -8.72)
-collision_layer = 1
+collision_layer = 2
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/StandingCoffinCollision"]
@@ -229,7 +230,7 @@ shape = SubResource("StandingCoffinShape")
 
 [node name="SouthwestCoffinCollision" type="StaticBody3D" parent="OuterDatum"]
 position = Vector3(-4.12, 0.5, 6.3)
-collision_layer = 1
+collision_layer = 2
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/SouthwestCoffinCollision"]
@@ -237,7 +238,7 @@ shape = SubResource("FlatCoffinShape")
 
 [node name="SoutheastCoffinCollision" type="StaticBody3D" parent="OuterDatum"]
 position = Vector3(7.43, 0.5, 5.11)
-collision_layer = 1
+collision_layer = 2
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/SoutheastCoffinCollision"]
@@ -245,7 +246,7 @@ shape = SubResource("WideCoffinShape")
 
 [node name="EastGraveNorthCollision" type="StaticBody3D" parent="OuterDatum"]
 position = Vector3(7.38, 0.6, -3.14)
-collision_layer = 1
+collision_layer = 2
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/EastGraveNorthCollision"]
@@ -253,7 +254,7 @@ shape = SubResource("GraveClusterShape")
 
 [node name="EastGraveSouthCollision" type="StaticBody3D" parent="OuterDatum"]
 position = Vector3(7.38, 0.6, 2.46)
-collision_layer = 1
+collision_layer = 2
 collision_mask = 1
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/EastGraveSouthCollision"]

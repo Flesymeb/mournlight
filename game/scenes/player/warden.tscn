@@ -70,7 +70,7 @@ ring_segments = 5
 process_mode = 1
 script = ExtResource("1_controller")
 collision_layer = 1
-collision_mask = 1
+collision_mask = 3
 animation_profile = ExtResource("16_animation_profile")
 
 [node name="Collider" type="CollisionShape3D" parent="."]
