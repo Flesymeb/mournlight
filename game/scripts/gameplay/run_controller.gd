@@ -175,6 +175,7 @@ func _ready() -> void:
 	wave_director.boss_requested.connect(_spawn_bellkeeper)
 	draft_controller.draft_opened.connect(_on_draft_opened)
 	draft_view.choice_requested.connect(_on_draft_choice)
+	draft_view.cancel_requested.connect(_on_draft_cancel)
 	world.attack_runtime.hit_resolved.connect(_on_player_hit_resolved)
 	warden.dash_phase_changed.connect(_on_dash_changed)
 	input_router.logical_press_edge.connect(_on_logical_press_edge)
@@ -857,6 +858,10 @@ func _on_dash_changed(_phase: String, _invulnerable: bool) -> void:
 	_emit_snapshot()
 
 func _on_logical_press_edge(action: StringName, activation: int, receipt: Dictionary) -> void:
+	if action == &"ui_cancel" and run_state == "draft":
+		var cancelled := _on_draft_cancel()
+		input_router.bind_destination("back", "upgrade_draft_cancelled" if cancelled else "upgrade_draft_cancel_rejected", 1 if cancelled else 0)
+		return
 	if action != &"dash":
 		return
 	var accepted := false
@@ -867,6 +872,32 @@ func _on_logical_press_edge(action: StringName, activation: int, receipt: Dictio
 		"warden_dash" if accepted else "warden_dash_rejected",
 		1 if accepted else 0
 	)
+
+func _on_draft_cancel() -> bool:
+	if _upgrade_commit_in_progress or run_state != "draft" or not draft_controller.active:
+		return false
+	var cancelled := draft_controller.cancel()
+	if not cancelled:
+		return false
+	draft_view.close()
+	get_tree().paused = false
+	_transition("active")
+	upgrade_transaction_receipt["phase"] = "cancelled"
+	upgrade_transaction_receipt["resolved"] = false
+	upgrade_transaction_receipt["cancelled"] = true
+	upgrade_transaction_receipt["cancel_reason"] = "back_or_escape"
+	upgrade_transaction_receipt["tree_paused"] = false
+	upgrade_transaction_receipt["pause_owner_cleared"] = true
+	upgrade_transaction_receipt["reset_isolation"] = {
+		"complete":true,
+		"tree_paused":false,
+		"draft_active":false,
+		"run_state":"active",
+		"active_enemy_count":int(spawner.get_snapshot().get("live", 0)),
+		"pending_levelup_transactions":_pending_levelup_transactions,
+	}
+	_emit_snapshot()
+	return true
 
 func _on_input_context_changed(_previous: String, current: String, _generation: int) -> void:
 	if current not in ["active", "boss"]:
@@ -1003,7 +1034,9 @@ func _on_draft_choice(index: int) -> void:
 	var choice := draft_controller.choose(index, inventory, health, warden)
 	if choice.is_empty():
 		upgrade_transaction_receipt["phase"] = "rejected_ineligible"
+		draft_view.reject_choice()
 		_upgrade_commit_in_progress = false
+		_emit_snapshot()
 		return
 	var wave_state := wave_director.get_snapshot()
 	choice["draft_serial"] = draft_controller.draft_serial

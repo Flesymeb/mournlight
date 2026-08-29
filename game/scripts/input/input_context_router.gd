@@ -209,6 +209,8 @@ func _confirm_action() -> StringName:
 func _back_action() -> StringName:
 	if context in ["active", "boss", "pause", "paused"]:
 		return &"pause"
+	if context in ["draft"]:
+		return &"ui_cancel"
 	if context in ["title", "settings", "help", "credits"]:
 		return &"ui_cancel"
 	return &""

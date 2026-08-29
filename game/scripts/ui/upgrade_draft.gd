@@ -2,6 +2,7 @@ class_name UpgradeDraftView
 extends Control
 
 signal choice_requested(index: int)
+signal cancel_requested
 
 const STAT_ICON_PATHS := {
 	"equipped":"res://assets/ui/upgrades/stats/weapon.svg", "rank":"res://assets/ui/upgrades/stats/rank.svg",
@@ -74,20 +75,42 @@ func _layout_cards() -> void:
 
 func present(next_cards: Array[Dictionary]) -> void:
 	_presentation_serial += 1
-	cards = next_cards.duplicate(true)
+	# Normalize the externally supplied offer before touching any child controls.
+	# Tester fixtures intentionally exercise empty/malformed option data; a bad
+	# row should become an unavailable card rather than raising a typed-index
+	# error or leaking placeholder values into the surface.
+	cards.clear()
+	for value in next_cards:
+		cards.append(_normalize_card(value))
 	latched = false
 	selected_index = -1
 	for index in buttons.size():
-		var card: Dictionary = cards[index] if index < cards.size() else {"title":"NO OFFER", "icon_path":FALLBACK_ICON_PATH, "changes":[], "consequence":"No eligible vigil.", "available":false}
-		var icon_path := String(card.get("icon_path", ""))
+		var card: Dictionary = cards[index] if index < cards.size() else _normalize_card({})
+		var icon_path := str(card.get("icon_path", ""))
 		_icon_nodes[index].texture = load(icon_path if not icon_path.is_empty() else FALLBACK_ICON_PATH) as Texture2D
-		_title_nodes[index].text = String(card.get("title", "VIGIL")).to_upper()
-		_consequence_nodes[index].text = String(card.get("consequence", "Shape the next exchange."))
+		_title_nodes[index].text = str(card.get("title", "VIGIL")).to_upper()
+		_consequence_nodes[index].text = str(card.get("consequence", "Shape the next exchange."))
 		_rebuild_stat_rows(index, _decision_changes(card.get("changes", [])))
 		buttons[index].disabled = not bool(card.get("available", true))
 		_refresh_card_state(index)
 	visible = true
 	buttons[0].grab_focus()
+
+func _normalize_card(value: Variant) -> Dictionary:
+	if not value is Dictionary:
+		return {"id":"invalid_offer", "title":"NO OFFER", "icon_path":FALLBACK_ICON_PATH, "changes":[], "consequence":"No eligible vigil.", "available":false, "newly_unlocked":false}
+	var source: Dictionary = value
+	if source.is_empty():
+		return {"id":"invalid_offer", "title":"NO OFFER", "icon_path":FALLBACK_ICON_PATH, "changes":[], "consequence":"No eligible vigil.", "available":false, "newly_unlocked":false}
+	var normalized := source.duplicate(true)
+	normalized["id"] = str(normalized.get("id", "invalid_offer"))
+	normalized["title"] = str(normalized.get("title", "VIGIL"))
+	var icon_candidate := str(normalized.get("icon_path", ""))
+	normalized["icon_path"] = icon_candidate if not icon_candidate.is_empty() else FALLBACK_ICON_PATH
+	normalized["consequence"] = str(normalized.get("consequence", "Shape the next exchange."))
+	normalized["available"] = bool(normalized.get("available", true)) and normalized["id"] != "invalid_offer"
+	normalized["changes"] = normalized.get("changes", []) if normalized.get("changes", []) is Array else []
+	return normalized
 
 func set_input_device(next_device: String, generation: int) -> void:
 	if next_device not in ["keyboard", "gamepad", "mouse"]:
@@ -135,13 +158,29 @@ func _choose(index: int) -> void:
 		return
 	choice_requested.emit(index)
 
+func cancel() -> void:
+	"""Request a Back/Escape close while the draft owns input focus."""
+	if not visible or latched:
+		return
+	cancel_requested.emit()
+
+func reject_choice() -> void:
+	"""Release a latched card after an authoritative transaction rejection."""
+	latched = false
+	selected_index = -1
+	for index in buttons.size():
+		buttons[index].disabled = index >= cards.size() or not bool(cards[index].get("available", false))
+		_refresh_card_state(index)
+
 func _decision_changes(source_changes: Variant) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	var source_array: Array = source_changes if source_changes is Array else []
 	for value in source_array:
 		if result.size() >= 3:
 			break
-		var change := value as Dictionary
+		if not value is Dictionary:
+			continue
+		var change: Dictionary = value
 		if change.is_empty() or not change.has("field") or not change.has("current") or not change.has("result"):
 			continue
 		var current = null if _is_placeholder_value(change.current) else change.current
@@ -266,11 +305,12 @@ func _build_stat_row(change: Dictionary) -> Control:
 	icon.custom_minimum_size = Vector2(18, 18)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.texture = load(String(STAT_ICON_PATHS.get(String(change.field), STAT_ICON_PATHS.rank))) as Texture2D
+	var field_name := str(change.get("field", "rank"))
+	icon.texture = load(str(STAT_ICON_PATHS.get(field_name, STAT_ICON_PATHS.rank))) as Texture2D
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(icon)
 	var label := Label.new()
-	label.text = String(change.label)
+	label.text = str(change.get("label", field_name.to_upper()))
 	label.custom_minimum_size = Vector2(81, 0)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.add_theme_font_size_override("font_size", 10)
@@ -291,7 +331,7 @@ func _build_stat_row(change: Dictionary) -> Control:
 		empty_current.custom_minimum_size = Vector2(62, 0)
 		row.add_child(empty_current)
 	else:
-		row.add_child(_value_label(_format_value(change.current, String(change.field)), false))
+		row.add_child(_value_label(_format_value(change.get("current"), field_name), false))
 	var arrow := Label.new()
 	arrow.text = "›"
 	arrow.custom_minimum_size = Vector2(10, 0)
@@ -300,7 +340,7 @@ func _build_stat_row(change: Dictionary) -> Control:
 	arrow.add_theme_color_override("font_color", Color(0.47, 0.92, 0.87))
 	arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(arrow)
-	row.add_child(_value_label(_format_value(change.result, String(change.field)), true))
+	row.add_child(_value_label(_format_value(change.get("result"), field_name), true))
 	return row
 
 func _value_label(value: String, result_value: bool) -> Label:
@@ -369,5 +409,5 @@ func _mcp_state() -> Dictionary:
 	for index in cards.size():
 		var card: Dictionary = cards[index]
 		var changes := _decision_changes(card.get("changes", []))
-		visible_cards.append({"id":card.get("id", ""), "title":card.get("title", ""), "icon_path":card.get("icon_path", FALLBACK_ICON_PATH), "changes":changes, "decision_delta_count":changes.size(), "silhouette_first":not String(card.get("icon_path", "")).is_empty(), "consequence":card.get("consequence", ""), "interaction_state":_state_nodes[index].text})
-	return {"authored_cards":visible_cards, "visible":visible, "latched":latched, "selected_index":selected_index, "focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none", "input_device":input_device, "device_generation":device_generation, "focus_states":{"keyboard":"KEYBOARD FOCUS  •  CONFIRM TO CHOOSE","gamepad":"GAMEPAD FOCUS  •  CONFIRM TO CHOOSE","mouse":"MOUSE FOCUS  •  CLICK TO CHOOSE","hover":"MOUSE FOCUS  •  CLICK TO CHOOSE","unavailable":"UNAVAILABLE","selected":"SELECTED  •  APPLYING"}, "cancel_policy":"draft_is_deliberately_non_cancelable", "stable_card_dimensions":Vector2(328,522), "hierarchy":"dominant_icon + consequence + projected_change_rows"}
+		visible_cards.append({"id":str(card.get("id", "")), "title":str(card.get("title", "")), "icon_path":str(card.get("icon_path", FALLBACK_ICON_PATH)), "changes":changes, "decision_delta_count":changes.size(), "silhouette_first":not str(card.get("icon_path", "")).is_empty(), "consequence":str(card.get("consequence", "")), "interaction_state":_state_nodes[index].text})
+	return {"authored_cards":visible_cards, "visible":visible, "latched":latched, "selected_index":selected_index, "focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none", "input_device":input_device, "device_generation":device_generation, "focus_states":{"keyboard":"KEYBOARD FOCUS  •  CONFIRM TO CHOOSE","gamepad":"GAMEPAD FOCUS  •  CONFIRM TO CHOOSE","mouse":"MOUSE FOCUS  •  CLICK TO CHOOSE","hover":"MOUSE FOCUS  •  CLICK TO CHOOSE","unavailable":"UNAVAILABLE","selected":"SELECTED  •  APPLYING"}, "cancel_policy":"back_or_escape_closes_without_mutation", "cancel_action":"ui_cancel", "stable_card_dimensions":Vector2(328,522), "hierarchy":"dominant_icon + consequence + projected_change_rows"}

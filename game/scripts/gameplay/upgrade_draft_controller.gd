@@ -25,6 +25,20 @@ func reset() -> void:
 	active = false
 	offer_slots.clear()
 
+func cancel() -> bool:
+	"""Close the current offer without mutating ranks or the selected build.
+
+	The draft is a paused decision surface, so Back/Escape must have a
+	deterministic, transaction-safe route back to gameplay.  Keeping the rank
+	ledger intact allows the pending level-up to be offered again later.
+	"""
+	if not active:
+		return false
+	active = false
+	offered.clear()
+	offer_slots.clear()
+	return true
+
 func open_draft(inventory: WeaponInventory, health: WardenHealth, warden: WardenController) -> Array[Dictionary]:
 	if active:
 		return offered
