@@ -14,6 +14,8 @@ const STAT_ICON_PATHS := {
 	"experience_yield_multiplier":"res://assets/ui/upgrades/stats/experience.svg",
 }
 const VIOLET := Color("c27cff")
+const PLACEHOLDER_VALUES := ["NEW", "LOCKED", "UNAVAILABLE", "N/A", "NA"]
+const FALLBACK_ICON_PATH := "res://assets/ui/upgrades/stats/weapon.svg"
 
 var cards: Array[Dictionary] = []
 var latched := false
@@ -36,6 +38,8 @@ func _ready() -> void:
 	cards_container.pivot_offset = Vector2(510, 261)
 	for index in buttons.size():
 		_build_card_content(buttons[index])
+		buttons[index].focus_mode = Control.FOCUS_ALL
+		buttons[index].mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		buttons[index].pressed.connect(_choose.bind(index))
 		buttons[index].focus_entered.connect(_refresh_card_state.bind(index))
 		buttons[index].focus_exited.connect(_refresh_card_state.bind(index))
@@ -69,9 +73,10 @@ func present(next_cards: Array[Dictionary]) -> void:
 	latched = false
 	selected_index = -1
 	for index in buttons.size():
-		var card: Dictionary = cards[index]
-		_icon_nodes[index].texture = load(String(card.icon_path)) as Texture2D
-		_title_nodes[index].text = String(card.title).to_upper()
+		var card: Dictionary = cards[index] if index < cards.size() else {"title":"NO OFFER", "icon_path":FALLBACK_ICON_PATH, "changes":[], "consequence":"No eligible vigil.", "available":false}
+		var icon_path := String(card.get("icon_path", ""))
+		_icon_nodes[index].texture = load(icon_path if not icon_path.is_empty() else FALLBACK_ICON_PATH) as Texture2D
+		_title_nodes[index].text = String(card.get("title", "VIGIL")).to_upper()
 		_consequence_nodes[index].text = String(card.get("consequence", "Shape the next exchange."))
 		_rebuild_stat_rows(index, _decision_changes(card.get("changes", [])))
 		buttons[index].disabled = not bool(card.get("available", true))
@@ -122,18 +127,31 @@ func _choose(index: int) -> void:
 		return
 	choice_requested.emit(index)
 
-func _decision_changes(source_changes: Array) -> Array[Dictionary]:
+func _decision_changes(source_changes: Variant) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	for value in source_changes:
+	var source_array: Array = source_changes if source_changes is Array else []
+	for value in source_array:
 		if result.size() >= 3:
 			break
 		var change := value as Dictionary
 		if change.is_empty() or not change.has("field") or not change.has("current") or not change.has("result"):
 			continue
-		if _display_values_equal(change.current, change.result):
+		var current = null if _is_placeholder_value(change.current) else change.current
+		var next = null if _is_placeholder_value(change.result) else change.result
+		# A placeholder is not a player-facing value.  Treat it as absent so a
+		# stale catalog row can never leak NEW/LOCKED into CURRENT or NEW.
+		if next == null:
 			continue
-		result.append(change.duplicate(true))
+		if _display_values_equal(current, next):
+			continue
+		var normalized := change.duplicate(true)
+		normalized["current"] = current
+		normalized["result"] = next
+		result.append(normalized)
 	return result
+
+func _is_placeholder_value(value) -> bool:
+	return value is String and String(value).strip_edges().to_upper() in PLACEHOLDER_VALUES
 
 func _display_values_equal(current, next) -> bool:
 	if current == null or next == null:
@@ -310,7 +328,7 @@ func _refresh_card_state(index: int) -> void:
 	elif latched: state = "CHOICE LOCKED"
 	elif _pressed[index]: state = "PRESS  •  RELEASE TO CHOOSE"
 	elif buttons[index].has_focus(): state = ("GAMEPAD FOCUS" if input_device == "gamepad" else "KEYBOARD FOCUS") + "  •  CONFIRM TO CHOOSE"
-	elif _hovered[index]: state = "HOVER  •  CLICK TO CHOOSE"
+	elif _hovered[index]: state = "MOUSE FOCUS  •  CLICK TO CHOOSE"
 	elif newly_unlocked: state = "NEW WEAPON"
 	_state_nodes[index].text = state
 	buttons[index].add_theme_stylebox_override("normal", _card_style(state, false))
@@ -338,5 +356,5 @@ func _mcp_state() -> Dictionary:
 	var visible_cards: Array[Dictionary] = []
 	for index in cards.size():
 		var card: Dictionary = cards[index]
-		visible_cards.append({"id":card.id, "title":card.title, "icon_path":card.icon_path, "changes":_decision_changes(card.changes), "consequence":card.get("consequence", ""), "interaction_state":_state_nodes[index].text})
+		visible_cards.append({"id":card.get("id", ""), "title":card.get("title", ""), "icon_path":card.get("icon_path", FALLBACK_ICON_PATH), "changes":_decision_changes(card.get("changes", [])), "consequence":card.get("consequence", ""), "interaction_state":_state_nodes[index].text})
 	return {"authored_cards":visible_cards, "visible":visible, "latched":latched, "selected_index":selected_index, "focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none", "input_device":input_device, "device_generation":device_generation, "cancel_policy":"draft_is_deliberately_non_cancelable", "stable_card_dimensions":Vector2(328,522), "hierarchy":"dominant_icon + consequence + projected_change_rows"}

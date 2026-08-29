@@ -195,11 +195,52 @@ func _first_shape(body: StaticBody3D) -> CollisionShape3D:
 	return null
 
 func _shape_world_half_extents(shape_node: CollisionShape3D) -> Vector2:
-	if not is_instance_valid(shape_node) or not shape_node.shape is BoxShape3D:
+	if not is_instance_valid(shape_node) or not is_instance_valid(shape_node.shape):
 		return Vector2.ZERO
-	var box := shape_node.shape as BoxShape3D
 	var scale := shape_node.global_transform.basis.get_scale().abs()
-	return Vector2(box.size.x * scale.x * 0.5, box.size.z * scale.z * 0.5)
+	if shape_node.shape is BoxShape3D:
+		var box := shape_node.shape as BoxShape3D
+		return Vector2(box.size.x * scale.x * 0.5, box.size.z * scale.z * 0.5)
+	if shape_node.shape is CylinderShape3D:
+		var cylinder := shape_node.shape as CylinderShape3D
+		return Vector2(cylinder.radius * scale.x, cylinder.radius * scale.z)
+	if shape_node.shape is CapsuleShape3D:
+		var capsule := shape_node.shape as CapsuleShape3D
+		return Vector2(capsule.radius * scale.x, capsule.radius * scale.z)
+	return Vector2.ZERO
+
+func _landmark_alignment_receipt() -> Dictionary:
+	# Keep the product-owned collision datum auditable against its visible
+	# landmark anchor.  This is intentionally a bounded transform check rather
+	# than a second visual asset or a hidden proxy geometry source.
+	var bindings := {
+		"keeper_post": ["KeeperLanternPostAnchor", "KeeperLanternPostAnchor/KeeperPostCollision", "KeeperLanternPostAnchor/KeeperPostAsset"],
+		"mausoleum": ["SmallMausoleumAnchor", "MausoleumCollision", "SmallMausoleumAnchor"],
+		"cracked_bell": ["CrackedMoonBellAnchor", "CrackedMoonBellAnchor/CrackedBellCollision", "CrackedMoonBellAnchor/CrackedBellAsset"],
+	}
+	var result: Dictionary = {}
+	for key in bindings:
+		var pair: Array = bindings[key]
+		var anchor := get_node_or_null("OuterDatum/%s" % pair[0]) as Node3D
+		var body := get_node_or_null("OuterDatum/%s" % pair[1]) as StaticBody3D
+		var shape := _first_shape(body) if is_instance_valid(body) else null
+		var visual := get_node_or_null("OuterDatum/%s" % pair[2]) as Node3D
+		# Vertical body placement intentionally centers the collider around the
+		# landmark's height; alignment is a traversability/footprint contract, so
+		# compare only the ground-plane (x/z) datum.
+		var body_offset := Vector2(anchor.global_position.x, anchor.global_position.z).distance_to(Vector2(body.global_position.x, body.global_position.z)) if is_instance_valid(anchor) and is_instance_valid(body) else INF
+		var offset := Vector2(shape.global_position.x, shape.global_position.z).distance_to(Vector2(visual.global_position.x, visual.global_position.z)) if is_instance_valid(shape) and is_instance_valid(visual) else INF
+		result[key] = {
+			"anchor_path":"OuterDatum/%s" % pair[0],
+			"collision_path":"OuterDatum/%s" % pair[1],
+			"anchor_bound":is_instance_valid(anchor),
+			"collision_bound":is_instance_valid(body) and is_instance_valid(shape),
+			"anchor_body_offset":body_offset,
+			"visual_collision_offset":offset,
+			"footprint":_shape_world_half_extents(shape),
+			"aligned":is_instance_valid(anchor) and is_instance_valid(body) and is_instance_valid(shape) and is_instance_valid(visual) and body_offset <= 0.05 and offset <= 0.1,
+		}
+	return result
 
 func get_snapshot() -> Dictionary:
 	var playable := get_playable_rect()
@@ -248,6 +289,7 @@ func get_snapshot() -> Dictionary:
 		"background_mode":"single_intact_authored_cemetery_with_restrained_fog",
 		"external_world":{"source":"intact_authored_package_native_terrain_and_perimeter", "procedural_scenery":false, "primitive_meshes":0, "opaque":true, "non_playable_depth_beyond_all_edges":true},
 		"landmark_collision":{"keeper_post":is_instance_valid(get_node_or_null("OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision")), "small_mausoleum":is_instance_valid(get_node_or_null("OuterDatum/MausoleumCollision")), "cracked_bell":is_instance_valid(get_node_or_null("OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision"))},
+		"landmark_collision_alignment":_landmark_alignment_receipt(),
 		"perimeter_collision":{"north":is_instance_valid(north_boundary), "south":is_instance_valid(south_boundary), "east":is_instance_valid(east_boundary), "west":is_instance_valid(west_boundary)},
 	}
 

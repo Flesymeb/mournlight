@@ -9,11 +9,20 @@ const MIN_ENEMIES := 25
 const MAX_ENEMIES := 40
 const TARGET_ENEMIES := 32
 const WINDOW_SECONDS := 4.0
+const NATIVE_STATUS := "qualified"
+const SOFTWARE_STATUS := "rejected_software_renderer"
+const UNKNOWN_STATUS := "pending_native_renderer"
 
 static func contract() -> Dictionary:
 	return {
 		"contract_id": CONTRACT_ID,
 		"release_guard": "OS.has_feature(\"editor\")",
+		"renderer_gate": "hardware_qualification_eligible == true",
+		"qualification_statuses": {
+			"hardware": NATIVE_STATUS,
+			"software": SOFTWARE_STATUS,
+			"unknown": UNKNOWN_STATUS,
+		},
 		"entrypoints": {
 			"prepare": "tester_dense_prepare",
 			"advance": "tester_dense_advance",
@@ -30,3 +39,12 @@ static func contract() -> Dictionary:
 		"receipts": ["requested", "resolved", "reset_isolation"],
 		"ordinary_balance_untouched": true,
 	}
+
+static func renderer_status(classification: String, hardware_eligible: bool) -> String:
+	# Renderer identity is an evidence gate, never a tuning override. Unknown
+	# adapters remain explicitly pending until the host supplies native proof.
+	if hardware_eligible and classification == "hardware":
+		return NATIVE_STATUS
+	if classification == "software":
+		return SOFTWARE_STATUS
+	return UNKNOWN_STATUS

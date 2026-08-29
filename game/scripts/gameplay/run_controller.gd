@@ -1441,8 +1441,10 @@ func _prepare_final_profile() -> void:
 	_validation_setup_generation += 1
 	var encounter := spawner.get_snapshot()
 	get_tree().paused = true
+	var renderer_receipt := _profile_renderer_receipt()
 	validation_profile_receipt = {
 		"accepted":bool(preparation.get("accepted",false)) and is_instance_valid(boss),
+		"status":DenseWaveProfileClass.renderer_status(String(renderer_receipt.get("classification", "unknown")), bool(renderer_receipt.get("hardware_qualification_eligible", false))),
 		"branch_id":"final_wave_bellkeeper_profile",
 		"run_serial":run_serial,
 		"setup_generation":_validation_setup_generation,
@@ -1465,7 +1467,8 @@ func _prepare_final_profile() -> void:
 		"workload":_profile_workload_receipt(encounter),
 		"lifecycle":_lifecycle_counters(),
 		"viewport":_profile_viewport_receipt(),
-		"renderer":_profile_renderer_receipt(),
+		"renderer":renderer_receipt,
+		"renderer_gate_status":DenseWaveProfileClass.renderer_status(String(renderer_receipt.get("classification", "unknown")), bool(renderer_receipt.get("hardware_qualification_eligible", false))),
 		"requested_profile":"representative_final_wave_and_bellkeeper",
 		"resolved_profile":"prepared_paused",
 		"preparation_paused":get_tree().paused,
@@ -1715,7 +1718,16 @@ func _advance_profile_sample(delta: float) -> void:
 		"route_qualification":_route_qualification(wave_director.get_snapshot()),
 	}
 	validation_profile_sample["qualification"] = _profile_qualification(validation_profile_sample)
-	validation_profile_sample["status"] = "qualified" if bool((validation_profile_sample["qualification"] as Dictionary).get("qualified", false)) else "rejected"
+	var profile_renderer := validation_profile_sample.get("renderer", {}) as Dictionary
+	var profile_classification := String(profile_renderer.get("classification", "unknown"))
+	var profile_hardware_eligible := bool(profile_renderer.get("hardware_qualification_eligible", false))
+	var renderer_gate_status := DenseWaveProfileClass.renderer_status(profile_classification, profile_hardware_eligible)
+	var qualification_passed := bool((validation_profile_sample["qualification"] as Dictionary).get("qualified", false))
+	# Unknown identity is pending native evidence even if synthetic predicates
+	# happen to pass; software is an explicit rejection. Only an eligible native
+	# renderer may produce a qualified status.
+	validation_profile_sample["status"] = DenseWaveProfileClass.UNKNOWN_STATUS if renderer_gate_status == DenseWaveProfileClass.UNKNOWN_STATUS else (DenseWaveProfileClass.NATIVE_STATUS if qualification_passed and renderer_gate_status == DenseWaveProfileClass.NATIVE_STATUS else "rejected")
+	validation_profile_sample["renderer_gate_status"] = renderer_gate_status
 	validation_profile_sample["rejection_reasons"] = (validation_profile_sample["qualification"] as Dictionary).get("reasons", []).duplicate()
 	_record_profile_matrix_sample(validation_profile_sample)
 	_record_profile_cycle("advance", validation_profile_sample)
@@ -2379,6 +2391,8 @@ func _profile_renderer_receipt() -> Dictionary:
 	for marker in ["llvmpipe", "softpipe", "swiftshader", "lavapipe", "software rasterizer"]:
 		software_renderer = software_renderer or identity_text.contains(marker)
 	var identity_complete := not adapter_name.strip_edges().is_empty() and not adapter_vendor.strip_edges().is_empty() and not adapter_api_version.strip_edges().is_empty()
+	var classification := "software" if software_renderer else ("hardware" if identity_complete else "unknown")
+	var classification_reason := "software_marker_detected" if software_renderer else ("complete_native_identity" if identity_complete else "renderer_identity_incomplete")
 	return {
 		"rendering_method":RenderingServer.get_current_rendering_method(),
 		"rendering_driver":rendering_driver,
@@ -2390,7 +2404,8 @@ func _profile_renderer_receipt() -> Dictionary:
 		"identity_complete":identity_complete,
 		"software_renderer":software_renderer,
 		"hardware_backed":identity_complete and not software_renderer,
-		"classification":"software" if software_renderer else ("hardware" if identity_complete else "unknown"),
+		"classification":classification,
+		"classification_reason":classification_reason,
 		"hardware_qualification_eligible":identity_complete and not software_renderer,
 		"project_name":String(ProjectSettings.get_setting("application/config/name", "Mournlight")),
 		"profile_identity":"mournlight.release.final_wave.v1",
@@ -2436,7 +2451,10 @@ func _profile_qualification(sample: Dictionary) -> Dictionary:
 	if int(observation_work.get("sampled_frame_group_inventories", 0)) != 0:
 		reasons.append("weapon_target_full_group_inventory_detected")
 	var density_qualified := minimum_workload >= PROFILE_DENSITY_MIN and maximum_workload <= PROFILE_DENSITY_MAX and start_workload >= PROFILE_DENSITY_MIN and end_workload >= PROFILE_DENSITY_MIN
-	return {"qualified":reasons.is_empty(), "ordinary_route_qualified":passive_ordinary and reasons.is_empty(), "density_qualified":density_qualified, "reasons":reasons, "requires_hardware":true, "p95_limit_ms":16.67,
+	var renderer_classification := String(renderer.get("classification", "unknown"))
+	var renderer_eligible := bool(renderer.get("hardware_qualification_eligible", false))
+	var gate_status := DenseWaveProfileClass.renderer_status(renderer_classification, renderer_eligible)
+	return {"qualified":reasons.is_empty(), "ordinary_route_qualified":passive_ordinary and reasons.is_empty(), "density_qualified":density_qualified, "reasons":reasons, "requires_hardware":true, "renderer_gate_status":gate_status, "p95_limit_ms":16.67,
 		"required_density_range":{"minimum":25,"maximum":40,"boundary_target":32}}
 
 func _validation_controls_receipt() -> Dictionary:
@@ -3081,6 +3099,8 @@ func _mcp_state() -> Dictionary:
 		"profile_subsystem_window":validation_profile_sample.get("subsystem_window", {}),
 		"profile_renderer_classification":profile_renderer.get("classification", "unknown"),
 		"profile_hardware_eligible":profile_renderer.get("hardware_qualification_eligible", false),
+		"profile_renderer_gate_status":validation_profile_sample.get("renderer_gate_status", DenseWaveProfileClass.UNKNOWN_STATUS),
+		"profile_native_qualification_pending":String(validation_profile_sample.get("renderer_gate_status", DenseWaveProfileClass.UNKNOWN_STATUS)) == DenseWaveProfileClass.UNKNOWN_STATUS,
 		"profile_viewport_width":profile_viewport.get("width", 0),
 		"profile_viewport_height":profile_viewport.get("height", 0),
 		"profile_requested_enemies":profile_cohort.get("requested", validation_profile_sample.get("requested_enemy_workload", 0)),
