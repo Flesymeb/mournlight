@@ -7,6 +7,8 @@ signal victory_requested
 
 const WAVE_SEQUENCE := preload("res://resources/waves/mournlight_wave_sequence.tres")
 const ROLE_KEYS := ["mossling", "wispbat", "bone_slinger", "grave_brute"]
+const MAX_LIVE_ENEMIES := 40
+const MAX_SPAWN_BUDGET := 160
 
 var phase := "idle"
 var wave_index := -1
@@ -129,8 +131,10 @@ func _definition(index: int) -> Dictionary:
 		weights[role] = int(values[index])
 	return {
 		"id": ids[index], "index": index, "title": titles[index],
-		"duration": float(durations[index]), "cap": int(caps[index]),
-		"cadence": float(cadences[index]), "spawn_budget": int(budgets[index]),
+		"duration": maxf(1.0, float(durations[index])),
+		"cap": clampi(int(caps[index]), 1, MAX_LIVE_ENEMIES),
+		"cadence": maxf(0.1, float(cadences[index])),
+		"spawn_budget": clampi(int(budgets[index]), 1, MAX_SPAWN_BUDGET),
 		"initial_spawns":int(initial_spawns[index]),
 		"composition_weights": weights, "elite_every": int(elite_every[index]),
 		"elite_enabled": int(elite_every[index]) > 0, "warning": warnings[index],

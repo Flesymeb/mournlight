@@ -15,7 +15,7 @@
 sky_top_color = Color(0.012, 0.02, 0.075, 1)
 sky_horizon_color = Color(0.09, 0.105, 0.23, 1)
 sky_curve = 0.09
-sky_energy_multiplier = 0.42
+sky_energy_multiplier = 0.55
 ground_bottom_color = Color(0.008, 0.012, 0.035, 1)
 ground_horizon_color = Color(0.055, 0.068, 0.15, 1)
 ground_curve = 0.07
@@ -28,11 +28,11 @@ sky_material = SubResource("ProceduralSky_mournlight")
 [sub_resource type="Environment" id="Environment_moonlit"]
 background_mode = 2
 background_color = Color(0.012, 0.018, 0.055, 1)
-background_energy_multiplier = 0.42
+background_energy_multiplier = 0.58
 sky = SubResource("Sky_mournlight")
 ambient_light_source = 2
 ambient_light_color = Color(0.28, 0.34, 0.62, 1)
-ambient_light_energy = 1.28
+ambient_light_energy = 1.42
 reflected_light_source = 2
 tonemap_mode = 2
 glow_enabled = true
@@ -41,11 +41,11 @@ bloom = 0.08
 fog_enabled = true
 fog_light_color = Color(0.075, 0.09, 0.19, 1)
 fog_light_energy = 0.38
-fog_density = 0.009
+fog_density = 0.015
 fog_sky_affect = 0.88
 fog_aerial_perspective = 0.2
 fog_depth_begin = 8.0
-fog_depth_end = 48.0
+fog_depth_end = 64.0
 fog_depth_curve = 1.15
 fog_height = 0.0
 fog_height_density = 0.045
@@ -72,7 +72,11 @@ light_specular = 0.0
 shadow_enabled = false
 
 [node name="CemeteryGarden" parent="." instance=ExtResource("4_cemetery")]
-scale = Vector3(1.65, 1.65, 1.65)
+# The authored package is calibrated at 2.2x in its native scene.  Keep the
+# single intact instance, but give the garden enough street and perimeter
+# extent that the camera has a real loop and cross-route instead of a
+# camera-sized combat pad.
+scale = Vector3(1.95, 1.95, 1.95)
 
 [node name="Warden" parent="." instance=ExtResource("2_warden")]
 position = Vector3(0, 0.05, 6)
@@ -93,10 +97,10 @@ arena_contract = NodePath("../CemeteryGarden")
 near = 0.15
 far = 180.0
 arena_limit = Vector2(18.0, 17.0)
-normal_fov = 60.0
-follow_height = 16.0
-follow_distance = 14.5
-arena_fill_limit = Vector2(12.5, 11.0)
+normal_fov = 64.0
+follow_height = 22.0
+follow_distance = 21.0
+arena_fill_limit = Vector2(16.0, 14.0)
 coverage_max_correction = 3.5
 presentation_body = NodePath("../Warden/PresentationRoot/ModelPivot/AssetTransform/AuthoredWardenMage")
 presentation_lantern = NodePath("../Warden/PresentationRoot/LanternPivot/AuthoredLantern")

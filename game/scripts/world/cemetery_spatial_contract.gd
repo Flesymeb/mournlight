@@ -1,10 +1,11 @@
 class_name CemeterySpatialContract
 extends Node3D
 
-@export var camera_world_margin := Vector2(7.0, 6.6)
-@export var protected_camera_half_extents := Vector2(8.4, 6.2)
-@export var minimum_player_safe_radius := 8.2
+@export var camera_world_margin := Vector2(6.0, 5.6)
+@export var protected_camera_half_extents := Vector2(9.2, 6.8)
+@export var minimum_player_safe_radius := 8.8
 @export var spawn_clearance := 0.6
+@export var native_map_scale := 1.95
 
 @onready var ground_collision: StaticBody3D = $OuterDatum/GroundCollision
 @onready var north_boundary: StaticBody3D = $OuterDatum/NorthBoundary
@@ -16,6 +17,14 @@ extends Node3D
 
 const AUTHORED_LOCAL_MIN := Vector2(-12.143, -11.415)
 const AUTHORED_LOCAL_MAX := Vector2(12.149, 11.418)
+
+func _ready() -> void:
+	# The complete cemetery is authored with a native local datum.  Rebase the
+	# instance once at runtime so nested scene overrides cannot regress the
+	# release framing back to the old camera-sized pad.
+	var authored_scale := maxf(1.0, native_map_scale)
+	if not is_equal_approx(scale.x, authored_scale):
+		scale = Vector3.ONE * authored_scale
 
 func get_player_spawn() -> Vector3:
 	var result := player_spawn.global_position
@@ -156,7 +165,7 @@ func get_snapshot() -> Dictionary:
 	var visual := get_authored_visual_rect()
 	var fill := get_camera_fill_rect()
 	return {
-		"contract_id":"cemetery_spatial_integrity_v46",
+		"contract_id":"cemetery_spatial_integrity_v47",
 		"authored_bounds_contract":{
 			"minimum":visual.position,
 			"maximum":visual.end,
