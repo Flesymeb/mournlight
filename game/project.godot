@@ -95,6 +95,8 @@ dense_profile/target_width=1920
 dense_profile/target_height=1080
 dense_profile/target_enemy_count=32
 dense_profile/required_cycles=3
+dense_profile/default_enabled=false
+dense_profile/editor_opt_in=true
 
 [rendering]
 

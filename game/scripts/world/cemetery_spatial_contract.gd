@@ -54,23 +54,96 @@ func _audit_visible_uv_bindings() -> void:
 	# authored package from hidden calibration/proxy geometry.
 	var checked := 0
 	var uv_present := 0
-	var tangent_safe := 0
+	var uv_missing := 0
+	var uv_degenerate := 0
+	var tangent_present := 0
+	var tangent_missing := 0
+	var tangent_malformed := 0
+	var fallback_material_surfaces := 0
+	var surface_receipts: Array[Dictionary] = []
 	if is_instance_valid(package_root):
 		for node in package_root.find_children("*", "MeshInstance3D", true, false):
 			var mesh_instance := node as MeshInstance3D
 			if not is_instance_valid(mesh_instance) or not is_instance_valid(mesh_instance.mesh) or not mesh_instance.visible:
 				continue
 			checked += 1
-			var surfaces := mesh_instance.mesh.get_surface_count()
-			if surfaces > 0:
-				uv_present += 1
-				tangent_safe += 1
-			mesh_instance.set_meta("uv_binding_state", "native_validated")
-			mesh_instance.set_meta("uv_surface_count", surfaces)
+			var mesh := mesh_instance.mesh
+			var mesh_surface_receipts: Array[Dictionary] = []
+			for surface_index in mesh.get_surface_count():
+				var arrays := mesh.surface_get_arrays(surface_index)
+				var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX] if arrays.size() > Mesh.ARRAY_VERTEX and arrays[Mesh.ARRAY_VERTEX] is PackedVector3Array else PackedVector3Array()
+				var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV] if arrays.size() > Mesh.ARRAY_TEX_UV and arrays[Mesh.ARRAY_TEX_UV] is PackedVector2Array else PackedVector2Array()
+				var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays.size() > Mesh.ARRAY_INDEX and arrays[Mesh.ARRAY_INDEX] is PackedInt32Array else PackedInt32Array()
+				var tangents: PackedFloat32Array = arrays[Mesh.ARRAY_TANGENT] if arrays.size() > Mesh.ARRAY_TANGENT and arrays[Mesh.ARRAY_TANGENT] is PackedFloat32Array else PackedFloat32Array()
+				var uv_state := "missing"
+				var uv_is_degenerate := false
+				var triangle_count := 0
+				var degenerate_triangle_count := 0
+				if not uvs.is_empty():
+					uv_present += 1
+					uv_state = "valid"
+					if uvs.size() != vertices.size():
+						uv_state = "malformed_length"
+						uv_is_degenerate = true
+					else:
+						triangle_count = indices.size() / 3 if not indices.is_empty() else vertices.size() / 3
+						for triangle in triangle_count:
+							var i0 := int(indices[triangle * 3]) if not indices.is_empty() else triangle * 3
+							var i1 := int(indices[triangle * 3 + 1]) if not indices.is_empty() else triangle * 3 + 1
+							var i2 := int(indices[triangle * 3 + 2]) if not indices.is_empty() else triangle * 3 + 2
+							if i0 >= uvs.size() or i1 >= uvs.size() or i2 >= uvs.size():
+								degenerate_triangle_count += 1
+								continue
+							var uv_a := uvs[i1] - uvs[i0]
+							var uv_b := uvs[i2] - uvs[i0]
+							if absf(uv_a.cross(uv_b)) <= 0.000001:
+								degenerate_triangle_count += 1
+						if degenerate_triangle_count > 0:
+							uv_state = "degenerate_triangles"
+							uv_is_degenerate = true
+				if uv_is_degenerate:
+					uv_degenerate += 1
+				else:
+					uv_missing += 1 if uvs.is_empty() else 0
+				var tangent_state := "missing"
+				if not tangents.is_empty():
+					tangent_present += 1
+					tangent_state = "valid" if tangents.size() == vertices.size() * 4 else "malformed_length"
+				if tangent_state != "valid":
+						tangent_malformed += 1
+				else:
+					tangent_missing += 1
+				if uv_is_degenerate or uvs.is_empty():
+					# Keep the imported material and source mesh immutable while making
+					# the integration binding render-safe. World triplanar sampling
+					# avoids dependence on unusable UVs and retains the authored
+					# albedo/roughness/lighting language.
+					var source_material := mesh_instance.get_active_material(surface_index)
+					if source_material is BaseMaterial3D:
+						var fallback_material := (source_material as BaseMaterial3D).duplicate() as BaseMaterial3D
+						fallback_material.uv1_triplanar = true
+						fallback_material.uv1_world_triplanar = true
+						fallback_material.uv1_triplanar_sharpness = 1.0
+						mesh_instance.set_surface_override_material(surface_index, fallback_material)
+						fallback_material_surfaces += 1
+				mesh_surface_receipts.append({
+					"surface":surface_index, "vertex_count":vertices.size(),
+					"uv_count":uvs.size(), "uv_state":uv_state,
+					"triangle_count":triangle_count, "degenerate_triangle_count":degenerate_triangle_count,
+					"tangent_float_count":tangents.size(), "tangent_state":tangent_state,
+				})
+			surface_receipts.append({"mesh":mesh_instance.get_path(), "surfaces":mesh_surface_receipts})
+			mesh_instance.set_meta("uv_binding_state", "native_surface_audited")
+			mesh_instance.set_meta("uv_surface_receipt", mesh_surface_receipts)
 	uv_binding_receipt = {
-		"status":"validated", "scope":"visible_authored_cemetery",
-		"checked_meshes":checked, "uv_bound_meshes":uv_present,
-		"tangent_safe_meshes":tangent_safe, "degenerate_uv_surfaces":0,
+		"status":"validated_with_render_safe_fallback" if fallback_material_surfaces > 0 else "validated", "scope":"visible_authored_cemetery",
+		"checked_meshes":checked, "uv_bound_surfaces":uv_present,
+		"uv_missing_surfaces":uv_missing, "degenerate_uv_surfaces":uv_degenerate,
+		"tangent_bound_surfaces":tangent_present, "tangent_missing_surfaces":tangent_missing,
+		"malformed_tangent_surfaces":tangent_malformed,
+		"render_safe_fallback_surfaces":fallback_material_surfaces,
+		"render_safe_fallback":"world_triplanar_material_override_for_invalid_uvs",
+		"surface_receipts":surface_receipts,
 		"source_immutable":true, "runtime_binding":"AuthoredCemeteryPackage",
 	}
 

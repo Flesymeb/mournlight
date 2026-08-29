@@ -24,6 +24,9 @@ static func contract() -> Dictionary:
 	return {
 		"contract_id": CONTRACT_ID,
 		"release_guard": "OS.has_feature(\"editor\")",
+		"default_enabled": false,
+		"editor_opt_in": true,
+		"release_presentation_impact": "none_when_disabled",
 		"renderer_gate": "hardware_qualification_eligible == true",
 		"qualification_mode": QUALIFICATION_MODE,
 		"qualification_statuses": {
@@ -54,6 +57,7 @@ static func contract() -> Dictionary:
 			"spawned_total", "despawned_total", "runtime_error_count",
 		],
 		"receipts": ["requested", "resolved", "reset_isolation"],
+		"cycle_protocol": ["prepare", "advance", "reset"],
 		"cycle_aggregation": {
 			"identity":"mournlight.native_dense_three_cycle.v1",
 			"required_complete_cycles":3,
