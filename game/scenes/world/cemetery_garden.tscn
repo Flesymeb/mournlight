@@ -1,327 +1,285 @@
-[gd_scene load_steps=20 format=3]
+[gd_scene format=3 uid="uid://dqrhkxaklacg8"]
 
-[ext_resource type="PackedScene" path="res://assets/authored/low_poly_graveyard.glb" id="1_cemetery"]
-[ext_resource type="PackedScene" path="res://assets/landmarks/keeper_post.glb" id="2_keeper_post"]
-[ext_resource type="PackedScene" path="res://assets/landmarks/candidates/digiba_cracked_bell.glb" id="3_cracked_bell"]
-[ext_resource type="Script" path="res://scripts/world/cemetery_spatial_contract.gd" id="4_spatial_contract"]
+[ext_resource type="PackedScene" uid="uid://db7kvkbqwy1sb" path="res://assets/authored/low_poly_graveyard.glb" id="1_cemetery"]
+[ext_resource type="PackedScene" uid="uid://cs67yjh0rn1qy" path="res://assets/landmarks/keeper_post.glb" id="2_keeper_post"]
+[ext_resource type="PackedScene" uid="uid://dwaf770rsfod" path="res://assets/landmarks/candidates/digiba_cracked_bell.glb" id="3_cracked_bell"]
+[ext_resource type="Script" uid="uid://bivvqjf7o3473" path="res://scripts/world/cemetery_spatial_contract.gd" id="4_spatial_contract"]
+
+[sub_resource type="NavigationMesh" id="CemeteryNavigationMesh"]
+agent_height = 1.6
+agent_radius = 0.45
 
 [sub_resource type="BoxShape3D" id="GroundShape"]
-size = Vector3(30.0, 0.7, 30.0)
+size = Vector3(30, 0.7, 30)
 
 [sub_resource type="BoxShape3D" id="NorthSouthShape"]
-size = Vector3(30.0, 2.2, 0.7)
+size = Vector3(30, 2.2, 0.7)
 
 [sub_resource type="BoxShape3D" id="EastWestShape"]
-size = Vector3(0.7, 2.2, 30.0)
+size = Vector3(0.7, 2.2, 30)
 
 [sub_resource type="BoxShape3D" id="MausoleumShape"]
-size = Vector3(6.9, 3.8, 11.0)
+size = Vector3(6.9, 3.8, 11)
 
 [sub_resource type="CylinderShape3D" id="TreeShape"]
-radius = 1.05
 height = 3.2
+radius = 1.05
 
 [sub_resource type="CylinderShape3D" id="KeeperPostShape"]
-radius = 0.2
 height = 2.6
+radius = 0.2
 
 [sub_resource type="BoxShape3D" id="CrackedBellShape"]
-size = Vector3(1.8, 2.0, 1.8)
+size = Vector3(1.8, 2, 1.8)
 
 [sub_resource type="BoxShape3D" id="StandingCoffinShape"]
 size = Vector3(1.7, 2.8, 1.6)
 
 [sub_resource type="BoxShape3D" id="FlatCoffinShape"]
-size = Vector3(1.3, 1.0, 2.7)
+size = Vector3(1.3, 1, 2.7)
 
 [sub_resource type="BoxShape3D" id="WideCoffinShape"]
-size = Vector3(2.8, 1.0, 1.5)
+size = Vector3(2.8, 1, 1.5)
 
 [sub_resource type="BoxShape3D" id="GraveClusterShape"]
 size = Vector3(3.8, 1.2, 1.9)
 
-[sub_resource type="NavigationMesh" id="CemeteryNavigationMesh"]
-agent_height = 1.6
-agent_radius = 0.45
-cell_size = 0.25
-cell_height = 0.25
-
-
-[node name="CemeteryGarden" type="Node3D" groups=["authored_environment", "mcp_watch"]]
+[node name="CemeteryGarden" type="Node3D" unique_id=220135597 groups=["authored_environment", "mcp_watch"]]
 script = ExtResource("4_spatial_contract")
 
-[node name="PackageTransform" type="Node3D" parent="."]
-position = Vector3(0.28, 0.02, 0.0)
-scale = Vector3(3.2, 3.2, 3.2)
+[node name="PackageTransform" type="Node3D" parent="." unique_id=1533547498]
+transform = Transform3D(3.2, 0, 0, 0, 3.2, 0, 0, 0, 3.2, 0.28, 0.02, 0)
 
-[node name="AuthoredCemeteryPackage" parent="PackageTransform" instance=ExtResource("1_cemetery")]
-position = Vector3(0.0, 0.0, -66.8727)
+[node name="AuthoredCemeteryPackage" parent="PackageTransform" unique_id=932545532 instance=ExtResource("1_cemetery")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -66.8727)
 
-[node name="OuterDatum" type="Node3D" parent="."]
-# Product-owned collision/navigation datum is rebased to the authored package
-# footprint; this leaves a broad traversable garden while retaining external
-# cemetery depth beyond every perimeter edge.
-scale = Vector3(1.55, 1.0, 1.55)
+[node name="OuterDatum" type="Node3D" parent="." unique_id=227997051]
 
-[node name="NativeNavigationRegion" type="NavigationRegion3D" parent="OuterDatum"]
-navigation_layers = 1
+[node name="NativeNavigationRegion" type="NavigationRegion3D" parent="OuterDatum" unique_id=798922117]
 navigation_mesh = SubResource("CemeteryNavigationMesh")
 metadata/_spatial_contract = "native_authored_streets"
 metadata/_authoritative_map_instance = "AuthoredCemeteryPackage"
 
-[node name="GroundCollision" type="StaticBody3D" parent="OuterDatum"]
+[node name="GroundCollision" type="StaticBody3D" parent="OuterDatum" unique_id=913682918]
 collision_layer = 4
-collision_mask = 1
 
-[node name="Shape" type="CollisionShape3D" parent="OuterDatum/GroundCollision"]
-position = Vector3(0, -0.38, 0)
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/GroundCollision" unique_id=1020065580]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.38, 0)
 shape = SubResource("GroundShape")
 
-[node name="NorthBoundary" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(0.5, 1.1, -15.18)
+[node name="NorthBoundary" type="StaticBody3D" parent="OuterDatum" unique_id=389951254]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1.1, -15.18)
 collision_layer = 2
-collision_mask = 1
 
-[node name="Shape" type="CollisionShape3D" parent="OuterDatum/NorthBoundary"]
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/NorthBoundary" unique_id=1811804182]
 shape = SubResource("NorthSouthShape")
 
-[node name="SouthBoundary" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(0.5, 1.1, 15.18)
+[node name="SouthBoundary" type="StaticBody3D" parent="OuterDatum" unique_id=1061381764]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1.1, 15.18)
 collision_layer = 2
-collision_mask = 1
 
-[node name="Shape" type="CollisionShape3D" parent="OuterDatum/SouthBoundary"]
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/SouthBoundary" unique_id=1643629900]
 shape = SubResource("NorthSouthShape")
 
-[node name="EastBoundary" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(15.18, 1.1, 0.18)
+[node name="EastBoundary" type="StaticBody3D" parent="OuterDatum" unique_id=903064246]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.18, 1.1, 0.18)
 collision_layer = 2
-collision_mask = 1
 
-[node name="Shape" type="CollisionShape3D" parent="OuterDatum/EastBoundary"]
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/EastBoundary" unique_id=915108167]
 shape = SubResource("EastWestShape")
 
-[node name="WestBoundary" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(-14.68, 1.1, 0.18)
+[node name="WestBoundary" type="StaticBody3D" parent="OuterDatum" unique_id=702137295]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.68, 1.1, 0.18)
 collision_layer = 2
-collision_mask = 1
 
-[node name="Shape" type="CollisionShape3D" parent="OuterDatum/WestBoundary"]
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/WestBoundary" unique_id=1498427778]
 shape = SubResource("EastWestShape")
 
-[node name="MausoleumCollision" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(0.53, 1.9, -2.52)
-# Layer 1 keeps the authored landmark solid for the player (whose mask includes
-# layer 1) while excluding the gameplay obstacle from camera landmark raycasts.
-# The mesh remains the sole visual mausoleum; this is only a query-layer split.
-collision_layer = 1
-collision_mask = 1
+[node name="MausoleumCollision" type="StaticBody3D" parent="OuterDatum" unique_id=631849061]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.53, 1.9, -2.52)
+collision_layer = 4
 
-[node name="Shape" type="CollisionShape3D" parent="OuterDatum/MausoleumCollision"]
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/MausoleumCollision" unique_id=403615118]
 shape = SubResource("MausoleumShape")
 
-[node name="NortheastTreeCollision" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(6.85, 1.6, -5.46)
-collision_layer = 1
-collision_mask = 1
+[node name="NortheastTreeCollision" type="StaticBody3D" parent="OuterDatum" unique_id=1768484639]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.85, 1.6, -5.46)
 
-[node name="Shape" type="CollisionShape3D" parent="OuterDatum/NortheastTreeCollision"]
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/NortheastTreeCollision" unique_id=2136960841]
 shape = SubResource("TreeShape")
 
-[node name="NorthwestTreeCollision" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(-6.9, 1.6, -6.42)
-collision_layer = 1
-collision_mask = 1
+[node name="NorthwestTreeCollision" type="StaticBody3D" parent="OuterDatum" unique_id=1610349841]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.9, 1.6, -6.42)
 
-[node name="Shape" type="CollisionShape3D" parent="OuterDatum/NorthwestTreeCollision"]
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/NorthwestTreeCollision" unique_id=55888550]
 shape = SubResource("TreeShape")
 
-[node name="SoutheastTreeCollision" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(9.28, 1.6, 8.94)
-collision_layer = 1
-collision_mask = 1
+[node name="SoutheastTreeCollision" type="StaticBody3D" parent="OuterDatum" unique_id=1909054674]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.28, 1.6, 8.94)
 
-[node name="Shape" type="CollisionShape3D" parent="OuterDatum/SoutheastTreeCollision"]
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/SoutheastTreeCollision" unique_id=1326067322]
 shape = SubResource("TreeShape")
 
-[node name="PlayerSpawn" type="Marker3D" parent="OuterDatum" groups=["spawn_anchor"]]
-position = Vector3(0, 0.05, 5.8)
+[node name="PlayerSpawn" type="Marker3D" parent="OuterDatum" unique_id=108365110 groups=["spawn_anchor"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 5.8)
 
-[node name="SpawnLanes" type="Node3D" parent="OuterDatum"]
+[node name="SpawnLanes" type="Node3D" parent="OuterDatum" unique_id=1734080278]
 
-[node name="Lane00" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
-position = Vector3(-8.8, 0.05, -8.5)
+[node name="Lane00" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=5226820 groups=["arena_spawn_lane"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.8, 0.05, -8.5)
 
-[node name="Lane01" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
-position = Vector3(-4.2, 0.05, -8.8)
+[node name="Lane01" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=955396470 groups=["arena_spawn_lane"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.2, 0.05, -8.8)
 
-[node name="Lane02" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
-position = Vector3(0.4, 0.05, -8.75)
+[node name="Lane02" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=34347366 groups=["arena_spawn_lane"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 0.05, -8.75)
 
-[node name="Lane03" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
-position = Vector3(4.6, 0.05, -8.7)
+[node name="Lane03" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=1901626138 groups=["arena_spawn_lane"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.6, 0.05, -8.7)
 
-[node name="Lane04" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
-position = Vector3(9.5, 0.05, -3.6)
+[node name="Lane04" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=1832336006 groups=["arena_spawn_lane"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.5, 0.05, -3.6)
 
-[node name="Lane05" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
-position = Vector3(9.45, 0.05, 2.1)
+[node name="Lane05" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=1734849149 groups=["arena_spawn_lane"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0.05, 2.1)
 
-[node name="Lane06" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
-position = Vector3(9.5, 0.05, 7.2)
+[node name="Lane06" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=845471335 groups=["arena_spawn_lane"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.5, 0.05, 7.2)
 
-[node name="Lane07" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
-position = Vector3(4.8, 0.05, 9.0)
+[node name="Lane07" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=715445586 groups=["arena_spawn_lane"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.8, 0.05, 9)
 
-[node name="Lane08" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
-position = Vector3(0.0, 0.05, 9.1)
+[node name="Lane08" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=1267278934 groups=["arena_spawn_lane"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 9.1)
 
-[node name="Lane09" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
-position = Vector3(-5.4, 0.05, 9.0)
+[node name="Lane09" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=675773870 groups=["arena_spawn_lane"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.4, 0.05, 9)
 
-[node name="Lane10" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
-position = Vector3(-8.8, 0.05, 5.0)
+[node name="Lane10" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=1263137551 groups=["arena_spawn_lane"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.8, 0.05, 5)
 
-[node name="Lane11" type="Marker3D" parent="OuterDatum/SpawnLanes" groups=["arena_spawn_lane"]]
-position = Vector3(-8.9, 0.05, -1.8)
+[node name="Lane11" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=325386550 groups=["arena_spawn_lane"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.9, 0.05, -1.8)
 
-[node name="KeeperLanternPostAnchor" type="Marker3D" parent="OuterDatum" groups=["landmark_anchor"]]
-position = Vector3(-4.8, 0, 1.8)
+[node name="KeeperLanternPostAnchor" type="Marker3D" parent="OuterDatum" unique_id=674448232 groups=["landmark_anchor"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.8, 0, 1.8)
 
-[node name="KeeperPostAsset" parent="OuterDatum/KeeperLanternPostAnchor" groups=["keeper_post_landmark"] instance=ExtResource("2_keeper_post")]
-scale = Vector3(0.3, 0.3, 0.3)
+[node name="KeeperPostAsset" parent="OuterDatum/KeeperLanternPostAnchor" unique_id=1640642097 groups=["keeper_post_landmark"] instance=ExtResource("2_keeper_post")]
+transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 0, 0, 0)
 
-[node name="KeeperPostCollision" type="StaticBody3D" parent="OuterDatum/KeeperLanternPostAnchor"]
-collision_layer = 1
-collision_mask = 1
+[node name="KeeperPostCollision" type="StaticBody3D" parent="OuterDatum/KeeperLanternPostAnchor" unique_id=1253139806]
 
-[node name="Shape" type="CollisionShape3D" parent="OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision"]
-position = Vector3(0, 1.3, 0)
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision" unique_id=1833638720]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, 0)
 shape = SubResource("KeeperPostShape")
 
-[node name="WarmLandmarkLight" type="OmniLight3D" parent="OuterDatum/KeeperLanternPostAnchor"]
-position = Vector3(0, 2.1, 0)
+[node name="WarmLandmarkLight" type="OmniLight3D" parent="OuterDatum/KeeperLanternPostAnchor" unique_id=1551095271]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1, 0)
 light_color = Color(1, 0.53, 0.19, 1)
 light_energy = 3.2
-omni_range = 6.5
 shadow_enabled = true
+omni_range = 6.5
 
-[node name="SmallMausoleumAnchor" type="Marker3D" parent="OuterDatum" groups=["landmark_anchor"]]
-position = Vector3(0.53, 0, -2.52)
+[node name="SmallMausoleumAnchor" type="Marker3D" parent="OuterDatum" unique_id=501573369 groups=["landmark_anchor"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.53, 0, -2.52)
 
-[node name="MausoleumMoonLift" type="OmniLight3D" parent="OuterDatum/SmallMausoleumAnchor"]
-position = Vector3(0, 2.4, 0)
+[node name="MausoleumMoonLift" type="OmniLight3D" parent="OuterDatum/SmallMausoleumAnchor" unique_id=1562012714]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.4, 0)
 light_color = Color(0.27, 0.68, 0.9, 1)
 light_energy = 1.7
 omni_range = 5.5
-shadow_enabled = false
 
-[node name="CrackedMoonBellAnchor" type="Marker3D" parent="OuterDatum" groups=["landmark_anchor"]]
-position = Vector3(4.2, 0, -8.6)
+[node name="CrackedMoonBellAnchor" type="Marker3D" parent="OuterDatum" unique_id=855017616 groups=["landmark_anchor"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.2, 0, -8.6)
 
-[node name="CrackedBellAsset" parent="OuterDatum/CrackedMoonBellAnchor" groups=["cracked_bell_landmark"] instance=ExtResource("3_cracked_bell")]
-position = Vector3(3.7, 0.0, 6.0)
-rotation = Vector3(-1.5708, 2.72, 0)
-scale = Vector3(2, 2, 2)
+[node name="CrackedBellAsset" parent="OuterDatum/CrackedMoonBellAnchor" unique_id=1563090568 groups=["cracked_bell_landmark"] instance=ExtResource("3_cracked_bell")]
+transform = Transform3D(-1.8248768, -0.8184283, -2.9627022e-06, 0, -7.2399803e-06, 2, -0.8184283, 1.8248768, 6.606036e-06, 3.7, 0, 6)
 
-[node name="CrackedBellCollision" type="StaticBody3D" parent="OuterDatum/CrackedMoonBellAnchor"]
-collision_layer = 1
-collision_mask = 1
+[node name="CrackedBellCollision" type="StaticBody3D" parent="OuterDatum/CrackedMoonBellAnchor" unique_id=787450712]
 
-[node name="Shape" type="CollisionShape3D" parent="OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision"]
-position = Vector3(3.7, 0.9, 6.0)
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision" unique_id=997783122]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.7, 0.9, 6)
 shape = SubResource("CrackedBellShape")
 
-[node name="BellLanternLight" type="OmniLight3D" parent="OuterDatum/CrackedMoonBellAnchor"]
-position = Vector3(3.7, 2.1, 6.0)
+[node name="BellLanternLight" type="OmniLight3D" parent="OuterDatum/CrackedMoonBellAnchor" unique_id=1665137444]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.7, 2.1, 6)
 light_color = Color(0.82, 0.25, 0.66, 1)
 light_energy = 1.65
 omni_range = 5.2
-shadow_enabled = false
 
-[node name="StandingCoffinCollision" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(9.83, 1.4, -8.72)
-collision_layer = 1
-collision_mask = 1
+[node name="StandingCoffinCollision" type="StaticBody3D" parent="OuterDatum" unique_id=1320701132]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.83, 1.4, -8.72)
 
-[node name="Shape" type="CollisionShape3D" parent="OuterDatum/StandingCoffinCollision"]
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/StandingCoffinCollision" unique_id=1149114626]
 shape = SubResource("StandingCoffinShape")
 
-[node name="SouthwestCoffinCollision" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(-4.12, 0.5, 6.3)
-collision_layer = 1
-collision_mask = 1
+[node name="SouthwestCoffinCollision" type="StaticBody3D" parent="OuterDatum" unique_id=137146369]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.12, 0.5, 6.3)
 
-[node name="Shape" type="CollisionShape3D" parent="OuterDatum/SouthwestCoffinCollision"]
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/SouthwestCoffinCollision" unique_id=815456941]
 shape = SubResource("FlatCoffinShape")
 
-[node name="SoutheastCoffinCollision" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(7.43, 0.5, 5.11)
-collision_layer = 1
-collision_mask = 1
+[node name="SoutheastCoffinCollision" type="StaticBody3D" parent="OuterDatum" unique_id=996499717]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.43, 0.5, 5.11)
 
-[node name="Shape" type="CollisionShape3D" parent="OuterDatum/SoutheastCoffinCollision"]
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/SoutheastCoffinCollision" unique_id=1511879562]
 shape = SubResource("WideCoffinShape")
 
-[node name="EastGraveNorthCollision" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(7.38, 0.6, -3.14)
-collision_layer = 1
-collision_mask = 1
+[node name="EastGraveNorthCollision" type="StaticBody3D" parent="OuterDatum" unique_id=603597264]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.38, 0.6, -3.14)
 
-[node name="Shape" type="CollisionShape3D" parent="OuterDatum/EastGraveNorthCollision"]
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/EastGraveNorthCollision" unique_id=1552738117]
 shape = SubResource("GraveClusterShape")
 
-[node name="EastGraveSouthCollision" type="StaticBody3D" parent="OuterDatum"]
-position = Vector3(7.38, 0.6, 2.46)
-collision_layer = 1
-collision_mask = 1
+[node name="EastGraveSouthCollision" type="StaticBody3D" parent="OuterDatum" unique_id=762417445]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.38, 0.6, 2.46)
 
-[node name="Shape" type="CollisionShape3D" parent="OuterDatum/EastGraveSouthCollision"]
+[node name="Shape" type="CollisionShape3D" parent="OuterDatum/EastGraveSouthCollision" unique_id=1146646697]
 shape = SubResource("GraveClusterShape")
 
-[node name="TargetAnchorA" type="Marker3D" parent="OuterDatum" groups=["combat_anchor"]]
-position = Vector3(4.8, 0, 1.6)
+[node name="TargetAnchorA" type="Marker3D" parent="OuterDatum" unique_id=960117830 groups=["combat_anchor"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.8, 0, 1.6)
 
-[node name="TargetAnchorB" type="Marker3D" parent="OuterDatum" groups=["combat_anchor"]]
-position = Vector3(-5.4, 0, -1.8)
+[node name="TargetAnchorB" type="Marker3D" parent="OuterDatum" unique_id=129999853 groups=["combat_anchor"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.4, 0, -1.8)
 
-[node name="RouteCheckpoints" type="Node3D" parent="OuterDatum"]
+[node name="RouteCheckpoints" type="Node3D" parent="OuterDatum" unique_id=720758724]
 
-[node name="00_Spawn" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(0, 0.05, 5.8)
+[node name="00_Spawn" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=193680995 groups=["arena_route_checkpoint"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 5.8)
 
-[node name="01_South" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(0, 0.05, 8.7)
+[node name="01_South" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=912956288 groups=["arena_route_checkpoint"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 8.7)
 
-[node name="02_Southeast" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(7.8, 0.05, 7.2)
+[node name="02_Southeast" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=592857020 groups=["arena_route_checkpoint"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.8, 0.05, 7.2)
 
-[node name="03_East" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(9.1, 0.05, 0)
+[node name="03_East" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=581824213 groups=["arena_route_checkpoint"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.1, 0.05, 0)
 
-[node name="04_Northeast" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(7.7, 0.05, -7.5)
+[node name="04_Northeast" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=1108566365 groups=["arena_route_checkpoint"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.7, 0.05, -7.5)
 
-[node name="05_North" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(0, 0.05, -8.5)
+[node name="05_North" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=576582243 groups=["arena_route_checkpoint"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -8.5)
 
-[node name="06_Northwest" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(-7.4, 0.05, -7.4)
+[node name="06_Northwest" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=1772249163 groups=["arena_route_checkpoint"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.4, 0.05, -7.4)
 
-[node name="07_West" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(-8.4, 0.05, 0)
+[node name="07_West" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=1666648834 groups=["arena_route_checkpoint"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.4, 0.05, 0)
 
-[node name="08_KeeperPost" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(-5.9, 0.05, 2.9)
+[node name="08_KeeperPost" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=218090319 groups=["arena_route_checkpoint"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.9, 0.05, 2.9)
 
-[node name="09_CrackedBell" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(-7.5, 0.05, -0.2)
+[node name="09_CrackedBell" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=507056088 groups=["arena_route_checkpoint"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.5, 0.05, -0.2)
 
-[node name="10_Mausoleum" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(5.1, 0.05, -2.5)
+[node name="10_Mausoleum" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=1044815565 groups=["arena_route_checkpoint"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.1, 0.05, -2.5)
 
-[node name="11_CrossRouteEast" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(5.8, 0.05, 3.6)
+[node name="11_CrossRouteEast" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=989913969 groups=["arena_route_checkpoint"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.8, 0.05, 3.6)
 
-[node name="12_Return" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint"]]
-position = Vector3(0, 0.05, 5.8)
+[node name="12_Return" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=556009249 groups=["arena_route_checkpoint"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 5.8)

@@ -103,11 +103,36 @@ func _ready() -> void:
 	current = true
 	fov = normal_fov
 	if target:
+		_normalize_occluder_bindings()
 		_bind_visibility_presentation()
 		_bind_tall_occluders()
 		_bind_coverage_occluder_visuals()
 		_build_visibility_compositor()
 		_snap_to_target()
+
+func _normalize_occluder_bindings() -> void:
+	# Keep the product-owned sight volumes paired with their authored visuals.
+	# The serialized profile predates the mausoleum isolation pass and had the
+	# Crypt visual paired with a tree collider, so obstruction detection could
+	# never fade the landmark that actually crossed the Warden sightline.  This
+	# rebase is runtime-only and does not touch the intact imported package.
+	var pairs := [
+		[NodePath("../CemeteryGarden/OuterDatum/MausoleumCollision"), NodePath("../CemeteryGarden/PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/Crypt")],
+		[NodePath("../CemeteryGarden/OuterDatum/NortheastTreeCollision"), NodePath("../CemeteryGarden/PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/DeadTree3")],
+		[NodePath("../CemeteryGarden/OuterDatum/NorthwestTreeCollision"), NodePath("../CemeteryGarden/PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/DeadTree")],
+		[NodePath("../CemeteryGarden/OuterDatum/SoutheastTreeCollision"), NodePath("../CemeteryGarden/PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/DeadTree2")],
+	]
+	var normalized_colliders: Array[NodePath] = []
+	var normalized_visuals: Array[NodePath] = []
+	for pair in pairs:
+		var collider_path: NodePath = pair[0]
+		var visual_path: NodePath = pair[1]
+		if is_instance_valid(get_node_or_null(collider_path)) and is_instance_valid(get_node_or_null(visual_path)):
+			normalized_colliders.append(collider_path)
+			normalized_visuals.append(visual_path)
+	if not normalized_colliders.is_empty():
+		tall_occluders = normalized_colliders
+		coverage_occluder_visuals = normalized_visuals
 
 func _exit_tree() -> void:
 	reset_occlusion_response()

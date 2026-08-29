@@ -39,6 +39,11 @@ func _ready() -> void:
 	for index in buttons.size():
 		_build_card_content(buttons[index])
 		buttons[index].focus_mode = Control.FOCUS_ALL
+		# Explicit lateral neighbors make the three-card draft deterministic on
+		# gamepad and keyboard regardless of container sizing or UI scale.  The
+		# ring wraps so a held direction can never escape into an underlying page.
+		buttons[index].focus_neighbor_left = buttons[(index - 1 + buttons.size()) % buttons.size()].get_path()
+		buttons[index].focus_neighbor_right = buttons[(index + 1) % buttons.size()].get_path()
 		buttons[index].mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		buttons[index].pressed.connect(_choose.bind(index))
 		buttons[index].focus_entered.connect(_refresh_card_state.bind(index))
