@@ -256,7 +256,7 @@ func _layout_result(center: Vector2, page_top: float) -> void:
 
 func set_mode(next_mode: String, next_summary: Dictionary = {}) -> void:
 	if next_mode in ["settings", "help", "credits"]:
-		return_mode = mode if mode in ["title","pause"] else "title"
+		return_mode = mode if mode in ["title","pause","result"] else "title"
 	mode = next_mode
 	summary = next_summary.duplicate(true)
 	action_latched = false
@@ -290,8 +290,8 @@ func set_mode(next_mode: String, next_summary: Dictionary = {}) -> void:
 			var won := String(summary.get("outcome","failure")) == "victory"
 			var time := float(summary.get("elapsed",0.0))
 			_configure("DAWN ANSWERS" if won else "FLAME EXTINGUISHED","VICTORY" if won else "THE WATCH ENDS",
-				"%02d:%02d   ·   WAVE %d/%d   ·   LEVEL %d   ·   %d BANISHED\n%d DEALT   ·   %d TAKEN" % [int(time)/60,int(time)%60,int(summary.get("wave",1)),int(summary.get("wave_count",5)),int(summary.get("level",1)),int(summary.get("defeated",0)),int(summary.get("damage_dealt",0)),int(summary.get("damage_taken",0))],
-				[["retry","RETRY"],["title","RETURN TO TITLE"]])
+				"%02d:%02d   ·   WAVE %d/%d   ·   LEVEL %d   ·   %d BANISHED\n%d DEALT   ·   %d TAKEN\nPROVENANCE BOUND  ·  ASSET_PROVENANCE.JSON" % [int(time)/60,int(time)%60,int(summary.get("wave",1)),int(summary.get("wave_count",5)),int(summary.get("level",1)),int(summary.get("defeated",0)),int(summary.get("damage_dealt",0)),int(summary.get("damage_taken",0))],
+				[["retry","RETRY"],["title","RETURN TO TITLE"],["credits","CREDITS & NOTICES"]])
 			_bind_result_presentation()
 		"draft":
 			_configure("CHOOSE A VIGIL","THE NIGHT HOLDS ITS BREATH","Select one upgrade. The choice applies before combat resumes.",[])

@@ -21,8 +21,8 @@ signal_game_exit = true
 mouse_filter = 2
 
 [node name="MenuContainer" parent="." parent_id_path=PackedInt32Array(781937481) index="3" unique_id=396616752]
-theme_override_constants/margin_left = 54
-theme_override_constants/margin_right = 820
+theme_override_constants/margin_left = 0
+theme_override_constants/margin_right = 0
 
 [node name="TitleMargin" parent="MenuContainer" parent_id_path=PackedInt32Array(396616752) index="0" unique_id=2112060331]
 theme_override_constants/margin_top = 58
@@ -32,7 +32,7 @@ theme_override_colors/font_color = Color(0.96, 0.98, 0.98, 0.98)
 theme_override_constants/outline_size = 5
 theme_override_font_sizes/font_size = 54
 text = "MOURNLIGHT"
-horizontal_alignment = 0
+horizontal_alignment = 1
 auto_update = false
 
 [node name="SubTitleMargin" parent="MenuContainer" parent_id_path=PackedInt32Array(396616752) index="1" unique_id=1510335937]
@@ -43,22 +43,22 @@ theme_override_colors/font_color = Color(0.45, 0.85, 0.79, 0.94)
 theme_override_constants/outline_size = 4
 theme_override_font_sizes/font_size = 16
 text = "KEEP THE LAST LANTERN LIT"
-horizontal_alignment = 0
+horizontal_alignment = 1
 
 [node name="MenuButtonsMargin" parent="MenuContainer" parent_id_path=PackedInt32Array(396616752) index="2" unique_id=210553886]
 theme_override_constants/margin_top = 218
 theme_override_constants/margin_bottom = 112
 
 [node name="MenuButtonsBoxContainer" parent="MenuContainer/MenuButtonsMargin/MenuButtonsContainer" parent_id_path=PackedInt32Array(116448484) index="0" unique_id=2017477786]
-anchors_preset = 15
-anchor_left = 0.0
-anchor_top = 0.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 0.0
-offset_bottom = 0.0
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -104.0
+offset_right = 280.0
+offset_bottom = 104.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 7

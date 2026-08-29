@@ -25,6 +25,20 @@ func _ready() -> void:
 	var authored_scale := maxf(1.0, native_map_scale)
 	if not is_equal_approx(scale.x, authored_scale):
 		scale = Vector3.ONE * authored_scale
+	_calibrate_authored_visibility()
+
+func _calibrate_authored_visibility() -> void:
+	# The bound GLB carries zero-sized imported custom AABBs on several meshes.
+	# Keep the intact package and its materials, but provide a runtime cull
+	# envelope so the shipped camera cannot drop native cemetery surfaces.
+	if not is_instance_valid(package_root):
+		return
+	for node in package_root.find_children("*", "MeshInstance3D", true, false):
+		var mesh := node as MeshInstance3D
+		if not is_instance_valid(mesh):
+			continue
+		mesh.extra_cull_margin = 32.0
+		mesh.custom_aabb = AABB(Vector3(-64.0, -32.0, -64.0), Vector3(128.0, 64.0, 128.0))
 
 func get_player_spawn() -> Vector3:
 	var result := player_spawn.global_position
@@ -63,10 +77,27 @@ func get_playable_rect() -> Rect2:
 	return Rect2(Vector2(west, north), Vector2(east - west, south - north))
 
 func get_authored_visual_rect() -> Rect2:
+	# Include the authored package's nested transform in the visual datum.  The
+	# previous contract measured only the outer node, so a scaled package (or a
+	# package rebase) could report a camera fill rect that disagreed with the
+	# actual cemetery geometry and leave a visible outer void.
 	var world_scale := global_transform.basis.get_scale().abs()
 	var root_scale := Vector2(world_scale.x, world_scale.z)
-	var minimum := AUTHORED_LOCAL_MIN * root_scale
-	var maximum := AUTHORED_LOCAL_MAX * root_scale
+	var package_offset := Vector2.ZERO
+	var package_scale := Vector2.ONE
+	if is_instance_valid(package_root):
+		var package_transform := package_root.get_parent() as Node3D
+		if is_instance_valid(package_transform):
+			package_offset = Vector2(package_transform.position.x, package_transform.position.z)
+			var nested_scale := package_transform.global_transform.basis.get_scale().abs()
+			package_scale = Vector2(nested_scale.x, nested_scale.z) / root_scale
+	# The bound Sketchfab package stores a large native export datum in its
+	# child transforms.  PackageTransform intentionally rebases that datum onto
+	# the gameplay origin; do not let the export offset poison camera margins.
+	if package_offset.length() > 100.0:
+		package_offset = Vector2.ZERO
+	var minimum := (package_offset + Vector2(AUTHORED_LOCAL_MIN.x * package_scale.x, AUTHORED_LOCAL_MIN.y * package_scale.y)) * root_scale
+	var maximum := (package_offset + Vector2(AUTHORED_LOCAL_MAX.x * package_scale.x, AUTHORED_LOCAL_MAX.y * package_scale.y)) * root_scale
 	return Rect2(minimum, maximum - minimum)
 
 func get_camera_fill_rect() -> Rect2:
@@ -173,6 +204,11 @@ func get_snapshot() -> Dictionary:
 			"playable_inside_authored":playable.position.x > visual.position.x and playable.end.x < visual.end.x and playable.position.y > visual.position.y and playable.end.y < visual.end.y,
 		},
 		"world_scale":global_transform.basis.get_scale().abs(),
+		"package_transform":{
+			"position":package_root.get_parent().position if is_instance_valid(package_root) else Vector3.ZERO,
+			"scale":package_root.get_parent().scale if is_instance_valid(package_root) else Vector3.ONE,
+			"native_export_rebased":is_instance_valid(package_root) and package_root.get_parent().position.length() > 100.0,
+		},
 		"playable_rect":playable,
 		"playable_area":playable.size.x * playable.size.y,
 		"authored_visual_rect":visual,

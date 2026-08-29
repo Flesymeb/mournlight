@@ -303,6 +303,7 @@ func start_run() -> void:
 
 func _begin_run() -> void:
 	get_tree().paused = false
+	world.visible = true
 	_profile_active = false
 	_profile_origin = ""
 	_profile_samples_ms.clear()
@@ -421,6 +422,7 @@ func _enter_title() -> void:
 	_teardown_run("title", "return_to_title")
 	boss_snapshot.clear()
 	hud.clear_snapshot()
+	world.visible = false
 	_transition("title")
 	shell.set_mode("hidden")
 	_set_title_surface(true)
@@ -438,6 +440,7 @@ func _begin_shell_title_handoff(source: String, physical: String) -> void:
 	_teardown_run("title", "return_to_title")
 	boss_snapshot.clear()
 	hud.clear_snapshot()
+	world.visible = false
 	_transition("title")
 	shell.set_mode("hidden")
 	_set_title_surface(false)
@@ -480,11 +483,17 @@ func _begin_context_handoff(source: String, destination: String, physical: Strin
 		}
 		_complete_context_handoff(destination, true)
 		return
-	_context_handoff_active = true
+	# A valid UI activation already committed the player's destination.  Do not
+	# hold the title/result handoff hostage to a later physical release: the
+	# router still binds the originating transaction so the held confirm cannot
+	# leak into the newly exposed page, while the receipt records the release as
+	# pending for QA visibility.
+	_context_handoff_active = false
 	_context_handoff_generation += 1
-	_context_handoff_destination = destination
-	_context_handoff_physical = physical
-	_context_handoff_activation_generation = int(transaction.get("activation_generation", -1))
+	var activation_generation := int(transaction.get("activation_generation", -1))
+	_context_handoff_destination = ""
+	_context_handoff_physical = ""
+	_context_handoff_activation_generation = -1
 	input_router.bind_destination(physical, destination, 1)
 	context_handoff_receipt = {
 		"generation":_context_handoff_generation,
@@ -492,18 +501,19 @@ func _begin_context_handoff(source: String, destination: String, physical: Strin
 		"physical":physical,
 		"originating_context":transaction.get("originating_context", source),
 		"originating_context_generation":transaction.get("originating_context_generation", -1),
-		"activation_generation":_context_handoff_activation_generation,
+		"activation_generation":activation_generation,
 		"shell_action_generation":shell.action_generation,
-		"stage":"awaiting_physical_release",
-		"release_observed":false, "destination_exposed":false,
+		"stage":"complete",
+		"release_observed":false, "destination_exposed":true,
 		"downstream_action_count":1,
 		"teardown_complete":bool(teardown_receipt.get("complete", false)),
 		"teardown_generation":int(teardown_receipt.get("completion_generation", 0)),
 		"reset_invariants":(teardown_receipt.get("reset_invariants", {}) as Dictionary).duplicate(true),
 	}
 	if source == "result":
-		_terminal_handoff_active = true
+		_terminal_handoff_active = false
 		terminal_handoff_receipt = context_handoff_receipt.duplicate(true)
+	_complete_context_handoff(destination, true)
 
 func _advance_context_handoff() -> void:
 	if not _context_handoff_active:
@@ -523,6 +533,7 @@ func _complete_context_handoff(destination: String, immediate: bool) -> void:
 	_context_handoff_physical = ""
 	_context_handoff_activation_generation = -1
 	if destination == "title":
+		world.visible = false
 		shell.set_mode("hidden")
 		_set_title_surface(true)
 		title_menu.new_game_button.grab_focus.call_deferred()
@@ -885,10 +896,12 @@ func _open_help_page() -> void:
 	_emit_snapshot()
 
 func _open_credits_page() -> void:
-	if run_state == "title":
+	if run_state in ["title", "result"]:
 		_set_title_surface(false)
 		shell.set_mode("credits")
 		complete_run_ledger.record_credits(run_serial, shell.mode)
+		if run_state == "result":
+			get_tree().paused = true
 	_emit_snapshot()
 
 func _return_from_shell_page() -> void:
@@ -898,11 +911,16 @@ func _return_from_shell_page() -> void:
 		shell.set_mode("pause", last_snapshot)
 		_begin_context_handoff(shell.mode, "pause", "back")
 		_emit_snapshot()
+	elif shell.return_mode == "result" and run_state == "result":
+		get_tree().paused = true
+		shell.set_mode("result", terminal_snapshot)
+		_emit_snapshot()
 	else:
 		var source := shell.mode
 		_teardown_run("title", "return_from_%s" % source)
 		boss_snapshot.clear()
 		hud.clear_snapshot()
+		world.visible = false
 		_transition("title")
 		shell.set_mode("hidden")
 		_set_title_surface(false)
