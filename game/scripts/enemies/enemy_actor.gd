@@ -206,6 +206,8 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_body_motion_steps_total += 1
 	global_position.y = 0.05
+	if is_instance_valid(neighbor_registry):
+		neighbor_registry.update_actor_position(self)
 	model_pivot.advance(delta, velocity, state_remaining, _state_duration(state))
 	if velocity.length_squared() > 0.04 and state == "approach":
 		if posmod(Engine.get_physics_frames(), EnemySemanticPresenter.DENSE_APPROACH_ANIMATION_BUCKETS) == _facing_bucket:
