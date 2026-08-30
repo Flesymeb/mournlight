@@ -38,7 +38,7 @@ enum DashPhase { READY, ANTICIPATION, ACTIVE, RECOVERY, COOLDOWN }
 ## The intact KayKit export carries a native root offset south of the actor
 ## origin. Rebase the visible package once at the wrapper boundary so rendered
 ## feet, collision, targeting, and camera framing share the same datum.
-@export var authored_model_rebase := Vector3(0.0, 0.0, 4.3)
+@export var authored_model_rebase := Vector3(0.0, 0.0, 0.0)
 
 @onready var presentation_root: Node3D = $PresentationRoot
 @onready var model_pivot: Node3D = $PresentationRoot/ModelPivot
@@ -88,6 +88,7 @@ func _ready() -> void:
 	_authored_animation = _find_animation_player(authored_character)
 	_apply_authored_model_rebase()
 	_repair_visible_uv_bindings()
+	_calibrate_visible_culling()
 	_resolve_and_apply_shipped_camera_hat_isolation("ready")
 	animation_binding = WardenAnimationBinding.new()
 	animation_binding.name = "SemanticAnimationBinding"
@@ -162,6 +163,25 @@ func _repair_visible_uv_bindings() -> void:
 		"source_immutable":true,
 		"runtime_binding":"PresentationRoot/AuthoredWardenMage",
 	}
+
+func _calibrate_visible_culling() -> void:
+	# A few imported KayKit surfaces carry a zero custom AABB. Godot then
+	# frustum/occlusion-culls the visible mesh even though its skeleton and
+	# transform are valid, making the Warden disappear while the authored aura
+	# remains on screen. Keep the intact package and add only a conservative
+	# integration cull envelope for those surfaces.
+	for node in presentation_root.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := node as MeshInstance3D
+		if not is_instance_valid(mesh_instance) or not mesh_instance.visible:
+			continue
+		mesh_instance.extra_cull_margin = maxf(mesh_instance.extra_cull_margin, 2.0)
+		# The imported cemetery can contribute oversized occluder volumes around
+		# the central landmark. Keep the actor's authored silhouette visible under
+		# the shipped high-angle camera; this is a presentation binding, not a
+		# geometry replacement.
+		mesh_instance.ignore_occlusion_culling = true
+		if mesh_instance.custom_aabb.size.length_squared() < 0.0001:
+			mesh_instance.custom_aabb = AABB(Vector3(-2.5, -2.0, -2.5), Vector3(5.0, 6.0, 5.0))
 
 func _planar_uvs(vertices: PackedVector3Array) -> PackedVector2Array:
 	var result := PackedVector2Array()

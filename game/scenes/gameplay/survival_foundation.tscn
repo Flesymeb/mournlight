@@ -98,12 +98,12 @@ near = 0.15
 far = 180.0
 arena_limit = Vector2(34.0, 32.0)
 normal_fov = 58.0
-follow_height = 24.0
+follow_height = 27.0
 follow_distance = 18.0
-follow_lateral = 8.0
+follow_lateral = 10.0
 # Keep the player in the lower-safe lane while the authored mausoleum and bell
 # sit above the route instead of filling the camera's center sight lane.
-framing_bias = Vector3(0.0, 0, 2.2)
+framing_bias = Vector3(0.0, 0, -7.0)
 arena_fill_limit = Vector2(33.0, 30.5)
 coverage_max_correction = 3.5
 coverage_threat_weight = 0.30
@@ -115,5 +115,5 @@ dense_compositor_refresh_seconds = 0.12
 presentation_body = NodePath("../Warden/PresentationRoot/ModelPivot/AssetTransform/AuthoredWardenMage")
 presentation_lantern = NodePath("../Warden/PresentationRoot/LanternPivot/AuthoredLantern")
 presentation_effects = Array[NodePath]([NodePath("../Warden/DashAura"), NodePath("../Warden/ActiveRing"), NodePath("../Warden/WardenHalo")])
-tall_occluders = Array[NodePath]([NodePath("../CemeteryGarden/OuterDatum/NortheastTreeCollision"), NodePath("../CemeteryGarden/OuterDatum/NorthwestTreeCollision"), NodePath("../CemeteryGarden/OuterDatum/SoutheastTreeCollision")])
+tall_occluders = Array[NodePath]([NodePath("../CemeteryGarden/OuterDatum/MausoleumCollision"), NodePath("../CemeteryGarden/OuterDatum/NortheastTreeCollision"), NodePath("../CemeteryGarden/OuterDatum/NorthwestTreeCollision"), NodePath("../CemeteryGarden/OuterDatum/SoutheastTreeCollision")])
 coverage_occluder_visuals = Array[NodePath]([NodePath("../CemeteryGarden/PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/Crypt"), NodePath("../CemeteryGarden/PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/DeadTree3"), NodePath("../CemeteryGarden/PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/DeadTree"), NodePath("../CemeteryGarden/PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/DeadTree2"), NodePath("../CemeteryGarden/OuterDatum/CrackedMoonBellAnchor/CrackedBellAsset"), NodePath("../CemeteryGarden/OuterDatum/KeeperLanternPostAnchor/KeeperPostAsset")])

@@ -1803,7 +1803,16 @@ func _advance_profile_sample(delta: float) -> void:
 	var metric_counts := _profile_counts()
 	var workload_sample := _profile_workload_receipt(spawner.get_snapshot())
 	if _profile_metric_samples.size() < PROFILE_MAX_SAMPLES:
+		var cycle_provenance: Dictionary = validation_profile_sample.get("cycle_provenance", {})
+		var sample_index := _profile_metric_samples.size()
 		_profile_metric_samples.append({
+			# Every bounded record carries its own cycle identity and ordinal so the
+			# host can merge/reject retries without inferring provenance from array
+			# position. Time.get_ticks_msec is monotonic for the process lifetime.
+			"profile_id":DenseWaveProfileClass.CONTRACT_ID,
+			"cycle_id":String(cycle_provenance.get("cycle_id", "dense.%d" % _dense_cycle_index)),
+			"cycle_index":int(cycle_provenance.get("cycle_index", _dense_cycle_index)),
+			"sample_index":sample_index,
 			"timestamp_msec":Time.get_ticks_msec(),
 			"elapsed_seconds":_profile_elapsed,
 			"frame_ms":frame_ms,
