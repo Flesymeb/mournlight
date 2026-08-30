@@ -25,6 +25,15 @@ func _ready() -> void:
 	# scene is instanced. Some inherited scene overrides restore StaticBody3D's
 	# default layer (1), which makes landmark/perimeter bodies invisible to the
 	# Warden mask and inconsistent with camera coverage metadata.
+	# All authored prop blockers use the environment layer so movement masks (7)
+	# still collide with them while camera-coverage probes on gameplay layer 1
+	# measure actor visibility rather than treating a low coffin/grave as a
+	# sightline occluder.
+	for prop in find_children("*", "StaticBody3D", true, false):
+		var authored_prop := prop as StaticBody3D
+		if is_instance_valid(authored_prop):
+			authored_prop.collision_layer = 2
+			authored_prop.collision_mask = 1
 	for body in [north_boundary, south_boundary, east_boundary, west_boundary]:
 		if is_instance_valid(body):
 			body.collision_layer = 2
@@ -32,13 +41,14 @@ func _ready() -> void:
 	if is_instance_valid(ground_collision):
 		ground_collision.collision_layer = 4
 		ground_collision.collision_mask = 1
-	# Tall landmark bodies live on gameplay layer 1 so Warden/enemies collide,
-	# while the camera coverage mask (layer 2) can inspect the sight lane without
-	# treating the landmark itself as a physics occluder.
+	# Tall landmark bodies live on the authored environment layer 2. The Warden
+	# and enemy masks include layer 2 (mask 7), while camera-coverage probes use
+	# gameplay layer 1 by default. This keeps landmark collision authoritative for
+	# movement without reporting the same body as a camera sightline occluder.
 	for path in ["OuterDatum/MausoleumCollision", "OuterDatum/NortheastTreeCollision", "OuterDatum/NorthwestTreeCollision", "OuterDatum/SoutheastTreeCollision", "OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision", "OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision"]:
 		var landmark := get_node_or_null(path) as StaticBody3D
 		if is_instance_valid(landmark):
-			landmark.collision_layer = 1
+			landmark.collision_layer = 2
 			landmark.collision_mask = 1
 	# The complete cemetery is authored with a native local datum.  Rebase the
 	# instance once at runtime so nested scene overrides cannot regress the
@@ -466,10 +476,11 @@ func get_snapshot() -> Dictionary:
 			"scale_binding":"native_map_scale * authored_wrapper_scale_multiplier",
 		},
 		"anchor_ids":["PlayerSpawn","KeeperLanternPostAnchor","SmallMausoleumAnchor","CrackedMoonBellAnchor","TargetAnchorA","TargetAnchorB"],
-		# Landmark bodies use gameplay layer 1; perimeter bodies remain on layer 2
-		# for boundary probes. Camera coverage can therefore audit the sight lane
-		# without treating the central building as a physics occluder.
-		"collision_layers":{"ground":4,"perimeter":2,"landmarks":1,"mausoleum_gameplay":1,"camera_query_excluded":2,"navigation":0},
+		# Landmark bodies use authored environment layer 2; perimeter bodies remain
+		# on layer 2 for boundary probes. Warden/enemy masks include both layers,
+		# while camera coverage mask 1 audits the sight lane without treating the
+		# central building as a physics occluder.
+		"collision_layers":{"ground":4,"perimeter":2,"landmarks":2,"mausoleum_gameplay":2,"camera_query_excluded":2,"navigation":0},
 		"navigation_region":{"path":"OuterDatum/NativeNavigationRegion","layers":1,"source":"native_authored_streets","enabled":is_instance_valid(get_node_or_null("OuterDatum/NativeNavigationRegion"))},
 		"playable_rect":playable,
 		"playable_area":playable.size.x * playable.size.y,
