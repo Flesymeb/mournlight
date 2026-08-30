@@ -1,6 +1,8 @@
 class_name BellkeeperActor
 extends CharacterBody3D
 
+const AuthoredMeshBinding := preload("res://scripts/world/authored_mesh_binding.gd")
+
 signal boss_changed(snapshot: Dictionary)
 signal defeated(event: Dictionary)
 signal phase_shifted(phase: int)
@@ -31,6 +33,7 @@ var _authored_presentation_scale := Vector3.ONE
 var target_registry: EnemyNeighborRegistry
 var _target_generation := 0
 var _registry_member := false
+var mesh_binding_receipt: Dictionary = {}
 
 func _ready() -> void:
 	add_to_group("active_enemies")
@@ -39,6 +42,7 @@ func _ready() -> void:
 	health.died.connect(_on_died)
 	telegraph.visible = false
 	_authored_presentation_scale = presentation.scale
+	mesh_binding_receipt = AuthoredMeshBinding.repair_visible_meshes(presentation)
 	boss_changed.emit(get_snapshot())
 
 func configure(next_target: WardenController, registry: EnemyNeighborRegistry = null) -> void:
@@ -192,6 +196,7 @@ func retire_run_actor(reason: String, completion_generation: int) -> Dictionary:
 		"collision_layer":collision_layer, "collision_mask":collision_mask,
 		"in_active_group":is_in_group("active_enemies"), "in_combat_group":is_in_group("combat_targets"),
 		"telegraph_visible":telegraph.visible,
+		"mesh_binding":mesh_binding_receipt.duplicate(true),
 	}
 	boss_changed.emit(get_snapshot())
 	return _retirement_receipt.duplicate(true)

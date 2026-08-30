@@ -21,6 +21,25 @@ const AUTHORED_LOCAL_MIN := Vector2(-12.143, -11.415)
 const AUTHORED_LOCAL_MAX := Vector2(12.149, 11.418)
 
 func _ready() -> void:
+	# Reassert the single transform-space collision contract after the authored
+	# scene is instanced. Some inherited scene overrides restore StaticBody3D's
+	# default layer (1), which makes landmark/perimeter bodies invisible to the
+	# Warden mask and inconsistent with camera coverage metadata.
+	for body in [north_boundary, south_boundary, east_boundary, west_boundary]:
+		if is_instance_valid(body):
+			body.collision_layer = 2
+			body.collision_mask = 1
+	if is_instance_valid(ground_collision):
+		ground_collision.collision_layer = 4
+		ground_collision.collision_mask = 1
+	# Tall landmark bodies live on gameplay layer 1 so Warden/enemies collide,
+	# while the camera coverage mask (layer 2) can inspect the sight lane without
+	# treating the landmark itself as a physics occluder.
+	for path in ["OuterDatum/MausoleumCollision", "OuterDatum/NortheastTreeCollision", "OuterDatum/NorthwestTreeCollision", "OuterDatum/SoutheastTreeCollision", "OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision", "OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision"]:
+		var landmark := get_node_or_null(path) as StaticBody3D
+		if is_instance_valid(landmark):
+			landmark.collision_layer = 1
+			landmark.collision_mask = 1
 	# The complete cemetery is authored with a native local datum.  Rebase the
 	# instance once at runtime so nested scene overrides cannot regress the
 	# release framing back to the old camera-sized pad.
@@ -447,10 +466,10 @@ func get_snapshot() -> Dictionary:
 			"scale_binding":"native_map_scale * authored_wrapper_scale_multiplier",
 		},
 		"anchor_ids":["PlayerSpawn","KeeperLanternPostAnchor","SmallMausoleumAnchor","CrackedMoonBellAnchor","TargetAnchorA","TargetAnchorB"],
-		# Landmark bodies use the camera-excluded layer 2; the Warden/enemy mask 7
-		# still collides with them, while coverage rays remain free of tall-prop
-		# false occlusion that would under-report player visibility.
-		"collision_layers":{"ground":4,"perimeter":2,"landmarks":2,"mausoleum_gameplay":2,"camera_query_excluded":2,"navigation":0},
+		# Landmark bodies use gameplay layer 1; perimeter bodies remain on layer 2
+		# for boundary probes. Camera coverage can therefore audit the sight lane
+		# without treating the central building as a physics occluder.
+		"collision_layers":{"ground":4,"perimeter":2,"landmarks":1,"mausoleum_gameplay":1,"camera_query_excluded":2,"navigation":0},
 		"navigation_region":{"path":"OuterDatum/NativeNavigationRegion","layers":1,"source":"native_authored_streets","enabled":is_instance_valid(get_node_or_null("OuterDatum/NativeNavigationRegion"))},
 		"playable_rect":playable,
 		"playable_area":playable.size.x * playable.size.y,

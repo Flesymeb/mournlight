@@ -2,6 +2,7 @@ class_name EnemySemanticPresenter
 extends Node3D
 
 const DenseProfile := preload("res://scripts/gameplay/dense_profile.gd")
+const AuthoredMeshBinding := preload("res://scripts/world/authored_mesh_binding.gd")
 
 const ROLE_DESCRIPTORS := {
 	"mossling": "mossling.myconid_guardians.v2",
@@ -40,6 +41,7 @@ var _manual_animation_enabled := false
 var binding_status := "unbound"
 var binding_error := ""
 var motion_signature := "none"
+var mesh_binding_receipt: Dictionary = {}
 
 func configure(next_role_id: String, _accent: Color, stable_id: StringName, generation: int, allocated_variant_index: int = -1) -> void:
 	role_id = next_role_id
@@ -67,6 +69,7 @@ func reset_presenter() -> void:
 	binding_error = ""
 	_active_variant = null
 	_presentation = null
+	mesh_binding_receipt.clear()
 	motion_signature = "none"
 	for child in get_children():
 		child.queue_free()
@@ -181,6 +184,7 @@ func _build_role(variant_index: int) -> void:
 	_base_position = _active_variant.position
 	_base_rotation = _active_variant.rotation
 	_base_scale = _active_variant.scale
+	mesh_binding_receipt = AuthoredMeshBinding.repair_visible_meshes(_active_variant)
 	_apply_dense_render_budget(_active_variant)
 	_apply_role_material_treatment(_active_variant, variant_index)
 	_animation_player = _find_animation_player(_active_variant)
@@ -237,6 +241,7 @@ func presentation_budget_snapshot() -> Dictionary:
 		"binding_error":binding_error,
 		"motion_signature":motion_signature,
 		"role_motion_profile":role_id,
+		"mesh_binding":mesh_binding_receipt.duplicate(true),
 	}
 
 func _restore_pose() -> void:
