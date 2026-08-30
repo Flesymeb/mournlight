@@ -64,9 +64,9 @@ func resolve_hit(attack_event: Dictionary, target: Node3D) -> Dictionary:
 	if not _hit_ledgers.has(attack_id):
 		return _reject(StringName(attack_event.get("weapon_id", "unknown")), "unknown_attack")
 	if not is_instance_valid(target) or not target.is_inside_tree():
-		return _reject(StringName(attack_event.get("weapon_id", "unknown")), "freed_target_before_hit")
+		return _reject(StringName(attack_event.get("weapon_id", "unknown")), "freed_target_before_hit", {"attack_id":attack_id, "accepted":false, "hit_material":"miss"})
 	if not target.has_method("is_legal_target") or not target.is_legal_target():
-		return _reject(StringName(attack_event.get("weapon_id", "unknown")), "illegal_target_before_hit", {"attack_id": attack_id})
+		return _reject(StringName(attack_event.get("weapon_id", "unknown")), "illegal_target_before_hit", {"attack_id": attack_id, "accepted":false, "hit_material":"miss"})
 	var target_id := String(target.get_stable_id()) if target.has_method("get_stable_id") else String(target.get_path())
 	var ledger: Dictionary = _hit_ledgers[attack_id]
 	var hit_targets: Dictionary = ledger.hit_targets
@@ -76,8 +76,15 @@ func resolve_hit(attack_event: Dictionary, target: Node3D) -> Dictionary:
 	record_phase(attack_id, "hit_resolution", {"target_id": target_id})
 	var health := target.get_node_or_null("HealthComponent")
 	if not health or not health.has_method("apply_damage"):
-		return _reject(StringName(attack_event.get("weapon_id", "unknown")), "missing_health_component")
-	var result: Dictionary = health.apply_damage(attack_event)
+		return _reject(StringName(attack_event.get("weapon_id", "unknown")), "missing_health_component", {"attack_id":attack_id, "accepted":false, "hit_material":"miss"})
+	var resolved_event := attack_event.duplicate(true)
+	var profile_value: Variant = target.get("profile")
+	var role_id := String(profile_value.get("role_id")) if profile_value is Resource else ""
+	# Surface material is a semantic hint for audio only; gameplay damage stays
+	# entirely data-driven. Armoured/stone roles use the bounded metal stem,
+	# while ordinary foes retain the character-hit stem.
+	resolved_event["hit_material"] = "metal" if role_id == "grave_brute" else "character"
+	var result: Dictionary = health.apply_damage(resolved_event)
 	if result.get("accepted", false):
 		hit_count += 1
 		result.phase = "impact"

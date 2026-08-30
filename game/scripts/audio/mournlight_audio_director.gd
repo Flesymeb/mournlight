@@ -171,6 +171,10 @@ func _bind_events() -> void:
 	if attack:
 		attack.attack_authorized.connect(_on_attack_authorized)
 		attack.hit_resolved.connect(_on_attack_hit)
+		# A legal attack can still miss (target retires between selection and
+		# impact). Keep that miss on the same authoritative transaction so the
+		# Effects bus receives one bounded semantic report instead of silence.
+		attack.attack_rejected.connect(_on_attack_rejected)
 		if attack.has_signal("attack_finished"):
 			attack.attack_finished.connect(_on_attack_finished)
 	var health := controller.get_node_or_null("World/Warden/HealthComponent")
@@ -211,6 +215,14 @@ func _on_attack_hit(event: Dictionary) -> void:
 	# even if presentation and combat both report the same hit.
 	_emit_attack_audio(event, "impact")
 
+func _on_attack_rejected(event: Dictionary) -> void:
+	if not event.has("attack_id"):
+		return
+	var miss := event.duplicate(true)
+	miss["accepted"] = false
+	miss["hit_material"] = "miss"
+	_emit_attack_audio(miss, "impact")
+
 func _on_attack_finished(event: Dictionary) -> void:
 	# Recovery is a lifecycle marker, not a second audible attack cue. Keeping it
 	# silent prevents cadence from stacking a second transient on the Effects bus.
@@ -228,7 +240,9 @@ func _emit_attack_audio(event: Dictionary, phase: String) -> bool:
 	_attack_audio_seen[event_key] = true
 	var weapon_id := String(event.get("weapon_id", "warden_lantern"))
 	var semantic := "weapon_%s_%s" % [weapon_id, phase]
-	var started := _play_lantern_attack_voice(phase) if weapon_id == "warden_lantern" else play_semantic(semantic)
+	if weapon_id == "warden_lantern" and phase == "impact":
+		semantic = _lantern_impact_semantic(event)
+	var started := _play_lantern_attack_voice(phase, semantic) if weapon_id == "warden_lantern" else play_semantic(semantic)
 	var source_paths: Array[String] = []
 	for stream in _lantern_streams_for_phase(phase) if weapon_id == "warden_lantern" else _streams_for(semantic):
 		if stream is AudioStream:
@@ -240,7 +254,7 @@ func _emit_attack_audio(event: Dictionary, phase: String) -> bool:
 		"attack_id": attack_id,
 		"generation": generation,
 		"phase": phase,
-		"impact_stem": ("character_hit" if phase == "impact" and bool(event.get("accepted", true)) else ("miss" if phase == "impact" else "native_report")),
+		"impact_stem": semantic.trim_prefix("weapon_warden_lantern_") if phase == "impact" and weapon_id == "warden_lantern" else (semantic if phase == "impact" else "native_report"),
 		"hit_material": String(event.get("hit_material", event.get("surface_material", "character" if phase == "impact" else "none"))),
 		"weapon_id": weapon_id,
 		"semantic": semantic,
@@ -249,7 +263,7 @@ func _emit_attack_audio(event: Dictionary, phase: String) -> bool:
 		"process_frame": Engine.get_process_frames(),
 		"bus": "Effects",
 		"source_paths": source_paths,
-		"runtime_derivative_receipt": ((library.get_meta("lantern_runtime_derivative_receipts", {}) as Dictionary).get(phase, {}) as Dictionary).duplicate(true) if library else {},
+		"runtime_derivative_receipt": ((library.get_meta("lantern_runtime_derivative_receipts", {}) as Dictionary).get(phase, {}) as Dictionary).duplicate(true) if library and weapon_id == "warden_lantern" else {},
 		"causal_owner": String(event.get("audio_owner", event.get("actor_id", "warden"))),
 		"bounded_window_seconds": float((library.get_meta("playback_windows", {}) as Dictionary).get(semantic, 0.0)) if library else 0.0,
 	}
@@ -259,15 +273,27 @@ func _emit_attack_audio(event: Dictionary, phase: String) -> bool:
 	last_attack_audio_receipt = receipt.duplicate(true)
 	return started
 
-func _play_lantern_attack_voice(phase: String) -> bool:
+func _lantern_impact_semantic(event: Dictionary) -> String:
+	if not bool(event.get("accepted", true)):
+		return "weapon_warden_lantern_miss"
+	var material := String(event.get("hit_material", event.get("surface_material", "character"))).to_lower()
+	if material in ["metal", "stone", "armour", "armor", "bell"]:
+		return "weapon_warden_lantern_metal_hit"
+	if material in ["world", "ground", "terrain", "environment"]:
+		return "weapon_warden_lantern_metal_hit"
+	return "weapon_warden_lantern_character_hit"
+
+func _play_lantern_attack_voice(phase: String, semantic_override: String = "") -> bool:
 	var voice := lantern_onset_voice if phase == "onset" else lantern_impact_voice if phase == "impact" else null
 	if not voice:
-		return play_semantic("weapon_warden_lantern_%s" % phase)
-	var streams := _lantern_streams_for_phase(phase)
+		return play_semantic(semantic_override if not semantic_override.is_empty() else "weapon_warden_lantern_%s" % phase)
+	var semantic := semantic_override if not semantic_override.is_empty() else "weapon_warden_lantern_%s" % phase
+	var streams := _streams_for(semantic)
+	if streams.is_empty() and phase in ["onset", "impact"]:
+		streams = _lantern_streams_for_phase(phase)
 	if streams.is_empty() or not streams[0] is AudioStream:
-		missing_source_counts["weapon_warden_lantern_%s" % phase] = int(missing_source_counts.get("weapon_warden_lantern_%s" % phase, 0)) + 1
+		missing_source_counts[semantic] = int(missing_source_counts.get(semantic, 0)) + 1
 		return false
-	var semantic := "weapon_warden_lantern_%s" % phase
 	var volumes: Dictionary = library.get_meta("volumes_db", {}) if library else {}
 	var windows: Dictionary = library.get_meta("playback_windows", {}) if library else {}
 	voice.stop()

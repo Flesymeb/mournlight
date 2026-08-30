@@ -14,6 +14,7 @@ var _guidance_title: Label
 var _guidance_action: Label
 var _guidance_prompt: Label
 var _guidance_dismiss: Label
+var _guidance_help_hint: Label
 
 @onready var _vitals_meter: FPSVitalsHUD = $VitalsMeter
 
@@ -83,6 +84,9 @@ func _build_guidance_panel() -> void:
 	_guidance_prompt = _guidance_label(11, SILVER)
 	_guidance_prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_guidance_dismiss = _guidance_label(9, Color(BRASS, 0.95))
+	_guidance_help_hint = _guidance_label(10, Color(BRASS, 0.95))
+	_guidance_help_hint.text = "H  HELP"
+	add_child(_guidance_help_hint)
 	for label in [_guidance_title, _guidance_action, _guidance_prompt, _guidance_dismiss]:
 		_guidance_panel.add_child(label)
 	_guidance_panel.visible = false
@@ -107,6 +111,8 @@ func _layout_guidance_panel() -> void:
 	_guidance_action.position = Vector2(18, 180); _guidance_action.size = Vector2(430, 28)
 	_guidance_prompt.position = Vector2(18, 210); _guidance_prompt.size = Vector2(430, 38)
 	_guidance_dismiss.position = Vector2(18, 250); _guidance_dismiss.size = Vector2(430, 18)
+	_guidance_help_hint.position = Vector2(size.x - 108, size.y - 42)
+	_guidance_help_hint.size = Vector2(82, 20)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
@@ -141,6 +147,7 @@ func bind_snapshot(next_snapshot: Dictionary) -> void:
 func _bind_guidance_panel(guidance_value: Variant) -> void:
 	var guidance: Dictionary = guidance_value if guidance_value is Dictionary else {}
 	_guidance_panel.visible = visible and bool(guidance.get("visible", false))
+	_guidance_help_hint.visible = visible and bool(guidance.get("dismissed", false)) and not bool(guidance.get("completed", false))
 	if not _guidance_panel.visible:
 		return
 	_guidance_title.text = "%s   ·   %s" % [String(guidance.get("title", "KEEPER'S FIRST VIGIL")), String(guidance.get("device", "keyboard")).to_upper()]
@@ -154,6 +161,8 @@ func clear_snapshot() -> void:
 	visible = false
 	if is_instance_valid(_guidance_panel):
 		_guidance_panel.visible = false
+	if is_instance_valid(_guidance_help_hint):
+		_guidance_help_hint.visible = false
 	queue_redraw()
 
 func _draw() -> void:
@@ -333,6 +342,7 @@ func _mcp_state() -> Dictionary:
 		"displayed_experience_ratio":_displayed_experience_ratio,
 		"target_experience_ratio":_target_experience_ratio,
 		"collection_flash":_collection_flash},
+		"help_hint_visible":is_instance_valid(_guidance_help_hint) and _guidance_help_hint.visible,
 		"snapshot_serial": snapshot_serial, "visible": visible}
 
 func _weapon_rank_digest() -> Array[Dictionary]:
