@@ -19,28 +19,28 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 
 | Field | Value |
 | --- | --- |
-| Open | 2 |
+| Open | 0 |
 | Closed | 0 |
-| All | 2 |
+| All | 0 |
 
 ---
 
-## Loop 03
+## Loop 01
 
 > A host-derived record of one Planner → Developer → QA Tester cycle.
 
 | Candidate | Base | Current state |
 | --- | --- | --- |
-| `loop-03-59388bec69cc` | `warm_start:loop-02-59388bec69cc` | PLANNED |
+| `loop-01-59388bec69cc` | `seed_import` | PLANNED |
 
 ### Project Planner
 
 | Field | Value |
 | --- | --- |
 | Status | PLANNED |
-| Focus | phase / authored_world_presentation |
-| Objective | Deliver one closure-ready authored-world presentation pass that restores readable cemetery traversal and camera framing, makes runtime-visible mesh shading safe, and completes combat feedback, animation/VFX/lighting/audio, first-run guidance, HUD choice hierarchy, accessibility, and restart/result shell behavior. |
-| Strategy | `authored_world_binding_and_presentation_repair` |
+| Focus | phase / survival_foundation |
+| Objective | Deliver one coherent survivor-foundation increment that makes camera-relative movement, dash, pause/reset ownership, authored-arena spatial integrity, and visual upgrade choices directly retestable in the shipped runtime. |
+| Strategy | `integrated_survivor_contract_hardening` |
 | Tasks | 1 |
 
 ### Developer
@@ -57,107 +57,12 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 
 ---
 
-## Loop 02
-
-> A host-derived record of one Planner → Developer → QA Tester cycle.
-
-| Candidate | Base | Current state |
-| --- | --- | --- |
-| `loop-02-59388bec69cc` | `development_snapshot:attempt-896b021f7f790859752c0d1f` | BLOCKED |
-
-### Project Planner
-
-| Field | Value |
-| --- | --- |
-| Status | PLANNED |
-| Focus | phase / build_wave_expansion |
-| Objective | Advance build expansion by repairing readable camera and arena traversal while delivering truthful weapon/build choices and authoritative five-wave/Bellkeeper progression. |
-| Strategy | `camera_spatial_wrapper_repair_plus_core_survivor_contracts` |
-| Tasks | 3 |
-
-### Developer
-
-| Field | Value |
-| --- | --- |
-| Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
-| Completed tasks | 3 |
-| Changed paths | 3 |
-| Blocker | See the QA outcome below. |
-| Attempt | `attempt-896b021f7f790859752c0d1f` |
-
-### QA Tester
-
-| Field | Value |
-| --- | --- |
-| Status | FAIL |
-| Candidate | `loop-02-59388bec69cc` |
-| Product completion | IN PROGRESS |
-| Review scope | `phase` |
-| Findings | 2 (1 blocking focus items) |
-
-### Evidence / QA findings
-
-| ID | Severity | Summary |
-| --- | --- | --- |
-| `camera_framing_readability` | MAJOR | Shipped high-angle camera remains too distant and partially occludes the Warden, weakening player/threat readability. |
-| `visible_mesh_degenerate_uvs` | MAJOR | Runtime-visible authored meshes still report widespread degenerate UV surfaces that can corrupt moonlit shading. |
-
----
-
-## Loop 01
-
-> A host-derived record of one Planner → Developer → QA Tester cycle.
-
-| Candidate | Base | Current state |
-| --- | --- | --- |
-| `loop-01-7e69a5ddc689` | `development_snapshot:attempt-90fc37a00244bb2552d34aae` | BLOCKED |
-
-### Project Planner
-
-| Field | Value |
-| --- | --- |
-| Status | PLANNED |
-| Focus | phase / survival_foundation |
-| Objective | Complete the survival-foundation camera, movement, and dash increment while simultaneously delivering the required authored weapon/upgrade choice hierarchy and arena spatial integrity, with deterministic lifecycle reset and evidence-ready authoritative state. |
-| Strategy | `authoritative_locomotion_spatial_and_choice_binding` |
-| Tasks | 1 |
-
-### Developer
-
-| Field | Value |
-| --- | --- |
-| Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
-| Completed tasks | 1 |
-| Changed paths | 3 |
-| Blocker | See the QA outcome below. |
-| Attempt | `attempt-90fc37a00244bb2552d34aae` |
-
-### QA Tester
-
-| Field | Value |
-| --- | --- |
-| Status | FAIL |
-| Candidate | `loop-01-7e69a5ddc689` |
-| Product completion | IN PROGRESS |
-| Review scope | `phase` |
-| Findings | 1 (1 blocking focus items) |
-
-### Evidence / QA findings
-
-| ID | Severity | Summary |
-| --- | --- | --- |
-| `camera_framing_readability` | MAJOR | Shipped high-angle camera is too distant and partially occludes the player, weakening player/threat readability. |
-
----
-
 ## Current pointers
 
-- Latest candidate: `loop-03-59388bec69cc`
+- Latest candidate: `loop-01-59388bec69cc`
 - Accepted candidate: `none`
-- Latest attempted: `loop-03-59388bec69cc`
-- Latest warm start: `loop-03-59388bec69cc`
-- Last published: `loop-02-59388bec69cc`
-- Best verified: `loop-02-59388bec69cc`
+- Latest attempted: `loop-01-59388bec69cc`
+- Latest warm start: `none`
+- Last published: `none`
+- Best verified: `none`
 - Generated by the GameLoop host from immutable run evidence.
