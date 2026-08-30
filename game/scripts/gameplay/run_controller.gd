@@ -731,6 +731,17 @@ func _on_reward_pickup_collected(event: Dictionary) -> void:
 		level += 1
 		experience_threshold = 5 + (level - 1) * 2
 		_pending_levelup_transactions += 1
+	# Validate overflow against the same threshold progression used by the
+	# authoritative loop.  A merged pickup can cross several levels; subtracting
+	# only the starting threshold would falsely report a lost remainder and make
+	# the HUD/result evidence disagree with the build state.
+	var expected_experience := experience_before + resolved_reward
+	var expected_level := level_before
+	var expected_threshold := threshold_before
+	while expected_experience >= expected_threshold:
+		expected_experience -= expected_threshold
+		expected_level += 1
+		expected_threshold = 5 + (expected_level - 1) * 2
 	if _pending_levelup_transactions > 0:
 		_open_upgrade_draft()
 	_reward_collection_receipt = event.duplicate(true)
@@ -744,7 +755,10 @@ func _on_reward_pickup_collected(event: Dictionary) -> void:
 		"experience_before":experience_before, "experience_after":experience,
 		"threshold_before":threshold_before, "threshold_after":experience_threshold,
 		"level_before":level_before, "level_after":level,
-		"overflow_preserved":experience == experience_before + resolved_reward - (threshold_before if level > level_before else 0),
+		"overflow_preserved":experience == expected_experience and level == expected_level and experience_threshold == expected_threshold,
+		"expected_overflow":expected_experience,
+		"expected_level":expected_level,
+		"expected_threshold":expected_threshold,
 		"hud_interpolation_requested":true,
 	}
 	reward_collected.emit(_reward_collection_receipt.duplicate(true))
