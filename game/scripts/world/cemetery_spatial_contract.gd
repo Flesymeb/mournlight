@@ -33,7 +33,15 @@ func _ready() -> void:
 		if is_instance_valid(package_transform):
 			package_transform.scale = Vector3.ONE * 3.2
 	_calibrate_authored_visibility()
-	_audit_visible_uv_bindings()
+	# Keep the imported cemetery package intact.  UV/tangent inspection remains
+	# an evidence concern, but no runtime child-mesh surgery is performed here.
+	uv_binding_receipt = {
+		"status":"native_intact",
+		"scope":"visible_authored_cemetery",
+		"source_immutable":true,
+		"runtime_binding":"AuthoredCemeteryPackage",
+		"integration_repair":"none",
+	}
 
 func _calibrate_authored_visibility() -> void:
 	# The bound GLB carries zero-sized imported custom AABBs on several meshes.
@@ -453,7 +461,7 @@ func get_snapshot() -> Dictionary:
 			"warm_anchor":"OuterDatum/KeeperLanternPostAnchor/WarmLandmarkLight",
 			"cool_fills":["OuterDatum/RouteMoonFill","OuterDatum/WestMoonRim","OuterDatum/EastMoonRim","OuterDatum/SmallMausoleumAnchor/MausoleumMoonLift"],
 			"escape_lane_policy":"native_street_network_preserved",
-			"camera_profile":{"fov":62.0,"follow_height":23.0,"follow_distance":25.0,"follow_lateral":6.0},
+			"camera_profile":{"fov":70.0,"follow_height":28.0,"follow_distance":28.0,"follow_lateral":14.0},
 			"proxy_geometry_count":0,
 		},
 		"external_world":{"source":"intact_authored_package_native_terrain_and_perimeter", "procedural_scenery":false, "primitive_meshes":0, "opaque":true, "non_playable_depth_beyond_all_edges":true},

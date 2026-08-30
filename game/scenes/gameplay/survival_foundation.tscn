@@ -98,12 +98,12 @@ near = 0.15
 far = 180.0
 arena_limit = Vector2(34.0, 32.0)
 normal_fov = 70.0
-follow_height = 30.5
-follow_distance = 31.5
-follow_lateral = 12.0
+follow_height = 28.0
+follow_distance = 28.0
+follow_lateral = 14.0
 # Product framing keeps the Warden readable while preserving the mausoleum and
 # bell in the north-safe lane; avoid aiming through the central landmark.
-framing_bias = Vector3(-6.0, 0, -1.5)
+framing_bias = Vector3(-3.0, 0, -4.5)
 arena_fill_limit = Vector2(33.0, 30.5)
 coverage_max_correction = 3.5
 coverage_threat_weight = 0.30
