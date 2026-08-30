@@ -69,8 +69,8 @@ static func contract() -> Dictionary:
 		"enemy_range": {"minimum": MIN_ENEMIES, "maximum": MAX_ENEMIES, "target": TARGET_ENEMIES},
 		"metrics": [
 			"timestamp_msec", "frame_ms", "physics_ms", "render_ms", "draw_calls", "allocation_bytes", "orphan_nodes", "fps", "sample_count", "physics_sample_count", "sample_availability", "active_enemies", "active_projectiles",
-			"active_pickups", "active_effects", "active_lights", "active_audio_voices",
-			"spawned_total", "despawned_total", "runtime_error_count",
+			"active_pickups", "active_effects", "active_lights", "active_audio_voices", "pooled_enemies", "pooled_pickups",
+			"spawned_total", "despawned_total", "runtime_error_count", "subsystem_samples", "sample_distributions", "high_water_marks", "lifecycle_deltas",
 		],
 		"telemetry": {"sample_history_cap": SAMPLE_HISTORY_CAP, "per_sample_metrics": true, "runtime_errors_source": "godot_runtime_log"},
 		"receipts": ["requested", "resolved", "reset_isolation"],
@@ -169,3 +169,33 @@ static func qualification_contract() -> Dictionary:
 		"target_density":TARGET_ENEMIES,
 		"reset_isolation_required":true,
 	}
+
+## Normalize the bounded per-frame history into host-auditable distributions.
+## Raw samples remain available; this summary keeps collector logic consistent.
+static func sample_distribution(samples: Array) -> Dictionary:
+	var keys := ["frame_ms", "physics_ms", "render_ms", "draw_calls", "allocation_bytes", "orphan_nodes", "active_enemies", "active_projectiles", "active_pickups", "active_effects", "active_lights", "active_audio_voices", "pooled_enemies", "pooled_pickups"]
+	var distributions: Dictionary = {}
+	var high_water_marks: Dictionary = {}
+	for key_value in keys:
+		var key := String(key_value)
+		var values: Array[float] = []
+		for sample_value in samples:
+			var sample: Dictionary = sample_value
+			values.append(float(sample.get(key, 0.0)))
+		values.sort()
+		var maximum: float = float(values.back()) if not values.is_empty() else 0.0
+		distributions[key] = {
+			"p50": _percentile(values, 0.50),
+			"p95": _percentile(values, 0.95),
+			"p99": _percentile(values, 0.99),
+			"maximum": maximum,
+			"sample_count": values.size(),
+		}
+		if key.begins_with("active_") or key.begins_with("pooled_"):
+			high_water_marks[key] = maximum
+	return {"sample_count":samples.size(),"distributions":distributions,"high_water_marks":high_water_marks,"bounded":true}
+
+static func _percentile(sorted: Array[float], fraction: float) -> float:
+	if sorted.is_empty():
+		return 0.0
+	return sorted[clampi(int(ceil((sorted.size() - 1) * fraction)), 0, sorted.size() - 1)]

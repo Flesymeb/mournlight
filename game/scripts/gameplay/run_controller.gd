@@ -1796,6 +1796,7 @@ func _advance_profile_sample(delta: float) -> void:
 	var allocation_bytes := int(Performance.get_monitor(Performance.MEMORY_STATIC))
 	var orphan_nodes := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	var metric_counts := _profile_counts()
+	var workload_sample := _profile_workload_receipt(spawner.get_snapshot())
 	if _profile_metric_samples.size() < PROFILE_MAX_SAMPLES:
 		_profile_metric_samples.append({
 			"timestamp_msec":Time.get_ticks_msec(),
@@ -1812,9 +1813,18 @@ func _advance_profile_sample(delta: float) -> void:
 			"active_effects":int(metric_counts.get("effects", 0)),
 			"active_lights":int(metric_counts.get("lights", 0)),
 			"active_audio_voices":int(metric_counts.get("audio_voices", 0)),
+			"pooled_enemies":int(metric_counts.get("pooled_enemies", 0)),
+			"pooled_pickups":int(metric_counts.get("pooled_pickups", 0)),
 			"spawned_total":int(spawner.get_snapshot().get("spawned", 0)),
 			"despawned_total":int(spawner.get_snapshot().get("retired", 0)),
 			"runtime_error_count":0,
+			"subsystems": {
+				"targeting":(workload_sample.get("targeting", {}) as Dictionary).duplicate(true),
+				"steering":(workload_sample.get("steering", {}) as Dictionary).duplicate(true),
+				"physics":(workload_sample.get("physics", {}) as Dictionary).duplicate(true),
+				"presentation":(workload_sample.get("presentation_updates", {}) as Dictionary).duplicate(true),
+				"combat":(workload_sample.get("attacks", {}) as Dictionary).duplicate(true),
+			},
 		})
 	if _profile_samples_ms.size() < PROFILE_MAX_SAMPLES:
 		_profile_samples_ms.append(frame_ms)
@@ -1849,6 +1859,8 @@ func _advance_profile_sample(delta: float) -> void:
 			over_budget_count += 1
 		if sample_ms > 33.33:
 			long_frame_count += 1
+	var end_lifecycle := _lifecycle_counters()
+	var sample_distribution := DenseWaveProfileClass.sample_distribution(_profile_metric_samples)
 	validation_profile_sample = {
 		"contract_id":DenseWaveProfileClass.CONTRACT_ID,
 		"contract_version":DenseWaveProfileClass.CONTRACT_VERSION,
@@ -1871,6 +1883,9 @@ func _advance_profile_sample(delta: float) -> void:
 		"render_draw_proxy":{"draw_calls_p95":_percentile_metric(_profile_metric_samples, "draw_calls", 0.95), "draw_calls_max":_max_metric(_profile_metric_samples, "draw_calls"), "render_ms_p95":_percentile_metric(_profile_metric_samples, "render_ms", 0.95)},
 		"allocation_gc_proxy":{"allocation_bytes_start":int(_profile_metric_samples.front().get("allocation_bytes", 0)) if not _profile_metric_samples.is_empty() else 0, "allocation_bytes_end":int(_profile_metric_samples.back().get("allocation_bytes", 0)) if not _profile_metric_samples.is_empty() else 0, "orphan_nodes_max":_max_metric(_profile_metric_samples, "orphan_nodes"), "source":"Performance.MEMORY_STATIC_and_OBJECT_ORPHAN_NODE_COUNT"},
 		"telemetry_samples":_profile_metric_samples.duplicate(true),
+		"subsystem_samples":_profile_subsystem_samples(),
+		"sample_distributions":sample_distribution,
+		"high_water_marks":(sample_distribution.get("high_water_marks", {}) as Dictionary).duplicate(true),
 		"telemetry_sample_count":_profile_metric_samples.size(),
 		"sample_history_cap":PROFILE_MAX_SAMPLES, "window_seconds":_profile_elapsed,
 		"sampling_renderer_independent":true,
@@ -1898,7 +1913,8 @@ func _advance_profile_sample(delta: float) -> void:
 		"end_counts":end_counts.duplicate(true), "counts":end_counts.duplicate(true),
 		"lifecycle_metrics":{"spawned_total":int(spawner.get_snapshot().get("spawned", 0)), "despawned_total":int(spawner.get_snapshot().get("retired", 0)), "runtime_error_count":0, "runtime_error_source":"godot_runtime_log"},
 		"start_lifecycle":_profile_start_lifecycle.duplicate(true),
-		"end_lifecycle":_lifecycle_counters(),
+		"end_lifecycle":end_lifecycle,
+		"lifecycle_deltas":_profile_lifecycle_delta(_profile_start_lifecycle, end_lifecycle),
 		"cohort":cohort,
 		"requested_enemy_workload":int(cohort.get("requested", _profile_start_counts.get("enemies", 0))),
 		"start_enemy_workload":int(cohort.get("start", _profile_start_counts.get("enemies", 0))),
@@ -2453,6 +2469,19 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 		renderer_statuses.append(String(qualification.get("renderer_gate_status", DenseWaveProfileClass.UNKNOWN_STATUS)))
 	var renderer_consistent := renderer_statuses.size() == 3 and renderer_statuses.all(func(value: String) -> bool: return value == renderer_statuses[0])
 	var native_renderer_ready := native_ready and renderer_consistent and not renderer_statuses.is_empty() and renderer_statuses[0] == DenseWaveProfileClass.NATIVE_STATUS
+	var aggregate_high_water_marks: Dictionary = {}
+	var aggregate_lifecycle_deltas: Dictionary = {}
+	for cycle in completed:
+		var cycle_sample: Dictionary = cycle.get("sample", {})
+		var cycle_high_water: Dictionary = cycle_sample.get("high_water_marks", (cycle_sample.get("sample_distributions", {}) as Dictionary).get("high_water_marks", {}))
+		for key_value in cycle_high_water.keys():
+			var key := String(key_value)
+			aggregate_high_water_marks[key] = maxf(float(aggregate_high_water_marks.get(key, 0.0)), float(cycle_high_water[key_value]))
+		var lifecycle: Dictionary = cycle_sample.get("lifecycle_deltas", {})
+		var deltas: Dictionary = lifecycle.get("deltas", {})
+		for key_value in deltas.keys():
+			var key := String(key_value)
+			aggregate_lifecycle_deltas[key] = int(aggregate_lifecycle_deltas.get(key, 0)) + int(deltas[key_value])
 	return {
 		"identity":"mournlight.native_dense_three_cycle.v1",
 		"required_cycle_count":3,
@@ -2463,6 +2492,8 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 		"native_renderer_eligible":native_renderer_ready,
 		"three_cycle_reset_isolation":reset_ready,
 		"three_cycle_ready":native_renderer_ready and reset_ready,
+		"aggregate_high_water_marks":aggregate_high_water_marks,
+		"aggregate_lifecycle_deltas":aggregate_lifecycle_deltas,
 		"release_qualification_status":DenseWaveProfileClass.NATIVE_STATUS if native_ready and reset_ready and renderer_consistent and renderer_statuses[0] == DenseWaveProfileClass.NATIVE_STATUS else (DenseWaveProfileClass.SOFTWARE_STATUS if renderer_statuses.has(DenseWaveProfileClass.SOFTWARE_STATUS) else DenseWaveProfileClass.UNKNOWN_STATUS),
 		"diagnostic_only":true,
 	}
@@ -2942,6 +2973,30 @@ func _profile_workload_window(start: Dictionary, finish: Dictionary) -> Dictiona
 		"end_state":{"projectiles":finish.get("projectiles", 0),"pickups":finish.get("pickups", 0),"effects":finish.get("effects", 0),"audio":finish.get("audio", {}),"lights":finish.get("light_owners", {}),"telegraphs":finish.get("telegraph_admission", {})},
 		"counter_reset_scope":"ordinary_run",
 	}
+
+func _profile_lifecycle_delta(start: Dictionary, finish: Dictionary) -> Dictionary:
+	var keys := [
+		"scene_tree_nodes", "object_count", "resource_count", "orphan_nodes", "static_memory_bytes",
+		"input_action_count", "owned_signal_bindings", "audio_voices", "enemy_active", "enemy_pooled",
+		"projectiles", "pickups", "telegraph_active", "light_count", "active_attack_ledgers", "effects",
+		"input_owner_count", "terminal_commit_count",
+	]
+	var deltas: Dictionary = {}
+	for key_value in keys:
+		var key := String(key_value)
+		deltas[key] = int(finish.get(key, 0)) - int(start.get(key, 0))
+	return {"from":start.duplicate(true),"to":finish.duplicate(true),"deltas":deltas,"bounded":true}
+
+func _profile_subsystem_samples() -> Array[Dictionary]:
+	var samples: Array[Dictionary] = []
+	for sample_value in _profile_metric_samples:
+		var sample: Dictionary = sample_value
+		samples.append({
+			"timestamp_msec":sample.get("timestamp_msec", 0),
+			"elapsed_seconds":sample.get("elapsed_seconds", 0.0),
+			"subsystems":(sample.get("subsystems", {}) as Dictionary).duplicate(true),
+		})
+	return samples
 
 func _first_run_guidance_snapshot() -> Dictionary:
 	var bindings := {
@@ -3521,6 +3576,10 @@ func _mcp_state() -> Dictionary:
 		"profile_frame_sample_count":validation_profile_sample.get("sample_count", 0),
 		"profile_telemetry_sample_count":validation_profile_sample.get("telemetry_sample_count", 0),
 		"profile_telemetry_samples":validation_profile_sample.get("telemetry_samples", []),
+		"profile_subsystem_samples":validation_profile_sample.get("subsystem_samples", []),
+		"profile_sample_distributions":validation_profile_sample.get("sample_distributions", {}),
+		"profile_high_water_marks":validation_profile_sample.get("high_water_marks", {}),
+		"profile_lifecycle_deltas":validation_profile_sample.get("lifecycle_deltas", {}),
 		"profile_physics_sample_count":validation_profile_sample.get("physics_sample_count", 0),
 		"profile_sample_availability":validation_profile_sample.get("sample_availability", {}),
 		"profile_frame_execution":validation_profile_sample.get("frame_execution", {}),
