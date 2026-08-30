@@ -4,8 +4,8 @@
 [ext_resource type="Resource" path="res://resources/audio/mournlight_audio_library.tres" id="2"]
 [ext_resource type="AudioStream" path="res://assets/audio_semantic/cogito_footsteps/footstep_stone_02.ogg" id="3_footstep"]
 [ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_terminal/victory_achievement.wav" id="4_victory"]
-[ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/lantern_onset_compat.wav" id="5_lantern_onset"]
-[ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/lantern_impact_compat.wav" id="6_lantern_impact"]
+[ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/lantern_onset.mp3" id="5_lantern_onset"]
+[ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/lantern_impact.mp3" id="6_lantern_impact"]
 
 [node name="MournlightAudio" type="Node" groups=["mcp_watch"]]
 process_mode = 3

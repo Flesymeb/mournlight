@@ -3,21 +3,21 @@ extends Camera3D
 
 @export var target: Node3D
 @export var arena_contract: CemeterySpatialContract
-@export var follow_height := 24.0
-@export var follow_distance := 24.0
+@export var follow_height := 21.0
+@export var follow_distance := 12.0
 ## Fixed three-quarter azimuth keeps the Warden out of the mausoleum's stair
 ## silhouette while retaining a high-angle escape-lane read.  The rig still
 ## follows the player; this is only the authored lateral offset of that rig.
-@export var follow_lateral := 24.0
+@export var follow_lateral := 12.0
 @export var follow_damping := 8.5
 @export var lead_distance := 2.4
 @export var lead_damping := 5.0
 # Keep the Warden in the lower-safe lane without aiming the camera through the
 # mausoleum volume.  The previous -5.5 north bias put several Warden AABB
 # samples behind the landmark and under-reported shipped visibility.
-@export var framing_bias: Vector3 = Vector3(4.0, 0.0, 8.0)
+@export var framing_bias: Vector3 = Vector3(2.0, 0.0, 2.0)
 @export var arena_limit := Vector2(34.0, 32.0)
-@export var normal_fov := 70.0
+@export var normal_fov := 60.0
 @export var safe_frame_fraction := Vector2(0.08, 0.10)
 @export var safe_frame_activation_buffer := 0.04
 @export var safe_frame_correction_damping := 11.0
@@ -237,7 +237,10 @@ func _process(delta: float) -> void:
 		# southern/northern edge at the spawn lane, which reads as a black datum
 		# void in shipped captures.  The larger inset preserves external depth in
 		# frame while keeping the visible street network authoritative.
-		var camera_margin := 8.0
+		# Keep enough native cemetery depth in every cardinal view. At the old
+		# eight-metre inset the high-angle frustum crossed the authored edge and
+		# exposed the empty world background as a hard dark band.
+		var camera_margin := 14.0
 		desired_position.x = clampf(desired_position.x, visual_rect.position.x + camera_margin, visual_rect.end.x - camera_margin)
 		desired_position.z = clampf(desired_position.z, visual_rect.position.y + camera_margin, visual_rect.end.y - camera_margin)
 	global_position = global_position.lerp(desired_position, 1.0 - exp(-follow_damping * delta))

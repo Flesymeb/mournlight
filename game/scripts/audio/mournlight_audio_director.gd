@@ -11,6 +11,8 @@ var lantern_onset_voice: AudioStreamPlayer
 var lantern_impact_voice: AudioStreamPlayer
 var lantern_onset_window_remaining := 0.0
 var lantern_impact_window_remaining := 0.0
+var lantern_onset_started_msec := 0
+var lantern_impact_started_msec := 0
 var movement_window_remaining: Array[float] = []
 var voice_owners: Array[String] = []
 var voice_priorities: Array[int] = []
@@ -260,6 +262,10 @@ func _play_lantern_attack_voice(phase: String) -> bool:
 	voice.volume_db = float(volumes.get(semantic, -12.0))
 	voice.pitch_scale = 1.0
 	voice.play(0.0)
+	if phase == "onset":
+		lantern_onset_started_msec = Time.get_ticks_msec()
+	else:
+		lantern_impact_started_msec = Time.get_ticks_msec()
 	semantic_counts[semantic] = int(semantic_counts.get(semantic, 0)) + 1
 	if phase == "onset":
 		lantern_onset_window_remaining = maxf(0.06, float(windows.get(semantic, 0.24)))
@@ -271,11 +277,24 @@ func _retire_expired_lantern_windows(delta: float) -> void:
 	if lantern_onset_window_remaining > 0.0:
 		lantern_onset_window_remaining = maxf(0.0, lantern_onset_window_remaining - delta)
 		if lantern_onset_window_remaining <= 0.0 and lantern_onset_voice:
-			lantern_onset_voice.stop()
+			# A frozen game-time step can advance past the authored envelope before
+			# the mixer has emitted its first frame. Keep the scene-bound source alive
+			# through decoder startup so a valid report cannot be retired silently.
+			if lantern_onset_voice.playing or lantern_onset_voice.get_playback_position() > 0.001:
+				lantern_onset_voice.stop()
+			elif Time.get_ticks_msec() - lantern_onset_started_msec < 900:
+				lantern_onset_window_remaining = 0.04
+			else:
+				lantern_onset_voice.stop()
 	if lantern_impact_window_remaining > 0.0:
 		lantern_impact_window_remaining = maxf(0.0, lantern_impact_window_remaining - delta)
 		if lantern_impact_window_remaining <= 0.0 and lantern_impact_voice:
-			lantern_impact_voice.stop()
+			if lantern_impact_voice.playing or lantern_impact_voice.get_playback_position() > 0.001:
+				lantern_impact_voice.stop()
+			elif Time.get_ticks_msec() - lantern_impact_started_msec < 900:
+				lantern_impact_window_remaining = 0.04
+			else:
+				lantern_impact_voice.stop()
 
 func _on_reward_collected(event: Dictionary) -> void:
 	pickup_audio_event_count += 1
@@ -630,7 +649,7 @@ func _retire_expired_windows(delta: float) -> void:
 		# semantic voice merely because its first mixer frame has not landed yet;
 		# otherwise Effects captures lose the entire onset/impact despite a valid
 		# source and bus route.
-		if playback_position <= 0.001 and startup_age < 0.35:
+		if playback_position <= 0.001 and startup_age < 0.9:
 			continue
 		voice_window_remaining[index] = maxf(0.0, voice_window_remaining[index] - delta)
 		if voice_window_remaining[index] <= 0.0 or not voice.playing:
@@ -683,6 +702,8 @@ func reset_for_run() -> void:
 		lantern_impact_voice.stop()
 	lantern_onset_window_remaining = 0.0
 	lantern_impact_window_remaining = 0.0
+	lantern_onset_started_msec = 0
+	lantern_impact_started_msec = 0
 	for index in movement_voices.size():
 		_retire_movement_voice(index, "run_reset")
 	for index in voices.size():

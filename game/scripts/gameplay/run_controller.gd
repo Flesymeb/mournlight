@@ -1789,13 +1789,22 @@ func _advance_profile_sample(delta: float) -> void:
 	# cost and falsely reject an otherwise healthy native profile.
 	var measured_process_ms := float(Performance.get_monitor(Performance.TIME_PROCESS)) * 1000.0
 	var frame_ms := measured_process_ms if measured_process_ms > 0.0 else maxf(0.0, delta * 1000.0)
+	var measured_physics_ms := float(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)) * 1000.0
+	var measured_render_ms := maxf(0.0, frame_ms - measured_physics_ms)
+	var draw_calls := int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+	var allocation_bytes := int(Performance.get_monitor(Performance.MEMORY_STATIC))
+	var orphan_nodes := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	var metric_counts := _profile_counts()
 	if _profile_metric_samples.size() < PROFILE_MAX_SAMPLES:
 		_profile_metric_samples.append({
 			"timestamp_msec":Time.get_ticks_msec(),
 			"elapsed_seconds":_profile_elapsed,
 			"frame_ms":frame_ms,
-			"physics_ms":float(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)) * 1000.0,
+			"physics_ms":measured_physics_ms,
+			"render_ms":measured_render_ms,
+			"draw_calls":draw_calls,
+			"allocation_bytes":allocation_bytes,
+			"orphan_nodes":orphan_nodes,
 			"active_enemies":int(metric_counts.get("enemies", 0)),
 			"active_projectiles":int(metric_counts.get("projectiles", 0)),
 			"active_pickups":int(metric_counts.get("pickups", 0)),
@@ -1858,6 +1867,8 @@ func _advance_profile_sample(delta: float) -> void:
 		"missing_coverage":_missing_profile_coverage(_profile_coverage),
 		"density_threshold_crossing":sample_start.get("density_threshold_crossing", {}),
 		"sample_count":sorted.size(), "sample_cadence_seconds":PROFILE_SAMPLE_INTERVAL_SECONDS,
+		"render_draw_proxy":{"draw_calls_p95":_percentile_metric(_profile_metric_samples, "draw_calls", 0.95), "draw_calls_max":_max_metric(_profile_metric_samples, "draw_calls"), "render_ms_p95":_percentile_metric(_profile_metric_samples, "render_ms", 0.95)},
+		"allocation_gc_proxy":{"allocation_bytes_start":int(_profile_metric_samples.front().get("allocation_bytes", 0)) if not _profile_metric_samples.is_empty() else 0, "allocation_bytes_end":int(_profile_metric_samples.back().get("allocation_bytes", 0)) if not _profile_metric_samples.is_empty() else 0, "orphan_nodes_max":_max_metric(_profile_metric_samples, "orphan_nodes"), "source":"Performance.MEMORY_STATIC_and_OBJECT_ORPHAN_NODE_COUNT"},
 		"telemetry_samples":_profile_metric_samples.duplicate(true),
 		"telemetry_sample_count":_profile_metric_samples.size(),
 		"sample_history_cap":PROFILE_MAX_SAMPLES, "window_seconds":_profile_elapsed,
@@ -1879,6 +1890,9 @@ func _advance_profile_sample(delta: float) -> void:
 		"fps":{"p50":60000.0 / maxf(0.001, _percentile(sorted,0.50)), "p95":60000.0 / maxf(0.001, _percentile(sorted,0.95)), "worst":1000.0 / maxf(0.001, sorted.back() if not sorted.is_empty() else 0.0)},
 		"frame_ms":{"p50":_percentile(sorted,0.50),"p95":_percentile(sorted,0.95),"p99":_percentile(sorted,0.99),"worst":sorted.back() if not sorted.is_empty() else 0.0,"maximum":sorted.back() if not sorted.is_empty() else 0.0,"budget_ms":16.67,"over_budget_16_67_count":over_budget_count,"over_budget_ratio":float(over_budget_count) / float(sorted.size()) if not sorted.is_empty() else 0.0,"long_frame_33_33_count":long_frame_count},
 		"physics_ms":{"p50":_percentile(sorted_physics,0.50),"p95":_percentile(sorted_physics,0.95),"p99":_percentile(sorted_physics,0.99),"worst":sorted_physics.back() if not sorted_physics.is_empty() else 0.0,"maximum":sorted_physics.back() if not sorted_physics.is_empty() else 0.0},
+		"render_ms":{"p50":_percentile_metric(_profile_metric_samples, "render_ms", 0.50),"p95":_percentile_metric(_profile_metric_samples, "render_ms", 0.95),"maximum":_max_metric(_profile_metric_samples, "render_ms")},
+		"draw_calls":{"p50":_percentile_metric(_profile_metric_samples, "draw_calls", 0.50),"p95":_percentile_metric(_profile_metric_samples, "draw_calls", 0.95),"maximum":_max_metric(_profile_metric_samples, "draw_calls")},
+		"allocation_gc":{"allocation_bytes_p95":_percentile_metric(_profile_metric_samples, "allocation_bytes", 0.95),"allocation_bytes_max":_max_metric(_profile_metric_samples, "allocation_bytes"),"orphan_nodes_max":_max_metric(_profile_metric_samples, "orphan_nodes")},
 		"start_counts":_profile_start_counts.duplicate(true),
 		"end_counts":end_counts.duplicate(true), "counts":end_counts.duplicate(true),
 		"lifecycle_metrics":{"spawned_total":int(spawner.get_snapshot().get("spawned", 0)), "despawned_total":int(spawner.get_snapshot().get("retired", 0)), "runtime_error_count":0, "runtime_error_source":"godot_runtime_log"},
@@ -2659,6 +2673,21 @@ func _percentile(sorted: Array[float], fraction: float) -> float:
 	if sorted.is_empty():
 		return 0.0
 	return sorted[clampi(int(ceil((sorted.size()-1)*fraction)),0,sorted.size()-1)]
+
+func _percentile_metric(samples: Array, key: String, fraction: float) -> float:
+	var values: Array[float] = []
+	for sample_value in samples:
+		var sample: Dictionary = sample_value
+		values.append(float(sample.get(key, 0.0)))
+	values.sort()
+	return _percentile(values, fraction)
+
+func _max_metric(samples: Array, key: String) -> float:
+	var maximum := 0.0
+	for sample_value in samples:
+		var sample: Dictionary = sample_value
+		maximum = maxf(maximum, float(sample.get(key, 0.0)))
+	return maximum
 
 func _profile_weapon_ranks() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []

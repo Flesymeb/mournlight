@@ -68,7 +68,7 @@ static func contract() -> Dictionary:
 		},
 		"enemy_range": {"minimum": MIN_ENEMIES, "maximum": MAX_ENEMIES, "target": TARGET_ENEMIES},
 		"metrics": [
-			"timestamp_msec", "frame_ms", "physics_ms", "fps", "sample_count", "physics_sample_count", "sample_availability", "active_enemies", "active_projectiles",
+			"timestamp_msec", "frame_ms", "physics_ms", "render_ms", "draw_calls", "allocation_bytes", "orphan_nodes", "fps", "sample_count", "physics_sample_count", "sample_availability", "active_enemies", "active_projectiles",
 			"active_pickups", "active_effects", "active_lights", "active_audio_voices",
 			"spawned_total", "despawned_total", "runtime_error_count",
 		],

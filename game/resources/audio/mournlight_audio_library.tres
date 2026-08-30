@@ -30,13 +30,13 @@
 [resource]
 resource_name = "Mournlight Semantic Audio Library"
 metadata/music = Array[AudioStream]([ExtResource("1_music")])
-metadata/weapon_warden_lantern_onset = Array[AudioStream]([ExtResource("25_lantern_onset_compat")])
-metadata/weapon_warden_lantern_impact = Array[AudioStream]([ExtResource("26_lantern_impact_compat")])
+metadata/weapon_warden_lantern_onset = Array[AudioStream]([ExtResource("17_lantern_onset")])
+metadata/weapon_warden_lantern_impact = Array[AudioStream]([ExtResource("18_lantern_impact")])
 # The compatibility encodes are retained as the bounded lantern family. The
 # anticipation/recovery aliases keep the causal chain audible without adding
 # an unrelated tone or replacing the accepted source recordings.
-metadata/weapon_warden_lantern_anticipation = Array[AudioStream]([ExtResource("25_lantern_onset_compat")])
-metadata/weapon_warden_lantern_recovery = Array[AudioStream]([ExtResource("26_lantern_impact_compat")])
+metadata/weapon_warden_lantern_anticipation = Array[AudioStream]([ExtResource("17_lantern_onset")])
+metadata/weapon_warden_lantern_recovery = Array[AudioStream]([ExtResource("18_lantern_impact")])
 metadata/weapon_gravespade_onset = Array[AudioStream]([ExtResource("19_spade_onset")])
 metadata/weapon_gravespade_impact = Array[AudioStream]([ExtResource("20_spade_impact")])
 metadata/weapon_wandering_wisps_onset = Array[AudioStream]([ExtResource("21_wisps_onset")])
@@ -72,4 +72,4 @@ metadata/source_license = "Pixabay Content License recordings; MIT source projec
 # Explicit anticipation binding is kept as a first-class semantic entry.  The
 # lantern attack adapter requests this id before onset, so the authored source
 # must survive resource import rather than relying on a runtime alias.
-metadata/weapon_warden_lantern_anticipation = Array[AudioStream]([ExtResource("25_lantern_onset_compat")])
+metadata/weapon_warden_lantern_anticipation = Array[AudioStream]([ExtResource("17_lantern_onset")])
