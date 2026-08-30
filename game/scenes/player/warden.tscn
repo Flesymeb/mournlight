@@ -95,7 +95,9 @@ mesh = SubResource("WardenHaloMesh")
 cast_shadow = 0
 
 [node name="PresentationRoot" type="Node3D" parent="."]
-scale = Vector3(0.78, 0.78, 0.78)
+## Keep the authored mage silhouette legible in the high-angle shipped camera;
+## collision and targeting remain owned by the CharacterBody3D above.
+scale = Vector3(1.28, 1.28, 1.28)
 
 [node name="ModelPivot" type="Node3D" parent="PresentationRoot"]
 
