@@ -140,6 +140,10 @@ func _focus_first_available() -> void:
 func close() -> void:
 	_presentation_serial += 1
 	visible = false
+	# Closing is the end of the visual transaction. Clear the latch along with
+	# the card state so Result/Retry and a later draft cannot retain a stale
+	# pressed/selected guard in the hidden UI tree.
+	latched = false
 	cards.clear()
 	selected_index = -1
 	for index in buttons.size():

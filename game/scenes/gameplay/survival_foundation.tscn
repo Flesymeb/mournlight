@@ -13,11 +13,11 @@
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSky_mournlight"]
 sky_top_color = Color(0.035, 0.05, 0.14, 1)
-sky_horizon_color = Color(0.12, 0.15, 0.32, 1)
+sky_horizon_color = Color(0.16, 0.19, 0.40, 1)
 sky_curve = 0.09
 sky_energy_multiplier = 0.72
 ground_bottom_color = Color(0.03, 0.045, 0.12, 1)
-ground_horizon_color = Color(0.10, 0.13, 0.28, 1)
+ground_horizon_color = Color(0.13, 0.16, 0.34, 1)
 ground_curve = 0.07
 ground_energy_multiplier = 0.4
 use_debanding = true
@@ -28,7 +28,7 @@ sky_material = SubResource("ProceduralSky_mournlight")
 [sub_resource type="Environment" id="Environment_moonlit"]
 background_mode = 2
 background_color = Color(0.018, 0.028, 0.09, 1)
-background_energy_multiplier = 1.02
+background_energy_multiplier = 1.18
 sky = SubResource("Sky_mournlight")
 ambient_light_source = 2
 ambient_light_color = Color(0.34, 0.42, 0.74, 1)
@@ -39,9 +39,9 @@ glow_enabled = true
 glow_intensity = 0.58
 bloom = 0.08
 fog_enabled = true
-fog_light_color = Color(0.09, 0.105, 0.22, 1)
-fog_light_energy = 0.38
-fog_density = 0.018
+fog_light_color = Color(0.12, 0.14, 0.30, 1)
+fog_light_energy = 0.46
+fog_density = 0.014
 fog_sky_affect = 0.58
 fog_aerial_perspective = 0.2
 fog_depth_begin = 8.0
@@ -72,7 +72,7 @@ light_specular = 0.0
 shadow_enabled = false
 
 [node name="CemeteryGarden" parent="." instance=ExtResource("4_cemetery")]
-# The authored package is calibrated at 2.2x in its native scene.  Keep the
+# The authored package is calibrated at 1.95x in its native scene.  Keep the
 # single intact instance, but give the garden enough street and perimeter
 # extent that the camera has a real loop and cross-route instead of a
 # camera-sized combat pad.
@@ -98,12 +98,12 @@ near = 0.15
 far = 180.0
 arena_limit = Vector2(34.0, 32.0)
 normal_fov = 70.0
-follow_height = 29.0
-follow_distance = 30.0
+follow_height = 30.5
+follow_distance = 31.5
 follow_lateral = 12.0
 # Product framing keeps the Warden readable while preserving the mausoleum and
 # bell in the north-safe lane; avoid aiming through the central landmark.
-framing_bias = Vector3(-8.0, 0, -0.5)
+framing_bias = Vector3(-6.0, 0, -1.5)
 arena_fill_limit = Vector2(33.0, 30.5)
 coverage_max_correction = 3.5
 coverage_threat_weight = 0.30

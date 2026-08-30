@@ -10,13 +10,13 @@ agent_height = 1.6
 agent_radius = 0.45
 
 [sub_resource type="BoxShape3D" id="GroundShape"]
-size = Vector3(30, 0.7, 30)
+size = Vector3(33.6, 0.7, 33.6)
 
 [sub_resource type="BoxShape3D" id="NorthSouthShape"]
-size = Vector3(30, 2.2, 0.7)
+size = Vector3(33.6, 2.2, 0.7)
 
 [sub_resource type="BoxShape3D" id="EastWestShape"]
-size = Vector3(0.7, 2.2, 30)
+size = Vector3(0.7, 2.2, 33.6)
 
 [sub_resource type="BoxShape3D" id="MausoleumShape"]
 size = Vector3(6.9, 3.8, 11)
@@ -68,28 +68,28 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.38, 0)
 shape = SubResource("GroundShape")
 
 [node name="NorthBoundary" type="StaticBody3D" parent="OuterDatum" unique_id=389951254]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1.1, -15.18)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1.1, -16.7)
 collision_layer = 2
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/NorthBoundary" unique_id=1811804182]
 shape = SubResource("NorthSouthShape")
 
 [node name="SouthBoundary" type="StaticBody3D" parent="OuterDatum" unique_id=1061381764]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1.1, 15.18)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1.1, 16.7)
 collision_layer = 2
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/SouthBoundary" unique_id=1643629900]
 shape = SubResource("NorthSouthShape")
 
 [node name="EastBoundary" type="StaticBody3D" parent="OuterDatum" unique_id=903064246]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.18, 1.1, 0.18)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.7, 1.1, 0.18)
 collision_layer = 2
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/EastBoundary" unique_id=915108167]
 shape = SubResource("EastWestShape")
 
 [node name="WestBoundary" type="StaticBody3D" parent="OuterDatum" unique_id=702137295]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.68, 1.1, 0.18)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16.7, 1.1, 0.18)
 collision_layer = 2
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/WestBoundary" unique_id=1498427778]
@@ -131,40 +131,40 @@ position = Vector3(0, 0.05, 6.2)
 [node name="SpawnLanes" type="Node3D" parent="OuterDatum" unique_id=1734080278]
 
 [node name="Lane00" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=5226820 groups=["arena_spawn_lane"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.8, 0.05, -8.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.8, 0.05, -14.4)
 
 [node name="Lane01" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=955396470 groups=["arena_spawn_lane"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.2, 0.05, -8.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.0, 0.05, -14.8)
 
 [node name="Lane02" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=34347366 groups=["arena_spawn_lane"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 0.05, -8.75)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 0.05, -14.7)
 
 [node name="Lane03" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=1901626138 groups=["arena_spawn_lane"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.6, 0.05, -8.7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.6, 0.05, -14.5)
 
 [node name="Lane04" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=1832336006 groups=["arena_spawn_lane"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.5, 0.05, -3.6)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.6, 0.05, -8.0)
 
 [node name="Lane05" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=1734849149 groups=["arena_spawn_lane"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0.05, 2.1)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.7, 0.05, 1.0)
 
 [node name="Lane06" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=845471335 groups=["arena_spawn_lane"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.5, 0.05, 7.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.5, 0.05, 9.0)
 
 [node name="Lane07" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=715445586 groups=["arena_spawn_lane"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.8, 0.05, 9)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.0, 0.05, 14.6)
 
 [node name="Lane08" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=1267278934 groups=["arena_spawn_lane"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 9.1)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 14.7)
 
 [node name="Lane09" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=675773870 groups=["arena_spawn_lane"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.4, 0.05, 9)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.4, 0.05, 14.6)
 
 [node name="Lane10" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=1263137551 groups=["arena_spawn_lane"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.8, 0.05, 5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.5, 0.05, 8.4)
 
 [node name="Lane11" type="Marker3D" parent="OuterDatum/SpawnLanes" unique_id=325386550 groups=["arena_spawn_lane"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.9, 0.05, -1.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.7, 0.05, 0.0)
 
 [node name="KeeperLanternPostAnchor" type="Marker3D" parent="OuterDatum" unique_id=674448232 groups=["landmark_anchor"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.8, 0, 1.8)
