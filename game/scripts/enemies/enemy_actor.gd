@@ -49,7 +49,7 @@ var _vitality_refresh_remaining := 0.0
 var _vitality_updates := 0
 var _vitality_skips := 0
 
-const DENSE_STEERING_BUCKETS := 2
+const DENSE_STEERING_BUCKETS := 3
 const DENSE_VITALITY_REFRESH_SECONDS := 0.05
 
 func _ready() -> void:
@@ -155,6 +155,9 @@ func _physics_process(delta: float) -> void:
 		_set_light_budget(_role_light_active, false)
 	if not is_instance_valid(target) or state in ["pooled", "death"]:
 		return
+	var target_offset := target.global_position - global_position
+	target_offset.y = 0.0
+	var target_distance_squared := target_offset.length_squared()
 	# Health changes still reveal immediately through the authoritative signal;
 	# proximity/fade presentation is capped at 20 Hz to keep a 25–40 actor wave
 	# from paying one UI update per physics tick.
@@ -163,7 +166,7 @@ func _physics_process(delta: float) -> void:
 	if vitality_due:
 		_vitality_refresh_remaining = DENSE_VITALITY_REFRESH_SECONDS
 		_vitality_updates += 1
-		vitality_bar.advance(delta, global_position.distance_to(target.global_position), true)
+		vitality_bar.advance(delta, sqrt(target_distance_squared), true)
 	else:
 		_vitality_skips += 1
 	state_remaining = maxf(0.0, state_remaining - delta)
@@ -174,11 +177,11 @@ func _physics_process(delta: float) -> void:
 				_set_state("approach")
 		"approach":
 			_steer_approach(delta)
-			if global_position.distance_to(target.global_position) <= profile.attack_range:
+			if target_distance_squared <= profile.attack_range * profile.attack_range:
 				_request_telegraph_admission()
 		"waiting_admission":
 			velocity = velocity.move_toward(Vector3.ZERO, 12.0 * delta)
-			if global_position.distance_to(target.global_position) > profile.attack_range + 0.9:
+			if target_distance_squared > (profile.attack_range + 0.9) * (profile.attack_range + 0.9):
 				_release_telegraph_admission("escape")
 				_set_state("approach")
 			elif is_instance_valid(encounter_owner) and encounter_owner.has_telegraph_admission(self):

@@ -17,6 +17,9 @@ var _target_next_hit_time: Dictionary = {}
 var _gameplay_time := 0.0
 var _retired := false
 var _retirement_generation := 0
+var _contact_refresh_remaining := 0.0
+
+const CONTACT_REFRESH_SECONDS := 0.05
 
 func configure_target_registry(registry: EnemyNeighborRegistry) -> void:
 	target_registry = registry
@@ -28,6 +31,7 @@ func _physics_process(delta: float) -> void:
 		_clear_wisps()
 		return
 	_gameplay_time += delta
+	_contact_refresh_remaining = maxf(0.0, _contact_refresh_remaining - delta)
 	var stats := inventory.get_stats(weapon_id)
 	_sync_wisp_count(int(stats.count))
 	orbit_phase = fmod(orbit_phase + delta * (1.9 + inventory.get_rank(weapon_id) * 0.16), TAU)
@@ -35,7 +39,9 @@ func _physics_process(delta: float) -> void:
 		var angle := orbit_phase + TAU * float(index) / float(_wisps.size())
 		var radius := float(stats.area)
 		_wisps[index].position = Vector3(cos(angle) * radius, 0.85 + sin(angle * 2.0) * 0.16, sin(angle) * radius)
-	_resolve_contacts(stats)
+	if _contact_refresh_remaining <= 0.0:
+		_contact_refresh_remaining = CONTACT_REFRESH_SECONDS
+		_resolve_contacts(stats)
 
 func _sync_wisp_count(count: int) -> void:
 	while _wisps.size() < count:
@@ -106,6 +112,7 @@ func retire_runtime(reason: String, generation: int) -> Dictionary:
 	_clear_wisps()
 	_target_next_hit_time.clear()
 	_gameplay_time = 0.0
+	_contact_refresh_remaining = 0.0
 	orbit_phase = 0.0
 	return {
 		"weapon_id": String(weapon_id), "reason": reason,
@@ -131,6 +138,8 @@ func _mcp_state() -> Dictionary:
 		"wisp_pool_available": _wisp_pool.size(), "wisp_pool_total": _wisp_pool.size() + _wisps.size(),
 		"per_target_interval_count": _target_next_hit_time.size(), "orbit_phase": orbit_phase,
 		"gameplay_clock": _gameplay_time, "retired": _retired,
+		"contact_refresh_seconds": CONTACT_REFRESH_SECONDS,
+		"contact_refresh_remaining": _contact_refresh_remaining,
 		"retirement_generation": _retirement_generation,
 		"stats": inventory.get_stats(weapon_id),
 	}

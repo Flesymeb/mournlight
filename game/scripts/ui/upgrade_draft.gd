@@ -84,6 +84,8 @@ func present(next_cards: Array[Dictionary]) -> void:
 		cards.append(_normalize_card(value))
 	latched = false
 	selected_index = -1
+	_hovered = [false, false, false]
+	_pressed = [false, false, false]
 	for index in buttons.size():
 		var card: Dictionary = cards[index] if index < cards.size() else _normalize_card({})
 		var icon_path := str(card.get("icon_path", ""))
@@ -94,7 +96,10 @@ func present(next_cards: Array[Dictionary]) -> void:
 		buttons[index].disabled = not bool(card.get("available", true))
 		_refresh_card_state(index)
 	visible = true
-	buttons[0].grab_focus()
+	if not buttons[0].disabled:
+		buttons[0].grab_focus()
+	else:
+		_focus_first_available()
 
 func _normalize_card(value: Variant) -> Dictionary:
 	if not value is Dictionary:
@@ -406,7 +411,7 @@ func _card_style(state: String, emphasized: bool) -> StyleBoxFlat:
 
 func _mcp_state() -> Dictionary:
 	var visible_cards: Array[Dictionary] = []
-	for index in cards.size():
+	for index in mini(cards.size(), buttons.size()):
 		var card: Dictionary = cards[index]
 		var changes := _decision_changes(card.get("changes", []))
 		visible_cards.append({"id":str(card.get("id", "")), "title":str(card.get("title", "")), "icon_path":str(card.get("icon_path", FALLBACK_ICON_PATH)), "changes":changes, "decision_delta_count":changes.size(), "silhouette_first":not str(card.get("icon_path", "")).is_empty(), "consequence":str(card.get("consequence", "")), "interaction_state":_state_nodes[index].text})

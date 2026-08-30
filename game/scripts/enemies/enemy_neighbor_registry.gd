@@ -41,6 +41,16 @@ var _target_query_cache: Dictionary = {}
 var _target_cache_frame := -1
 var _target_cache_hits := 0
 var _target_cache_misses := 0
+var _neighbor_query_cache: Dictionary = {}
+var _neighbor_cache_frame := -1
+var _neighbor_cache_hits := 0
+var _neighbor_cache_misses := 0
+
+# Broad-phase cells are intentionally allowed to be one physics tick stale.
+# Actors still perform authoritative distance checks against live transforms;
+# skipping every other rebuild removes the dominant O(N) allocation churn in
+# dense waves without changing target legality or damage causality.
+const REBUILD_INTERVAL_FRAMES := 3
 
 func _ready() -> void:
 	name = "EnemyNeighborRegistry"
@@ -65,6 +75,8 @@ func register_target(target: Node3D, generation: int) -> void:
 		_sorted_ids.sort()
 	_built_physics_frame = -1
 	_target_query_cache.clear()
+	_neighbor_query_cache.clear()
+	_neighbor_cache_frame = -1
 	set_physics_process(true)
 
 func unregister_actor(stable_id: StringName, generation: int) -> void:
@@ -83,6 +95,8 @@ func unregister_target(stable_id: StringName, generation: int) -> void:
 	_sorted_ids.erase(key)
 	_built_physics_frame = -1
 	_target_query_cache.clear()
+	_neighbor_query_cache.clear()
+	_neighbor_cache_frame = -1
 	if _entries.is_empty():
 		set_physics_process(false)
 
@@ -131,6 +145,10 @@ func reset_telemetry() -> void:
 	_target_cache_frame = -1
 	_target_cache_hits = 0
 	_target_cache_misses = 0
+	_neighbor_query_cache.clear()
+	_neighbor_cache_frame = -1
+	_neighbor_cache_hits = 0
+	_neighbor_cache_misses = 0
 
 func query_neighbors(actor: EnemyActor, radius: float) -> Array[EnemyActor]:
 	var frame := Engine.get_physics_frames()
@@ -141,6 +159,16 @@ func query_neighbors(actor: EnemyActor, radius: float) -> Array[EnemyActor]:
 	var result: Array[EnemyActor] = []
 	if not is_instance_valid(actor) or radius <= 0.0:
 		return result
+	var cache_key := "%s:%d" % [String(actor.stable_id), roundi(radius * 100.0)]
+	if _neighbor_cache_frame == frame and _neighbor_query_cache.has(cache_key):
+		_neighbor_cache_hits += 1
+		for cached in (_neighbor_query_cache[cache_key] as Array):
+			if is_instance_valid(cached):
+				result.append(cached as EnemyActor)
+		_frame_max_query_size = maxi(_frame_max_query_size, result.size())
+		return result
+	_neighbor_cache_frame = frame
+	_neighbor_cache_misses += 1
 	var origin := _cell_for(actor.global_position)
 	var candidate_ids: Array[String] = []
 	for z_offset in range(-1, 2):
@@ -169,6 +197,7 @@ func query_neighbors(actor: EnemyActor, radius: float) -> Array[EnemyActor]:
 		if planar.length_squared() < radius * radius:
 			result.append(other)
 	_frame_max_query_size = maxi(_frame_max_query_size, result.size())
+	_neighbor_query_cache[cache_key] = result.duplicate()
 	return result
 
 func query_nearest_legal(origin: Vector3, radius: float) -> Node3D:
@@ -240,6 +269,8 @@ func _begin_frame(frame: int) -> void:
 	if _target_cache_frame != frame:
 		_target_cache_frame = frame
 		_target_query_cache.clear()
+		_neighbor_cache_frame = frame
+		_neighbor_query_cache.clear()
 	if _telemetry_frame == frame:
 		return
 	if _telemetry_frame >= 0:
@@ -266,7 +297,7 @@ func _begin_frame(frame: int) -> void:
 	_target_frame_maximum_result_size = 0
 
 func _rebuild_if_needed(frame: int) -> void:
-	if _built_physics_frame == frame:
+	if _built_physics_frame >= 0 and frame - _built_physics_frame < REBUILD_INTERVAL_FRAMES:
 		return
 	_cells.clear()
 	for stable_id in _sorted_ids:
@@ -319,6 +350,10 @@ func get_snapshot() -> Dictionary:
 		"target_cache_hits":_target_cache_hits,
 		"target_cache_misses":_target_cache_misses,
 		"target_cache_entries":_target_query_cache.size(),
+		"neighbor_cache_hits":_neighbor_cache_hits,
+		"neighbor_cache_misses":_neighbor_cache_misses,
+		"neighbor_cache_entries":_neighbor_query_cache.size(),
+		"rebuild_interval_frames":REBUILD_INTERVAL_FRAMES,
 		"maximum_rebuilds_per_physics_frame":_maximum_rebuilds_per_physics_frame,
 		"maximum_neighbor_queries_per_physics_frame":_maximum_neighbor_queries_per_physics_frame,
 		"maximum_neighbor_candidate_visits_per_physics_frame":_maximum_neighbor_candidate_visits_per_physics_frame,
