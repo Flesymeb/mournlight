@@ -51,6 +51,11 @@ var _vitality_bucket := 0
 var _vitality_refresh_remaining := 0.0
 var _vitality_updates := 0
 var _vitality_skips := 0
+## Hurt is a presentation interrupt, not a second gameplay state.  Keep the
+## authoritative attack/approach state intact while the authored presenter
+## runs its short recoil clip, then restore the current semantic deterministically.
+var _hurt_motion_remaining := 0.0
+var _hurt_motion_count := 0
 
 const DENSE_STEERING_BUCKETS := 3
 const DENSE_VITALITY_REFRESH_SECONDS := 0.05
@@ -74,6 +79,8 @@ func activate(next_profile: EnemyProfile, next_target: WardenController, at_posi
 	encounter_owner = owner
 	telegraph_admitted = false
 	_hurt_light_remaining = 0.0
+	_hurt_motion_remaining = 0.0
+	_hurt_motion_count = 0
 	_set_light_budget(false, false)
 	_lifetime = 0.0
 	attack_serial = 0
@@ -130,6 +137,8 @@ func return_to_pool() -> void:
 	telegraph_ring.visible = false
 	lane_cue.visible = false
 	_hurt_light_remaining = 0.0
+	_hurt_motion_remaining = 0.0
+	_hurt_motion_count = 0
 	_set_light_budget(false, false)
 	_pool_return_pending = false
 	lifecycle_event.emit(_event("pool_return"))
@@ -155,6 +164,9 @@ func _physics_process(delta: float) -> void:
 	_physics_steps_total += 1
 	_lifetime += delta
 	_hurt_light_remaining = maxf(0.0, _hurt_light_remaining - delta)
+	_hurt_motion_remaining = maxf(0.0, _hurt_motion_remaining - delta)
+	if _hurt_motion_remaining <= 0.0 and is_instance_valid(model_pivot) and model_pivot.semantic_state == "hurt":
+		model_pivot.set_semantic(state)
 	if _hurt_light_remaining <= 0.0 and _hurt_light_active:
 		_set_light_budget(_role_light_active, false)
 	if not is_instance_valid(target) or state in ["pooled", "death"]:
@@ -291,6 +303,12 @@ func _damage_frame() -> void:
 
 func _on_hurt(event: Dictionary) -> void:
 	hurt_count += 1
+	_hurt_motion_count += 1
+	_hurt_motion_remaining = 0.22
+	if is_instance_valid(model_pivot):
+		# Preserve the gameplay state; only the authored semantic presenter is
+		# interrupted so hurt feedback cannot cancel telegraph/damage ownership.
+		model_pivot.set_semantic("hurt")
 	vitality_bar.reveal_damage()
 	_hurt_light_remaining = 0.24
 	lifecycle_event.emit(_event("hurt", {"health_after": event.get("health_after", health.current_health)}))
@@ -330,7 +348,7 @@ func _on_drop(event: Dictionary) -> void:
 func _set_state(next_state: String, duration: float = 0.0) -> void:
 	state = next_state
 	state_remaining = duration
-	if is_instance_valid(model_pivot):
+	if is_instance_valid(model_pivot) and _hurt_motion_remaining <= 0.0:
 		model_pivot.set_semantic(next_state)
 
 func _state_duration(for_state: String) -> float:
@@ -400,6 +418,9 @@ func _mcp_state() -> Dictionary:
 		"generation": spawn_generation, "lifecycle_state": state, "state_remaining": state_remaining,
 		"health": health.current_health, "maximum_health": health.maximum_health,
 		"hurt_count": hurt_count, "death_count": death_count, "target_valid": is_instance_valid(target),
+		"hurt_motion_active": _hurt_motion_remaining > 0.0,
+		"hurt_motion_remaining": _hurt_motion_remaining,
+		"hurt_motion_count": _hurt_motion_count,
 		"velocity": velocity, "pool_return_pending": _pool_return_pending,
 		"retirement_count": retirement_count,
 		"telegraph_admitted": telegraph_admitted,
