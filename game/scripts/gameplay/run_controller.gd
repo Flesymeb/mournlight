@@ -119,6 +119,7 @@ var _profile_metric_samples: Array[Dictionary] = []
 var _profile_advance_generation := 0
 var _profile_process_frame_start := 0
 var _profile_completion_grace_frames := 0
+var _dense_cycle_index := 0
 var validation_profile_matrix_samples: Array[Dictionary] = []
 var density_matrix_contract_checks: Dictionary = {}
 var _active_pickups: Dictionary = {}
@@ -1476,6 +1477,7 @@ func _transition(next_state: String) -> void:
 func _prepare_final_profile() -> void:
 	if not OS.has_feature("editor") or run_state not in ["active", "boss"]:
 		return
+	_dense_cycle_index += 1
 	_profile_active = false
 	_profile_origin = "diagnostic_prepared"
 	run_route_kind = "diagnostic_prepared"
@@ -1516,8 +1518,11 @@ func _prepare_final_profile() -> void:
 	get_tree().paused = true
 	var renderer_receipt := _profile_renderer_receipt()
 	var prepare_process_frame := Engine.get_process_frames()
-	var cycle_provenance := {"branch_id":"final_wave_bellkeeper_profile", "run_serial":run_serial, "setup_generation":_validation_setup_generation, "phase":"prepare"}
+	var cycle_provenance := _dense_cycle_provenance("prepare", run_serial, _validation_setup_generation, 0)
 	validation_profile_receipt = {
+		"contract_id":DenseWaveProfileClass.CONTRACT_ID,
+		"contract_version":DenseWaveProfileClass.CONTRACT_VERSION,
+		"contract_signature":DenseWaveProfileClass.CONTRACT_SIGNATURE,
 		"accepted":bool(preparation.get("accepted",false)) and is_instance_valid(boss),
 		"status":DenseWaveProfileClass.renderer_status(String(renderer_receipt.get("classification", "unknown")), bool(renderer_receipt.get("hardware_qualification_eligible", false))),
 		"branch_id":"final_wave_bellkeeper_profile",
@@ -1525,6 +1530,8 @@ func _prepare_final_profile() -> void:
 		"setup_generation":_validation_setup_generation,
 		"requested_density":32,
 		"resolved_density":int(encounter.get("live",0)),
+		"target_viewport":{"width":1920,"height":1080},
+		"target_density":DenseWaveProfileClass.TARGET_ENEMIES,
 		"frontline_positioning":frontline,
 		"enemy_roles":(encounter.get("roles",{}) as Dictionary).duplicate(true),
 		"boss_state":boss_snapshot.get("state","absent"),
@@ -1555,6 +1562,7 @@ func _prepare_final_profile() -> void:
 		"terminal_state_advanced":result_committed,
 		"advance_action_required":true,
 		"reset_isolation_pending":true,
+		"phase_sample_availability":{"prepare":{"frames_ran":false,"frame_sample_count":0,"physics_sample_count":0,"samples_available":false}},
 	}
 	validation_density_receipt = validation_profile_receipt.duplicate(true)
 	_record_profile_cycle("prepare", validation_profile_receipt)
@@ -1603,7 +1611,13 @@ func _advance_final_profile() -> void:
 		"initial_observation":initial_observation,
 		"work_caps":_dense_work_caps(spawner.get_snapshot()),
 		"workload_start":_profile_workload_receipt(spawner.get_snapshot()),
-		"cycle_provenance":{"branch_id":validation_profile_receipt.get("branch_id", "final_wave_bellkeeper_profile"), "run_serial":run_serial, "setup_generation":validation_profile_receipt.get("setup_generation", 0), "advance_generation":_profile_advance_generation, "phase":"advance"},
+		"cycle_provenance":_dense_cycle_provenance("advance", run_serial, int(validation_profile_receipt.get("setup_generation", 0)), _profile_advance_generation),
+		"contract_id":DenseWaveProfileClass.CONTRACT_ID,
+		"contract_version":DenseWaveProfileClass.CONTRACT_VERSION,
+		"contract_signature":DenseWaveProfileClass.CONTRACT_SIGNATURE,
+		"target_viewport":{"width":1920,"height":1080},
+		"target_density":DenseWaveProfileClass.TARGET_ENEMIES,
+		"phase_sample_availability":{"advance_start":{"frames_ran":false,"frame_sample_count":0,"physics_sample_count":0,"samples_available":false}},
 		"preflight":DenseWaveProfileClass.preflight(_profile_renderer_receipt(), _profile_viewport_receipt(), _profile_process_frame_start, _profile_process_frame_start, 0, 0, "advance_start", {"branch_id":validation_profile_receipt.get("branch_id", ""), "run_serial":run_serial, "setup_generation":validation_profile_receipt.get("setup_generation", 0), "advance_generation":_profile_advance_generation}, {"required":true,"pending":true}),
 	}
 	get_tree().paused = false
@@ -1806,6 +1820,9 @@ func _advance_profile_sample(delta: float) -> void:
 		if sample_ms > 33.33:
 			long_frame_count += 1
 	validation_profile_sample = {
+		"contract_id":DenseWaveProfileClass.CONTRACT_ID,
+		"contract_version":DenseWaveProfileClass.CONTRACT_VERSION,
+		"contract_signature":DenseWaveProfileClass.CONTRACT_SIGNATURE,
 		"status":"complete", "branch_id":sample_branch,
 		"sample_kind":_profile_origin, "route_kind":run_route_kind,
 		"passive":_profile_origin == "ordinary_final_wave_passive",
@@ -1855,6 +1872,8 @@ func _advance_profile_sample(delta: float) -> void:
 		"end_enemy_workload":int(cohort.get("end_live", end_counts.get("enemies", 0))),
 		"replenished_enemy_count":int(cohort.get("replenished", 0)),
 		"viewport":_profile_viewport_receipt(),
+		"target_viewport":{"width":1920,"height":1080},
+		"target_density":DenseWaveProfileClass.TARGET_ENEMIES,
 		"renderer":_profile_renderer_receipt(),
 		"wave_end":wave_director.get_snapshot().duplicate(true),
 		"work_caps":_dense_work_caps(spawner.get_snapshot()),
@@ -1876,6 +1895,9 @@ func _advance_profile_sample(delta: float) -> void:
 		validation_profile_sample.get("cycle_provenance", {}) as Dictionary,
 		{"required":true,"pending":false}
 	)
+	# Sampling is complete at this point; make the ordering explicit in the
+	# receipt so a software renderer retains diagnostics but cannot qualify.
+	validation_profile_sample["preflight"]["qualification_gate_deferred"] = false
 	validation_profile_sample["qualification"] = _profile_qualification(validation_profile_sample)
 	var profile_renderer := validation_profile_sample.get("renderer", {}) as Dictionary
 	var profile_classification := String(profile_renderer.get("classification", "unknown"))
@@ -1887,6 +1909,13 @@ func _advance_profile_sample(delta: float) -> void:
 	# renderer may produce a qualified status.
 	validation_profile_sample["status"] = DenseWaveProfileClass.UNKNOWN_STATUS if renderer_gate_status == DenseWaveProfileClass.UNKNOWN_STATUS else (DenseWaveProfileClass.NATIVE_STATUS if qualification_passed and renderer_gate_status == DenseWaveProfileClass.NATIVE_STATUS else "rejected")
 	validation_profile_sample["renderer_gate_status"] = renderer_gate_status
+	validation_profile_sample["phase_sample_availability"] = {"advance_complete": {
+		"frames_ran": bool((validation_profile_sample.get("frame_execution", {}) as Dictionary).get("frames_ran", false)),
+		"frame_sample_count": validation_profile_sample.get("sample_count", 0),
+		"physics_sample_count": validation_profile_sample.get("physics_sample_count", 0),
+		"samples_available": bool((validation_profile_sample.get("sample_availability", {}) as Dictionary).get("frame_samples_nonzero", false)) and bool((validation_profile_sample.get("sample_availability", {}) as Dictionary).get("physics_samples_nonzero", false)),
+	}}
+	validation_profile_sample["requested_resolved_receipt"] = {"requested": validation_profile_sample.get("requested_enemy_workload", 0), "resolved": validation_profile_sample.get("end_enemy_workload", 0), "reset_isolation": false}
 	validation_profile_sample["rejection_reasons"] = (validation_profile_sample["qualification"] as Dictionary).get("reasons", []).duplicate()
 	_record_profile_matrix_sample(validation_profile_sample)
 	_record_profile_cycle("advance", validation_profile_sample)
@@ -1912,6 +1941,8 @@ func _reset_final_profile() -> void:
 		return
 	var source_run_serial := run_serial
 	var source_sample := validation_profile_sample.duplicate(true)
+	var source_provenance: Dictionary = source_sample.get("cycle_provenance", {})
+	var source_cycle_id := String(source_sample.get("cycle_id", source_provenance.get("cycle_id", "")))
 	var requested_density := int(source_sample.get("requested_density", validation_profile_receipt.get("requested_density", 32)))
 	_validation_setup_generation += 1
 	var setup_generation := _validation_setup_generation
@@ -1950,9 +1981,13 @@ func _reset_final_profile() -> void:
 	validation_profile_sample["ordinary_input_context"] = immediate_input_context
 	validation_profile_sample["reset_phase"] = "ordinary_run_ready"
 	validation_profile_receipt = {
+		"contract_id":DenseWaveProfileClass.CONTRACT_ID,
+		"contract_version":DenseWaveProfileClass.CONTRACT_VERSION,
+		"contract_signature":DenseWaveProfileClass.CONTRACT_SIGNATURE,
 		"accepted":true, "reset":true, "branch_id":"final_wave_bellkeeper_profile",
 		"source_run_serial":source_run_serial, "run_serial":run_serial, "setup_generation":setup_generation,
 		"requested_density":requested_density, "resolved_density":counts.get("enemies",-1),
+		"target_viewport":{"width":1920,"height":1080}, "target_density":DenseWaveProfileClass.TARGET_ENEMIES,
 		"requested_profile":"reset", "resolved_profile":"ordinary_run_ready",
 		"requested_counts": requested_counts, "resolved_retirement": retirement,
 		"post_reset_counts":counts, "counts":counts,
@@ -1965,6 +2000,18 @@ func _reset_final_profile() -> void:
 		"renderer_gate_status":DenseWaveProfileClass.renderer_status(String((_profile_renderer_receipt()).get("classification", "unknown")), bool((_profile_renderer_receipt()).get("hardware_qualification_eligible", false))),
 		"lifecycle":_lifecycle_counters(),
 		"next_frame_isolation_pending": true,
+		"cycle_provenance":{
+			"identity":"mournlight.native_dense_three_cycle.v1",
+			"cycle_index":int(source_sample.get("cycle_index", _dense_cycle_index)),
+			"cycle_id":source_cycle_id,
+			"branch_id":"final_wave_bellkeeper_profile",
+			"source_run_serial":source_run_serial,
+			"run_serial":run_serial,
+			"setup_generation":setup_generation,
+			"advance_generation":int(source_sample.get("advance_generation", 0)),
+			"phase":"reset",
+		},
+		"phase_sample_availability":{"reset":{"frames_ran":false,"frame_sample_count":0,"physics_sample_count":0,"samples_available":false}},
 	}
 	validation_density_receipt = validation_profile_receipt.duplicate(true)
 	_record_profile_cycle("reset_immediate", validation_profile_receipt)
@@ -1974,7 +2021,12 @@ func _reset_final_profile() -> void:
 func _profile_reset_sample(source_sample: Dictionary, source_run_serial: int, next_run_serial: int, setup_generation: int, reason: String) -> Dictionary:
 	var source_status := String(source_sample.get("status", "idle"))
 	var source_branch := String(source_sample.get("branch_id", validation_profile_receipt.get("branch_id", "final_wave_bellkeeper_profile")))
+	var source_provenance: Dictionary = source_sample.get("cycle_provenance", {})
+	var source_cycle_id := String(source_sample.get("cycle_id", source_provenance.get("cycle_id", "")))
 	return {
+		"contract_id":DenseWaveProfileClass.CONTRACT_ID,
+		"contract_version":DenseWaveProfileClass.CONTRACT_VERSION,
+		"contract_signature":DenseWaveProfileClass.CONTRACT_SIGNATURE,
 		"status":"reset",
 		"retired":true,
 		"reset_reason":reason,
@@ -2008,7 +2060,20 @@ func _profile_reset_sample(source_sample: Dictionary, source_run_serial: int, ne
 		"observation_work":{"sampled_frame_scene_scans":0,"sampled_frame_group_inventories":0,"sampled_frame_counter_read_count":0},
 		"qualification":{"qualified":false,"ordinary_route_qualified":false,"density_qualified":false,"reasons":["retired_by_profile_reset"]},
 		"reset_process_frame":Engine.get_process_frames(),
-		"cycle_provenance":{"branch_id":source_branch,"source_run_serial":source_run_serial,"run_serial":next_run_serial,"setup_generation":setup_generation,"phase":"reset"},
+		"cycle_provenance":{
+			"identity":"mournlight.native_dense_three_cycle.v1",
+			"cycle_index":int(source_sample.get("cycle_index", _dense_cycle_index)),
+			"cycle_id":source_cycle_id if not source_cycle_id.is_empty() else "mournlight.native_dense_three_cycle.v1:%d:%d:%d" % [_dense_cycle_index, source_run_serial, setup_generation],
+			"branch_id":source_branch,
+			"source_run_serial":source_run_serial,
+			"run_serial":next_run_serial,
+			"setup_generation":setup_generation,
+			"phase":"reset"
+		},
+		"target_viewport":{"width":1920,"height":1080},
+		"target_density":DenseWaveProfileClass.TARGET_ENEMIES,
+		"phase_sample_availability":{"reset":{"frames_ran":false,"frame_sample_count":0,"physics_sample_count":0,"samples_available":false}},
+		"requested_resolved_receipt":{"requested":int(source_sample.get("requested_density", 0)),"resolved":0,"reset_isolation":false},
 		"preflight":DenseWaveProfileClass.preflight(_profile_renderer_receipt(), _profile_viewport_receipt(), Engine.get_process_frames(), Engine.get_process_frames(), 0, 0, "reset", {"branch_id":source_branch,"source_run_serial":source_run_serial,"run_serial":next_run_serial,"setup_generation":setup_generation,"phase":"reset"}, {"required":true,"pending":false}),
 	}
 
@@ -2027,13 +2092,40 @@ func _capture_profile_next_frame_isolation(setup_generation: int, expected_run_s
 	validation_profile_receipt.next_frame_lifecycle = _lifecycle_counters()
 	validation_profile_receipt.next_frame_input_context = next_frame_input_context
 	validation_profile_receipt.next_frame_isolation_pending = false
+	validation_profile_receipt.phase_sample_availability = {"reset_next_frame": {
+		"frames_ran": true,
+		"frame_sample_count": 0,
+		"physics_sample_count": 0,
+		"samples_available": false,
+		"reset_isolated": bool(validation_profile_receipt.next_frame_isolation),
+	}}
+	validation_profile_receipt.requested_resolved_receipt = {
+		"requested": int(validation_profile_receipt.get("requested_density", 0)),
+		"resolved": int(validation_profile_receipt.get("post_reset_counts", {}).get("enemies", 0)),
+		"reset_isolation": bool(validation_profile_receipt.get("next_frame_isolation", false)),
+	}
 	validation_density_receipt = validation_profile_receipt.duplicate(true)
 	_record_profile_cycle("reset_next_frame", validation_profile_receipt)
 	_emit_snapshot()
 
+func _dense_cycle_provenance(phase: String, source_run_serial: int, setup_generation: int, advance_generation: int) -> Dictionary:
+	return {
+		"identity":"mournlight.native_dense_three_cycle.v1",
+		"cycle_index":_dense_cycle_index,
+		"cycle_id":"mournlight.native_dense_three_cycle.v1:%d:%d:%d" % [_dense_cycle_index, source_run_serial, setup_generation],
+		"branch_id":"final_wave_bellkeeper_profile",
+		"run_serial":source_run_serial,
+		"setup_generation":setup_generation,
+		"advance_generation":advance_generation,
+		"phase":phase,
+	}
+
 func _record_profile_cycle(phase: String, receipt: Dictionary) -> void:
 	var entry := receipt.duplicate(true)
 	entry["receipt_phase"] = phase
+	var provenance: Dictionary = entry.get("cycle_provenance", {})
+	entry["cycle_index"] = int(provenance.get("cycle_index", entry.get("cycle_index", _dense_cycle_index)))
+	entry["cycle_id"] = String(provenance.get("cycle_id", entry.get("cycle_id", "")))
 	validation_profile_cycles.append(entry)
 	while validation_profile_cycles.size() > 16:
 		validation_profile_cycles.pop_front()
@@ -2276,6 +2368,8 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 		var phase := String(entry.get("receipt_phase", ""))
 		if phase == "prepare":
 			current = {
+				"cycle_index":entry.get("cycle_index", -1),
+				"cycle_id":entry.get("cycle_id", ""),
 				"run_serial":entry.get("run_serial", -1),
 				"setup_generation":entry.get("setup_generation", -1),
 				"requested_density":entry.get("requested_density", -1),
@@ -2283,7 +2377,7 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 				"renderer":(entry.get("renderer", {}) as Dictionary).duplicate(true),
 				"prepare":entry.duplicate(true),
 			}
-		elif phase == "advance" and not current.is_empty():
+		elif phase == "advance" and not current.is_empty() and String(entry.get("cycle_id", "")) == String(current.get("cycle_id", "")):
 			current["advance"] = entry.duplicate(true)
 			current["sample"] = {
 				"status":entry.get("status", ""),
@@ -2298,7 +2392,7 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 				"cycle_provenance":(entry.get("cycle_provenance", {}) as Dictionary).duplicate(true),
 				"counts":(entry.get("end_counts", entry.get("counts", {})) as Dictionary).duplicate(true),
 			}
-		elif phase == "reset_next_frame" and not current.is_empty():
+		elif phase == "reset_next_frame" and not current.is_empty() and String(entry.get("cycle_id", "")) == String(current.get("cycle_id", "")):
 			current["reset"] = entry.duplicate(true)
 			var renderer: Dictionary = current.get("sample", {}).get("renderer", current.get("renderer", {}))
 			var gate := DenseWaveProfileClass.renderer_status(String(renderer.get("classification", "unknown")), bool(renderer.get("hardware_qualification_eligible", false)))
@@ -2323,6 +2417,7 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 		reset_ready = reset_ready and bool(qualification.get("reset_isolation", false)) and bool(qualification.get("sample_available", false))
 		renderer_statuses.append(String(qualification.get("renderer_gate_status", DenseWaveProfileClass.UNKNOWN_STATUS)))
 	var renderer_consistent := renderer_statuses.size() == 3 and renderer_statuses.all(func(value: String) -> bool: return value == renderer_statuses[0])
+	var native_renderer_ready := native_ready and renderer_consistent and not renderer_statuses.is_empty() and renderer_statuses[0] == DenseWaveProfileClass.NATIVE_STATUS
 	return {
 		"identity":"mournlight.native_dense_three_cycle.v1",
 		"required_cycle_count":3,
@@ -2330,9 +2425,9 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 		"cycles":completed,
 		"renderer_statuses":renderer_statuses,
 		"renderer_consistent":renderer_consistent,
-		"native_renderer_eligible":native_ready and renderer_consistent and renderer_statuses[0] == DenseWaveProfileClass.NATIVE_STATUS,
+		"native_renderer_eligible":native_renderer_ready,
 		"three_cycle_reset_isolation":reset_ready,
-		"three_cycle_ready":native_ready and reset_ready and renderer_consistent,
+		"three_cycle_ready":native_renderer_ready and reset_ready,
 		"release_qualification_status":DenseWaveProfileClass.NATIVE_STATUS if native_ready and reset_ready and renderer_consistent and renderer_statuses[0] == DenseWaveProfileClass.NATIVE_STATUS else (DenseWaveProfileClass.SOFTWARE_STATUS if renderer_statuses.has(DenseWaveProfileClass.SOFTWARE_STATUS) else DenseWaveProfileClass.UNKNOWN_STATUS),
 		"diagnostic_only":true,
 	}

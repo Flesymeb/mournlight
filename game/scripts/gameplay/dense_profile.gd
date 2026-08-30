@@ -25,11 +25,16 @@ const SOFTWARE_STATUS := "rejected_software_renderer"
 const UNKNOWN_STATUS := "pending_native_renderer"
 const QUALIFICATION_MODE := "native_renderer_three_cycle"
 const PREFLIGHT_ID := "mournlight.native_dense_preflight.v1"
+## Stable provenance marker.  Keep this literal immutable so host recapture can
+## reject receipts produced by a different contract without trusting mutable
+## runtime state.
+const CONTRACT_SIGNATURE := "mournlight.release_convergence_dense_window.v1|renderer_gate_after_sampling|native_1920x1080_three_cycle"
 
 static func contract() -> Dictionary:
 	return {
 		"contract_id": CONTRACT_ID,
 		"contract_version": CONTRACT_VERSION,
+		"contract_signature": CONTRACT_SIGNATURE,
 		"sampling_renderer_independent": true,
 		"release_guard": "OS.has_feature(\"editor\")",
 		"default_enabled": false,
@@ -69,6 +74,11 @@ static func contract() -> Dictionary:
 		],
 		"telemetry": {"sample_history_cap": SAMPLE_HISTORY_CAP, "per_sample_metrics": true, "runtime_errors_source": "godot_runtime_log"},
 		"receipts": ["requested", "resolved", "reset_isolation"],
+		"phase_receipts": ["prepare", "advance_start", "advance_complete", "reset", "reset_next_frame"],
+		"cycle_identity": ["identity", "cycle_index", "cycle_id", "run_serial", "setup_generation", "advance_generation"],
+		"target_viewport": {"width": 1920, "height": 1080},
+		"target_density": TARGET_ENEMIES,
+		"release_export_available": false,
 		"cycle_protocol": ["prepare", "advance", "reset"],
 		"cycle_aggregation": {
 			"identity":"mournlight.native_dense_three_cycle.v1",
@@ -147,11 +157,15 @@ static func renderer_status(classification: String, hardware_eligible: bool) -> 
 
 static func qualification_contract() -> Dictionary:
 	return {
+		"contract_id": CONTRACT_ID,
+		"contract_version": CONTRACT_VERSION,
+		"contract_signature": CONTRACT_SIGNATURE,
 		"mode": QUALIFICATION_MODE,
 		"renderer_policy":"native_hardware_only",
 		"software_policy":"reject_and_surface_status",
 		"required_cycles":3,
 		"target_resolution":Vector2i(1920, 1080),
+		"target_viewport":{"width":1920,"height":1080},
 		"target_density":TARGET_ENEMIES,
 		"reset_isolation_required":true,
 	}
