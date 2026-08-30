@@ -100,7 +100,10 @@ scale = Vector3(0.78, 0.78, 0.78)
 [node name="ModelPivot" type="Node3D" parent="PresentationRoot"]
 
 [node name="AssetTransform" type="Node3D" parent="PresentationRoot/ModelPivot"]
-position = Vector3(0, 0.02, 0)
+# The authored GLB exports its root four metres south of the actor origin.
+# Rebase that native export at the integration boundary so the visible Warden
+# stays aligned with CharacterBody3D collision, targeting, and the camera.
+position = Vector3(0, 0.02, 4.3)
 
 [node name="AuthoredWardenMage" parent="PresentationRoot/ModelPivot/AssetTransform" instance=ExtResource("2_model")]
 

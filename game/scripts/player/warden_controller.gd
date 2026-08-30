@@ -35,6 +35,10 @@ enum DashPhase { READY, ANTICIPATION, ACTIVE, RECOVERY, COOLDOWN }
 @export var dash_invulnerable := false
 @export var plane_error := 0.0
 @export var animation_profile: Resource
+## The intact KayKit export carries a native root offset south of the actor
+## origin. Rebase the visible package once at the wrapper boundary so rendered
+## feet, collision, targeting, and camera framing share the same datum.
+@export var authored_model_rebase := Vector3(0.0, 0.0, 4.3)
 
 @onready var presentation_root: Node3D = $PresentationRoot
 @onready var model_pivot: Node3D = $PresentationRoot/ModelPivot
@@ -81,6 +85,7 @@ func _ready() -> void:
 	_base_lantern_position = lantern.position
 	_base_presentation_scale = presentation_root.scale
 	_authored_animation = _find_animation_player(authored_character)
+	_apply_authored_model_rebase()
 	_resolve_and_apply_shipped_camera_hat_isolation("ready")
 	animation_binding = WardenAnimationBinding.new()
 	animation_binding.name = "SemanticAnimationBinding"
@@ -394,6 +399,7 @@ func reset_for_run(spawn_position: Vector3, reset_owner := "run_reset") -> void:
 	lantern.position = _base_lantern_position
 	lantern.rotation = Vector3.ZERO
 	presentation_root.scale = _base_presentation_scale
+	_apply_authored_model_rebase()
 	_restore_and_reapply_hat_isolation(reset_owner)
 	end_victory_presentation(reset_owner)
 	_victory_vfx_duration = 0.0
@@ -404,6 +410,10 @@ func reset_for_run(spawn_position: Vector3, reset_owner := "run_reset") -> void:
 	animation_binding.reset(reset_owner)
 	_follow_lantern_socket()
 	reset_input_latch()
+
+func _apply_authored_model_rebase() -> void:
+	if is_instance_valid(authored_character):
+		authored_character.position = authored_model_rebase
 
 func _find_animation_player(root: Node) -> AnimationPlayer:
 	if root is AnimationPlayer:

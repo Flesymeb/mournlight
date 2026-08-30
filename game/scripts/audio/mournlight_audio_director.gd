@@ -110,6 +110,8 @@ func _bind_events() -> void:
 	if attack:
 		attack.attack_authorized.connect(_on_attack_authorized)
 		attack.hit_resolved.connect(_on_attack_hit)
+		if attack.has_signal("attack_finished"):
+			attack.attack_finished.connect(_on_attack_finished)
 	var health := controller.get_node_or_null("World/Warden/HealthComponent")
 	if health:
 		health.hurt.connect(func(_event: Dictionary) -> void: play_semantic("warden_hurt"))
@@ -136,10 +138,17 @@ func _bind_events() -> void:
 	_set_music("title")
 
 func _on_attack_authorized(event: Dictionary) -> void:
+	# Keep a short pre-impact cue on the same Effects owner before the onset
+	# report. Both are keyed to the authoritative attack id, so retries and
+	# presentation callbacks cannot duplicate the causal chain.
+	_emit_attack_audio(event, "anticipation")
 	_emit_attack_audio(event, "onset")
 
 func _on_attack_hit(event: Dictionary) -> void:
 	_emit_attack_audio(event, "impact")
+
+func _on_attack_finished(event: Dictionary) -> void:
+	_emit_attack_audio(event, "recovery")
 
 func _emit_attack_audio(event: Dictionary, phase: String) -> bool:
 	# AttackRuntime is the sole authority for these reports.  Deduplicate by the

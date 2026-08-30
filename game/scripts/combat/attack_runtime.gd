@@ -4,6 +4,7 @@ extends Node
 signal attack_authorized(event: Dictionary)
 signal hit_resolved(event: Dictionary)
 signal attack_rejected(event: Dictionary)
+signal attack_finished(event: Dictionary)
 
 @export var owner_id := &"warden"
 
@@ -125,6 +126,15 @@ func finish_attack(attack_id: String, final_phase: String = "recovery") -> void:
 		"timeline": (ledger.timeline as Array).duplicate(true),
 		"hit_target_ids": (ledger.hit_targets as Dictionary).keys(),
 	}
+	var event: Dictionary = ledger.event
+	attack_finished.emit({
+		"accepted": true,
+		"attack_id": attack_id,
+		"weapon_id": String(event.get("weapon_id", "unknown")),
+		"actor_id": String(event.get("actor_id", owner_id)),
+		"phase": final_phase,
+		"timeline": (transaction.get("timeline", []) as Array).duplicate(true),
+	})
 	_completed_history.append(transaction)
 	var weapon_id := String((ledger.event as Dictionary).get("weapon_id", "unknown"))
 	var summary := _transaction_summary(transaction)
