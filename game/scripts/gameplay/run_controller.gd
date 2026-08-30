@@ -583,6 +583,7 @@ func _complete_context_handoff(destination: String, immediate: bool) -> void:
 
 func _pause_run() -> void:
 	warden.reset_input_latch("pause")
+	audio_director.reset_attack_audio_lifecycle("pause")
 	_resume_state = run_state
 	_transition("paused")
 	get_tree().paused = true

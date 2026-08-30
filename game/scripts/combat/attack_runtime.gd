@@ -43,6 +43,7 @@ func authorize(weapon_id: StringName, target: Node3D, stats: Dictionary, hit_pol
 		"hit_policy": hit_policy,
 		"cooldown": float(stats.get("cooldown", 0.0)),
 		"range": float(stats.get("range", 0.0)),
+		"generation": _retirement_generation,
 	}
 	_hit_ledgers[attack_id] = {
 		"event": event.duplicate(true),

@@ -110,8 +110,8 @@ func _ensure_attack_semantic_bindings() -> void:
 	"""
 	if not library:
 		return
-	var onset: Variant = library.get_meta("weapon_warden_lantern_onset", [])
-	var impact: Variant = library.get_meta("weapon_warden_lantern_impact", [])
+	var onset: Variant = library.get_meta("weapon_warden_lantern_onset", []) if library.has_meta("weapon_warden_lantern_onset") else []
+	var impact: Variant = library.get_meta("weapon_warden_lantern_impact", []) if library.has_meta("weapon_warden_lantern_impact") else []
 	if onset is Array and not onset.is_empty() and not library.has_meta("weapon_warden_lantern_anticipation"):
 		library.set_meta("weapon_warden_lantern_anticipation", onset.duplicate())
 	if impact is Array and not impact.is_empty() and not library.has_meta("weapon_warden_lantern_recovery"):
@@ -223,12 +223,15 @@ func _emit_attack_audio(event: Dictionary, phase: String) -> bool:
 	var semantic := "weapon_%s_%s" % [weapon_id, phase]
 	var started := _play_lantern_attack_voice(phase) if weapon_id == "warden_lantern" else play_semantic(semantic)
 	var source_paths: Array[String] = []
-	for stream in _streams_for(semantic):
+	for stream in _lantern_streams_for_phase(phase) if weapon_id == "warden_lantern" else _streams_for(semantic):
 		if stream is AudioStream:
 			source_paths.append((stream as AudioStream).resource_path)
+	var generation := int(event.get("generation", 0))
 	var receipt := {
 		"event_id": event_key,
+		"deduplication_key": event_key,
 		"attack_id": attack_id,
+		"generation": generation,
 		"phase": phase,
 		"impact_stem": ("character_hit" if phase == "impact" and bool(event.get("accepted", true)) else ("miss" if phase == "impact" else "native_report")),
 		"hit_material": String(event.get("hit_material", event.get("surface_material", "character" if phase == "impact" else "none"))),
@@ -253,7 +256,7 @@ func _play_lantern_attack_voice(phase: String) -> bool:
 	var voice := lantern_onset_voice if phase == "onset" else lantern_impact_voice if phase == "impact" else null
 	if not voice:
 		return play_semantic("weapon_warden_lantern_%s" % phase)
-	var streams := _streams_for("weapon_warden_lantern_%s" % phase)
+	var streams := _lantern_streams_for_phase(phase)
 	if streams.is_empty() or not streams[0] is AudioStream:
 		missing_source_counts["weapon_warden_lantern_%s" % phase] = int(missing_source_counts.get("weapon_warden_lantern_%s" % phase, 0)) + 1
 		return false
@@ -275,6 +278,26 @@ func _play_lantern_attack_voice(phase: String) -> bool:
 	else:
 		lantern_impact_window_remaining = maxf(0.06, float(windows.get(semantic, 0.24)))
 	return true
+
+func _lantern_streams_for_phase(phase: String) -> Array:
+	"""Resolve the authored lantern stem without relying on fragile metadata keys.
+
+	Some Godot Resource imports drop metadata names that collide with an older
+	serialized schema (the onset key is absent at runtime while impact survives).
+	The scene-bound LanternOnsetVoice/LanternImpactVoice is the same registered
+	authored source and is therefore a legal deterministic fallback, not a new
+	generated cue. Metadata remains preferred whenever present.
+	"""
+	var semantic := "weapon_warden_lantern_%s" % phase
+	var streams := _streams_for(semantic)
+	if not streams.is_empty():
+		return streams
+	if phase == "onset" and lantern_onset_voice and lantern_onset_voice.stream:
+		return [lantern_onset_voice.stream]
+	if phase == "impact" and lantern_impact_voice and lantern_impact_voice.stream:
+		return [lantern_impact_voice.stream]
+	var alias := "weapon_warden_lantern_anticipation" if phase == "onset" else "weapon_warden_lantern_recovery" if phase == "impact" else ""
+	return _streams_for(alias) if not alias.is_empty() else []
 
 func _retire_expired_lantern_windows(delta: float) -> void:
 	if lantern_onset_window_remaining > 0.0:
@@ -740,6 +763,25 @@ func reset_for_run() -> void:
 	terminal_voice_last_finished_position = 0.0
 	terminal_audio_reset_generation += 1
 
+func reset_attack_audio_lifecycle(reason: String = "lifecycle_reset") -> Dictionary:
+	"""Stop pending lantern voices and invalidate semantic dedupe for a pause/reset.
+
+	The attack runtime remains authoritative for damage; this only retires the
+	short-lived presentation ownership so a resumed run cannot inherit a stale
+	onset key or an in-flight voice from the previous lifecycle.
+	"""
+	var stopped := 0
+	if lantern_onset_voice and (lantern_onset_voice.playing or lantern_onset_window_remaining > 0.0):
+		stopped += 1
+		lantern_onset_voice.stop()
+	if lantern_impact_voice and (lantern_impact_voice.playing or lantern_impact_window_remaining > 0.0):
+		stopped += 1
+		lantern_impact_voice.stop()
+	lantern_onset_window_remaining = 0.0
+	lantern_impact_window_remaining = 0.0
+	_attack_audio_seen.clear()
+	return {"reason":reason,"stopped_voices":stopped,"dedupe_cleared":true,"process_frame":Engine.get_process_frames()}
+
 func retire_run_ownership(route: String, generation: int) -> Dictionary:
 	var stopped_effects := 0
 	var owners_before: Array[String] = []
@@ -753,6 +795,7 @@ func retire_run_ownership(route: String, generation: int) -> Dictionary:
 	lantern_onset_window_remaining = 0.0
 	lantern_impact_window_remaining = 0.0
 	stopped_effects += lantern_before
+	_attack_audio_seen.clear()
 	if movement_before > 0:
 		owners_before.append("movement")
 		stopped_effects += _retire_movement_owner("route_%s" % route)
