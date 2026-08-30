@@ -61,6 +61,13 @@ extends Camera3D
 @export_range(0.25, 1.0, 0.05) var dense_compositor_resolution_scale := 0.5
 @export var dense_compositor_refresh_seconds := 0.12
 
+## Multi-subject projection is the most expensive camera-side query during a
+## dense wave (each subject projects an 8-corner actor volume twice per frame).
+## Keep the shipped camera responsive, but amortize that diagnostic/containment
+## work on a deterministic 20 Hz lane; the cached result is still consumed by
+## the every-frame damping and framing code below.
+const DENSE_COVERAGE_REFRESH_SECONDS := 0.05
+
 const VISIBILITY_LAYER := 20
 
 var movement_velocity := Vector3.ZERO
@@ -78,6 +85,11 @@ var _coverage_subject_paths: Array[String] = []
 var _coverage_active_count := 0
 var _coverage_members_cache: Array[Node] = []
 var _coverage_members_refresh_remaining := 0.0
+var _coverage_measure_remaining := 0.0
+var _coverage_before_cache: Dictionary = {}
+var _coverage_after_cache: Dictionary = {}
+var _coverage_projection_updates := 0
+var _coverage_projection_skips := 0
 var _coverage_members_scan_count := 0
 var _coverage_members_scan_skips := 0
 var _coverage_receipt: Dictionary = {}
@@ -168,6 +180,9 @@ func set_shell_state(run_state: String) -> void:
 		occlusion_guard_active = false
 		_blocked_seconds = 0.0
 		_clear_seconds = 0.0
+		_coverage_measure_remaining = 0.0
+		_coverage_before_cache.clear()
+		_coverage_after_cache.clear()
 		_apply_visibility_overlay(false)
 
 func _process(delta: float) -> void:
@@ -193,7 +208,22 @@ func _process(delta: float) -> void:
 	var obstruction_damping := 7.0 if desired_obstruction_strength > _obstruction_response_strength else 1.8
 	_obstruction_response_strength = lerpf(_obstruction_response_strength, desired_obstruction_strength, 1.0 - exp(-obstruction_damping * delta))
 	_apply_coverage_occluder_fade()
-	var before := _measure_subject_coverage(subjects)
+	_coverage_measure_remaining = maxf(0.0, _coverage_measure_remaining - delta)
+	var coverage_due := (
+		_coverage_measure_remaining <= 0.0
+		or _coverage_before_cache.is_empty()
+		or _coverage_after_cache.is_empty()
+		or (_coverage_before_cache.get("subject_paths", []) as Array) != _coverage_subject_paths
+	)
+	var before: Dictionary
+	if coverage_due:
+		_coverage_projection_updates += 1
+		before = _measure_subject_coverage(subjects)
+		before["subject_paths"] = _coverage_subject_paths.duplicate()
+		_coverage_before_cache = before.duplicate(true)
+	else:
+		_coverage_projection_skips += 1
+		before = _coverage_before_cache
 	var activation_fraction := Vector2(
 		coverage_frame_fraction.x + safe_frame_activation_buffer,
 		coverage_frame_fraction.y + safe_frame_activation_buffer
@@ -246,7 +276,14 @@ func _process(delta: float) -> void:
 	global_position = global_position.lerp(desired_position, 1.0 - exp(-follow_damping * delta))
 	look_at(framing_target + Vector3(0.0, 0.65, 0.0), Vector3.UP)
 	var warden_after := _measure_projected_safe_frame()
-	var after := _measure_subject_coverage(subjects)
+	var after: Dictionary
+	if coverage_due:
+		after = _measure_subject_coverage(subjects)
+		after["subject_paths"] = _coverage_subject_paths.duplicate()
+		_coverage_after_cache = after.duplicate(true)
+		_coverage_measure_remaining = DENSE_COVERAGE_REFRESH_SECONDS
+	else:
+		after = _coverage_after_cache
 	projected_margins = (warden_after.get("margins", {}) as Dictionary).duplicate(true)
 	var coverage_inside := bool(after.get("inside_fraction", false))
 	var warden_inside := bool(warden_after.get("inside_fraction", false))
@@ -902,6 +939,9 @@ func _mcp_state() -> Dictionary:
 		"multi_subject_coverage":_coverage_receipt.duplicate(true),
 		"coverage_frame_fraction":coverage_frame_fraction,
 		"coverage_active_count":_coverage_active_count,
+		"coverage_projection_updates":_coverage_projection_updates,
+		"coverage_projection_skips":_coverage_projection_skips,
+		"coverage_projection_refresh_seconds":DENSE_COVERAGE_REFRESH_SECONDS,
 		"dense_fov_boost":dense_fov_boost,
 		"coverage_offset":_coverage_offset,
 		"coverage_screen_shift":_coverage_screen_shift,
