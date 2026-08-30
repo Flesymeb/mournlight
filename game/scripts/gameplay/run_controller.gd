@@ -115,6 +115,7 @@ var _victory_fixture_commit_held := false
 var _victory_fixture_hold_generation := -1
 var complete_run_ledger: CompleteRunLedger
 var _profile_physics_samples_ms: Array[float] = []
+var _profile_metric_samples: Array[Dictionary] = []
 var _profile_advance_generation := 0
 var _profile_process_frame_start := 0
 var validation_profile_matrix_samples: Array[Dictionary] = []
@@ -330,6 +331,7 @@ func _begin_run() -> void:
 	_profile_origin = ""
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
+	_profile_metric_samples.clear()
 	_profile_elapsed = 0.0
 	_profile_sample_accumulator = 0.0
 	_profile_start_counts.clear()
@@ -1252,6 +1254,12 @@ func _commit_terminal_snapshot(terminal_outcome: String) -> void:
 	terminal_snapshot["commit_count"] = terminal_commit_count
 	terminal_snapshot["route_kind"] = run_route_kind
 	terminal_snapshot["natural_build_history"] = selected_upgrades.duplicate(true)
+	terminal_snapshot["build_identity"] = (inventory.get_snapshot().get("build_identity", {}) as Dictionary).duplicate(true)
+	terminal_snapshot["attack_pattern_receipt"] = {
+		"lantern":lantern_runtime._mcp_state() if is_instance_valid(lantern_runtime) else {},
+		"gravespade":gravespade_runtime._mcp_state() if is_instance_valid(gravespade_runtime) else {},
+		"wisps":wisps_runtime._mcp_state() if is_instance_valid(wisps_runtime) else {},
+	}
 	terminal_snapshot["boss_transition_history"] = boss_transition_history.duplicate(true)
 	terminal_snapshot["terminal_animation"] = warden.animation_binding.get_snapshot() if warden.animation_binding else {}
 	# Carry the renderer/build guards into the immutable terminal receipt.  The
@@ -1471,6 +1479,7 @@ func _prepare_final_profile() -> void:
 	run_route_kind = "diagnostic_prepared"
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
+	_profile_metric_samples.clear()
 	_profile_elapsed = 0.0
 	_profile_sample_accumulator = 0.0
 	get_tree().paused = false
@@ -1554,6 +1563,7 @@ func _advance_final_profile() -> void:
 		return
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
+	_profile_metric_samples.clear()
 	_profile_elapsed = 0.0
 	_profile_sample_accumulator = 0.0
 	_profile_sample_counter_reads = 0
@@ -1678,6 +1688,7 @@ func _try_begin_passive_ordinary_profile() -> void:
 	_profile_armed = false
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
+	_profile_metric_samples.clear()
 	_profile_elapsed = 0.0
 	_profile_sample_accumulator = 0.0
 	_profile_sample_counter_reads = 0
@@ -1740,6 +1751,23 @@ func _advance_profile_sample(delta: float) -> void:
 	# cost and falsely reject an otherwise healthy native profile.
 	var measured_process_ms := float(Performance.get_monitor(Performance.TIME_PROCESS)) * 1000.0
 	var frame_ms := measured_process_ms if measured_process_ms > 0.0 else maxf(0.0, delta * 1000.0)
+	var metric_counts := _profile_counts()
+	if _profile_metric_samples.size() < PROFILE_MAX_SAMPLES:
+		_profile_metric_samples.append({
+			"timestamp_msec":Time.get_ticks_msec(),
+			"elapsed_seconds":_profile_elapsed,
+			"frame_ms":frame_ms,
+			"physics_ms":float(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)) * 1000.0,
+			"active_enemies":int(metric_counts.get("enemies", 0)),
+			"active_projectiles":int(metric_counts.get("projectiles", 0)),
+			"active_pickups":int(metric_counts.get("pickups", 0)),
+			"active_effects":int(metric_counts.get("effects", 0)),
+			"active_lights":int(metric_counts.get("lights", 0)),
+			"active_audio_voices":int(metric_counts.get("audio_voices", 0)),
+			"spawned_total":int(spawner.get_snapshot().get("spawned", 0)),
+			"despawned_total":int(spawner.get_snapshot().get("retired", 0)),
+			"runtime_error_count":0,
+		})
 	if _profile_samples_ms.size() < PROFILE_MAX_SAMPLES:
 		_profile_samples_ms.append(frame_ms)
 	if _profile_physics_samples_ms.size() < PROFILE_MAX_SAMPLES:
@@ -1780,6 +1808,8 @@ func _advance_profile_sample(delta: float) -> void:
 		"missing_coverage":_missing_profile_coverage(_profile_coverage),
 		"density_threshold_crossing":sample_start.get("density_threshold_crossing", {}),
 		"sample_count":sorted.size(), "sample_cadence_seconds":PROFILE_SAMPLE_INTERVAL_SECONDS,
+		"telemetry_samples":_profile_metric_samples.duplicate(true),
+		"telemetry_sample_count":_profile_metric_samples.size(),
 		"sample_history_cap":PROFILE_MAX_SAMPLES, "window_seconds":_profile_elapsed,
 		"sampling_renderer_independent":true,
 		"physics_sample_count":sorted_physics.size(),
@@ -1872,6 +1902,7 @@ func _reset_final_profile() -> void:
 	_validation_setup_generation += 1
 	var setup_generation := _validation_setup_generation
 	_profile_active = false
+	_profile_metric_samples.clear()
 	# Retire the public record immediately beside the active-owner flag. Any
 	# teardown callback or snapshot emitted below therefore sees one state.
 	validation_profile_sample = _profile_reset_sample(
@@ -3319,6 +3350,8 @@ func _mcp_state() -> Dictionary:
 		"profile_p99_ms":profile_frame_ms.get("p99", 0.0),
 		"profile_worst_ms":profile_frame_ms.get("worst", 0.0),
 		"profile_frame_sample_count":validation_profile_sample.get("sample_count", 0),
+		"profile_telemetry_sample_count":validation_profile_sample.get("telemetry_sample_count", 0),
+		"profile_telemetry_samples":validation_profile_sample.get("telemetry_samples", []),
 		"profile_physics_sample_count":validation_profile_sample.get("physics_sample_count", 0),
 		"profile_sample_availability":validation_profile_sample.get("sample_availability", {}),
 		"profile_frame_execution":validation_profile_sample.get("frame_execution", {}),

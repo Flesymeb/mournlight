@@ -40,6 +40,12 @@ var _wave_id := "unconfigured"
 var _wave_spawned := 0
 var _spawn_budget := 0
 var _composition_weights: Dictionary = {}
+## Coverage lane for ordinary waves. Roles with a positive authored weight are
+## admitted once before weighted repeats, preventing short waves from starving
+## a role and making lifecycle evidence dependent on RNG luck.
+var _ordinary_role_coverage: Array[String] = []
+var _ordinary_role_seen: Dictionary = {}
+var _ordinary_role_coverage_cursor := 0
 var _elite_every := 0
 var _reconciliation_serial := 0
 var retired_total := 0
@@ -128,6 +134,12 @@ func configure_pressure(definition: Dictionary) -> void:
 	live_cap = requested_cap
 	_spawn_budget = maxi(live_cap, int(definition.get("spawn_budget", live_cap)))
 	_composition_weights = (definition.get("composition_weights", {}) as Dictionary).duplicate(true)
+	_ordinary_role_coverage.clear()
+	_ordinary_role_seen.clear()
+	_ordinary_role_coverage_cursor = 0
+	for role in ["mossling", "wispbat", "bone_slinger", "grave_brute"]:
+		if int(_composition_weights.get(role, 0)) > 0:
+			_ordinary_role_coverage.append(role)
 	_elite_every = maxi(0, int(definition.get("elite_every", 0)))
 	var cadence := maxf(0.35, float(definition.get("cadence", 1.45)))
 	_spawn_cooldown = minf(_spawn_cooldown, cadence)
@@ -174,6 +186,9 @@ func reset_encounter(preserve_pressure: bool = false) -> void:
 		_wave_id = "unconfigured"
 		_spawn_budget = 0
 		_composition_weights.clear()
+		_ordinary_role_coverage.clear()
+		_ordinary_role_seen.clear()
+		_ordinary_role_coverage_cursor = 0
 		_elite_every = 0
 		set_meta("spawn_cadence", 1.45)
 		set_meta("initial_spawn_count", 6)
@@ -433,6 +448,18 @@ func _select_profile(sequence_index: int) -> EnemyProfile:
 	if _elite_every > 0 and _wave_spawned > 0 and _wave_spawned % _elite_every == 0:
 		for candidate in profiles:
 			if String(candidate.role_id) == "grave_brute":
+				return candidate
+	# Admit each positively weighted authored role once per wave before applying
+	# weighted selection. This preserves the data-driven composition while
+	# making role lifecycle coverage deterministic for ordinary runs.
+	while _ordinary_role_coverage_cursor < _ordinary_role_coverage.size():
+		var required_role := _ordinary_role_coverage[_ordinary_role_coverage_cursor]
+		_ordinary_role_coverage_cursor += 1
+		if _ordinary_role_seen.has(required_role):
+			continue
+		_ordinary_role_seen[required_role] = true
+		for candidate in profiles:
+			if String(candidate.role_id) == required_role:
 				return candidate
 	var total_weight := 0
 	for candidate in profiles:
@@ -727,6 +754,8 @@ func get_profile_counters() -> Dictionary:
 		"vitality_stale_generation_rejections":_vitality_stale_generation_rejections,
 		"retirement_tween_count":_retirement_tweens.size(),
 		"retirement_tween_cap":pool_size,
+		"ordinary_role_coverage_complete":_ordinary_role_coverage_cursor >= _ordinary_role_coverage.size(),
+		"ordinary_role_coverage_seen":_ordinary_role_seen.keys(),
 	}
 
 func _emit_snapshot() -> void:
@@ -746,6 +775,7 @@ func get_snapshot() -> Dictionary:
 	var facing_updates := 0
 	var facing_skips := 0
 	var manual_animation_players := 0
+	var role_lifecycle_receipts: Dictionary = {}
 	var actor_physics_steps := 0
 	var actor_steering_steps := 0
 	var actor_steering_query_skips := 0
@@ -762,6 +792,13 @@ func get_snapshot() -> Dictionary:
 		explicit_space_queries += int(actor_work.get("explicit_space_queries", 0))
 		vitality_updates += int(actor_work.get("vitality_updates", 0))
 		vitality_skips += int(actor_work.get("vitality_skips", 0))
+		var completed_trace: Dictionary = actor.get_last_completed_lifecycle()
+		if not completed_trace.is_empty() and actor.profile:
+			var completed_role := String(actor.profile.role_id)
+			role_lifecycle_receipts[completed_role] = {
+				"trace": completed_trace,
+				"complete": actor.has_completed_lifecycle_trace(),
+			}
 		if actor.state == "pooled" or not actor.profile:
 			continue
 		var role := String(actor.profile.role_id)
@@ -794,6 +831,7 @@ func get_snapshot() -> Dictionary:
 		"cap": live_cap, "spawned": spawned_total, "defeated": defeated_total,
 		"pooled": pool_size - _active_count(), "roles": roles,
 		"role_variants":role_variants,
+		"role_lifecycle_receipts":role_lifecycle_receipts,
 		"role_variant_allocations":_role_variant_allocations.duplicate(true),
 		"variant_assignment_by_actor":_variant_assignment_by_actor.duplicate(true),
 		"variant_balance":_variant_balance_receipt(role_variants),
@@ -813,6 +851,13 @@ func get_snapshot() -> Dictionary:
 		"last_lifecycle_event": last_lifecycle_event,
 		"wave_id": _wave_id, "wave_spawned": _wave_spawned, "spawn_budget": _spawn_budget,
 		"composition_weights": _composition_weights, "elite_every": _elite_every,
+		"ordinary_role_coverage": {
+			"required": _ordinary_role_coverage.duplicate(),
+			"seen": _ordinary_role_seen.keys(),
+			"cursor": _ordinary_role_coverage_cursor,
+			"complete": _ordinary_role_coverage_cursor >= _ordinary_role_coverage.size(),
+			"policy": "positive_weight_roles_once_then_weighted_repeats",
+		},
 		"retired": retired_total, "last_reconciliation": last_reconciliation_receipt,
 		"retirement_tween_count": _retirement_tweens.size(),
 		"retirement_tween_policy": "owned_cancelled_on_stop_reset_and_actor_generation_guarded",

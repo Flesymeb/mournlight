@@ -67,6 +67,7 @@ static func contract() -> Dictionary:
 			"active_pickups", "active_effects", "active_lights", "active_audio_voices",
 			"spawned_total", "despawned_total", "runtime_error_count",
 		],
+		"telemetry": {"sample_history_cap": SAMPLE_HISTORY_CAP, "per_sample_metrics": true, "runtime_errors_source": "godot_runtime_log"},
 		"receipts": ["requested", "resolved", "reset_isolation"],
 		"cycle_protocol": ["prepare", "advance", "reset"],
 		"cycle_aggregation": {

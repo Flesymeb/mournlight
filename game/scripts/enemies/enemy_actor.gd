@@ -56,6 +56,8 @@ var _vitality_skips := 0
 ## runs its short recoil clip, then restore the current semantic deterministically.
 var _hurt_motion_remaining := 0.0
 var _hurt_motion_count := 0
+var _lifecycle_trace: Dictionary = {}
+var _last_completed_lifecycle: Dictionary = {}
 
 const DENSE_STEERING_BUCKETS := 3
 const DENSE_VITALITY_REFRESH_SECONDS := 0.05
@@ -81,6 +83,7 @@ func activate(next_profile: EnemyProfile, next_target: WardenController, at_posi
 	_hurt_light_remaining = 0.0
 	_hurt_motion_remaining = 0.0
 	_hurt_motion_count = 0
+	_lifecycle_trace = {"stable_id":String(stable_id),"role_id":String(profile.role_id),"generation":generation,"spawn":0,"approach":0,"telegraph":0,"damage":0,"hurt":0,"death":0,"drop":0,"pool_return":0}
 	_set_light_budget(false, false)
 	_lifetime = 0.0
 	attack_serial = 0
@@ -130,6 +133,8 @@ func return_to_pool() -> void:
 	target = null
 	state_remaining = 0.0
 	state = "pooled"
+	_lifecycle_trace["pool_return"] = int(_lifecycle_trace.get("pool_return", 0)) + 1
+	_last_completed_lifecycle = _lifecycle_trace.duplicate(true)
 	model_pivot.reset_presenter()
 	vitality_bar.retire("pool_return")
 	visible = false
@@ -302,6 +307,7 @@ func _damage_frame() -> void:
 	lifecycle_event.emit(event)
 
 func _on_hurt(event: Dictionary) -> void:
+	_lifecycle_trace["hurt"] = int(_lifecycle_trace.get("hurt", 0)) + 1
 	hurt_count += 1
 	_hurt_motion_count += 1
 	_hurt_motion_remaining = 0.22
@@ -342,11 +348,14 @@ func get_target_generation() -> int:
 	return spawn_generation
 
 func _on_drop(event: Dictionary) -> void:
+	_lifecycle_trace["drop"] = int(_lifecycle_trace.get("drop", 0)) + 1
 	drop_committed.emit(event)
 	lifecycle_event.emit(_event("drop", {"drop_id": event.get("drop_id", "")}))
 
 func _set_state(next_state: String, duration: float = 0.0) -> void:
 	state = next_state
+	if _lifecycle_trace.has(next_state):
+		_lifecycle_trace[next_state] = int(_lifecycle_trace.get(next_state, 0)) + 1
 	state_remaining = duration
 	if is_instance_valid(model_pivot) and _hurt_motion_remaining <= 0.0:
 		model_pivot.set_semantic(next_state)
@@ -409,6 +418,15 @@ func _event(phase: String, extra: Dictionary = {}) -> Dictionary:
 func get_stable_id() -> StringName:
 	return stable_id
 
+func get_lifecycle_trace() -> Dictionary:
+	return _lifecycle_trace.duplicate(true)
+
+func get_last_completed_lifecycle() -> Dictionary:
+	return _last_completed_lifecycle.duplicate(true)
+
+func has_completed_lifecycle_trace() -> bool:
+	return _lifecycle_trace_complete(_last_completed_lifecycle)
+
 func is_legal_target() -> bool:
 	return visible and state not in ["pooled", "death"] and health.is_alive()
 
@@ -433,10 +451,20 @@ func _mcp_state() -> Dictionary:
 		"presentation_variant_id": model_pivot.variant_id if is_instance_valid(model_pivot) else "none",
 		"semantic_state": model_pivot.semantic_state if is_instance_valid(model_pivot) else state,
 		"active_motion_id": model_pivot.active_motion_id if is_instance_valid(model_pivot) else "none",
+		"lifecycle_trace": _lifecycle_trace.duplicate(true),
+		"last_completed_lifecycle": _last_completed_lifecycle.duplicate(true),
+		"lifecycle_trace_complete": _lifecycle_trace_complete(_lifecycle_trace),
+		"last_lifecycle_trace_complete": _lifecycle_trace_complete(_last_completed_lifecycle),
 		"semantic_bindings": model_pivot.semantic_bindings() if is_instance_valid(model_pivot) else {},
 		"presentation_budget": get_presentation_budget_snapshot(),
 		"vitality":vitality_bar.get_snapshot() if is_instance_valid(vitality_bar) else {},
-	}
+}
+
+func _lifecycle_trace_complete(trace: Dictionary) -> bool:
+	for phase in ["spawn", "approach", "telegraph", "damage", "hurt", "death", "drop", "pool_return"]:
+		if int(trace.get(phase, 0)) <= 0:
+			return false
+	return true
 
 func get_presentation_budget_snapshot() -> Dictionary:
 	var receipt := model_pivot.presentation_budget_snapshot() if is_instance_valid(model_pivot) else {}
