@@ -118,6 +118,7 @@ var _profile_physics_samples_ms: Array[float] = []
 var _profile_metric_samples: Array[Dictionary] = []
 var _profile_advance_generation := 0
 var _profile_process_frame_start := 0
+var _profile_completion_grace_frames := 0
 var validation_profile_matrix_samples: Array[Dictionary] = []
 var density_matrix_contract_checks: Dictionary = {}
 var _active_pickups: Dictionary = {}
@@ -334,6 +335,7 @@ func _begin_run() -> void:
 	_profile_metric_samples.clear()
 	_profile_elapsed = 0.0
 	_profile_sample_accumulator = 0.0
+	_profile_completion_grace_frames = 0
 	_profile_start_counts.clear()
 	_profile_armed = false
 	_profile_arm_receipt.clear()
@@ -1571,6 +1573,7 @@ func _advance_final_profile() -> void:
 	_profile_origin = "diagnostic_prepared"
 	_profile_advance_generation += 1
 	_profile_process_frame_start = Engine.get_process_frames()
+	_profile_completion_grace_frames = 0
 	_profile_start_counts = _profile_counts()
 	_profile_start_lifecycle = _lifecycle_counters()
 	var cohort := spawner.begin_validation_profile_cohort(32, int(validation_profile_receipt.get("setup_generation", 0)))
@@ -1694,6 +1697,7 @@ func _try_begin_passive_ordinary_profile() -> void:
 	_profile_sample_counter_reads = 0
 	_profile_active = true
 	_profile_origin = "ordinary_final_wave_passive"
+	_profile_completion_grace_frames = 0
 	_profile_start_counts = _profile_counts()
 	_profile_start_lifecycle = _lifecycle_counters()
 	_profile_minimum_enemy_workload = live_density
@@ -1773,6 +1777,15 @@ func _advance_profile_sample(delta: float) -> void:
 	if _profile_physics_samples_ms.size() < PROFILE_MAX_SAMPLES:
 		_profile_physics_samples_ms.append(maxf(0.0, float(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)) * 1000.0))
 	if _profile_elapsed < _profile_duration:
+		return
+	# A death can be committed by an enemy physics tick immediately after the
+	# sampler's final cadence tick. Give the existing retirement tween and cohort
+	# maintainer a bounded couple of frames to return that actor to the pool and
+	# admit its replacement, so the measured window cannot end at 31/32 solely
+	# because of frame-ordering. Combat outcomes remain untouched.
+	if _profile_origin.begins_with("diagnostic_") and int(spawner.get_profile_counters().get("live", 0)) < int(validation_profile_sample.get("requested_density", 32)) and _profile_completion_grace_frames < 3:
+		_profile_completion_grace_frames += 1
+		_profile_sample_accumulator = 0.0
 		return
 	_profile_active = false
 	var sorted := _profile_samples_ms.duplicate()
@@ -1899,6 +1912,7 @@ func _reset_final_profile() -> void:
 		return
 	var source_run_serial := run_serial
 	var source_sample := validation_profile_sample.duplicate(true)
+	var requested_density := int(source_sample.get("requested_density", validation_profile_receipt.get("requested_density", 32)))
 	_validation_setup_generation += 1
 	var setup_generation := _validation_setup_generation
 	_profile_active = false
@@ -1938,7 +1952,7 @@ func _reset_final_profile() -> void:
 	validation_profile_receipt = {
 		"accepted":true, "reset":true, "branch_id":"final_wave_bellkeeper_profile",
 		"source_run_serial":source_run_serial, "run_serial":run_serial, "setup_generation":setup_generation,
-		"requested_density":requested_counts.get("enemies",-1), "resolved_density":counts.get("enemies",-1),
+		"requested_density":requested_density, "resolved_density":counts.get("enemies",-1),
 		"requested_profile":"reset", "resolved_profile":"ordinary_run_ready",
 		"requested_counts": requested_counts, "resolved_retirement": retirement,
 		"post_reset_counts":counts, "counts":counts,
