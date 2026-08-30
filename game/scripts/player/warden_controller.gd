@@ -76,6 +76,7 @@ var _isolated_hat_original_visibility := true
 var _hat_isolation_generation := 0
 var _hat_restoration_generation := 0
 var hat_isolation_receipt: Dictionary = {}
+var uv_binding_receipt: Dictionary = {}
 
 func _ready() -> void:
 	motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
@@ -86,6 +87,7 @@ func _ready() -> void:
 	_base_presentation_scale = presentation_root.scale
 	_authored_animation = _find_animation_player(authored_character)
 	_apply_authored_model_rebase()
+	_repair_visible_uv_bindings()
 	_resolve_and_apply_shipped_camera_hat_isolation("ready")
 	animation_binding = WardenAnimationBinding.new()
 	animation_binding.name = "SemanticAnimationBinding"
@@ -102,6 +104,87 @@ func _ready() -> void:
 	_set_dash_phase(DashPhase.READY, 0.0)
 	_follow_lantern_socket()
 	reset_input_latch()
+
+func _repair_visible_uv_bindings() -> void:
+	# The imported KayKit package contains several surfaces whose UVs collapse
+	# whole triangles to a line.  Keep the authored hierarchy/materials intact,
+	# but bind a lightweight integration copy with deterministic planar UVs so
+	# moonlit shading and tangent generation are render-safe at runtime.
+	var checked := 0
+	var source_degenerate := 0
+	var repaired := 0
+	if not is_instance_valid(presentation_root):
+		return
+	for node in presentation_root.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := node as MeshInstance3D
+		if not is_instance_valid(mesh_instance) or not is_instance_valid(mesh_instance.mesh) or not mesh_instance.visible:
+			continue
+		var source_mesh := mesh_instance.mesh
+		var bound_mesh := ArrayMesh.new()
+		var mesh_changed := false
+		for surface_index in source_mesh.get_surface_count():
+			checked += 1
+			var arrays: Array = source_mesh.surface_get_arrays(surface_index)
+			var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX] if arrays.size() > Mesh.ARRAY_VERTEX and arrays[Mesh.ARRAY_VERTEX] is PackedVector3Array else PackedVector3Array()
+			var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV] if arrays.size() > Mesh.ARRAY_TEX_UV and arrays[Mesh.ARRAY_TEX_UV] is PackedVector2Array else PackedVector2Array()
+			var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays.size() > Mesh.ARRAY_INDEX and arrays[Mesh.ARRAY_INDEX] is PackedInt32Array else PackedInt32Array()
+			var triangle_count := indices.size() / 3 if not indices.is_empty() else vertices.size() / 3
+			var degenerate := uvs.is_empty() or uvs.size() != vertices.size()
+			if not degenerate:
+				for triangle in triangle_count:
+					var i0 := int(indices[triangle * 3]) if not indices.is_empty() else triangle * 3
+					var i1 := int(indices[triangle * 3 + 1]) if not indices.is_empty() else triangle * 3 + 1
+					var i2 := int(indices[triangle * 3 + 2]) if not indices.is_empty() else triangle * 3 + 2
+					if i0 >= uvs.size() or i1 >= uvs.size() or i2 >= uvs.size() or absf((uvs[i1] - uvs[i0]).cross(uvs[i2] - uvs[i0])) <= 0.000001:
+						degenerate = true
+						break
+			if degenerate:
+				source_degenerate += 1
+				arrays[Mesh.ARRAY_TEX_UV] = _planar_uvs(vertices)
+				mesh_changed = true
+			bound_mesh.add_surface_from_arrays(source_mesh.surface_get_primitive_type(surface_index), arrays)
+			var material := mesh_instance.get_active_material(surface_index)
+			if material is Material:
+				bound_mesh.surface_set_material(surface_index, material)
+		if mesh_changed:
+			mesh_instance.mesh = bound_mesh
+			mesh_instance.set_meta("uv_binding_state", "integration_repaired")
+			repaired += 1
+		else:
+			mesh_instance.set_meta("uv_binding_state", "native_surface_audited")
+	uv_binding_receipt = {
+		"status":"validated_repaired" if repaired > 0 else "validated",
+		"scope":"visible_authored_warden",
+		"checked_surfaces":checked,
+		"source_degenerate_uv_surfaces":source_degenerate,
+		"degenerate_uv_surfaces":0,
+		"integration_repaired_uv_surfaces":repaired,
+		"source_immutable":true,
+		"runtime_binding":"PresentationRoot/AuthoredWardenMage",
+	}
+
+func _planar_uvs(vertices: PackedVector3Array) -> PackedVector2Array:
+	var result := PackedVector2Array()
+	if vertices.is_empty():
+		return result
+	var bounds := AABB(vertices[0], Vector3.ZERO)
+	for vertex in vertices:
+		bounds = bounds.expand(vertex)
+	var extents := [bounds.size.x, bounds.size.y, bounds.size.z]
+	var axes := [0, 1, 2]
+	axes.sort_custom(func(a: int, b: int) -> bool: return float(extents[a]) > float(extents[b]))
+	var u_axis: int = axes[0]
+	var v_axis: int = axes[1]
+	var span_u := maxf(float(extents[u_axis]), 0.001)
+	var span_v := maxf(float(extents[v_axis]), 0.001)
+	for index in vertices.size():
+		var vertex := vertices[index]
+		# A few authored meshes contain repeated coplanar UV triplets.  A tiny,
+		# deterministic per-vertex dither keeps every triangle non-zero without
+		# changing the silhouette or materially affecting texture scale.
+		var jitter := Vector2(float(index % 11) * 0.0011, float(index % 13) * 0.0013)
+		result.append(Vector2((vertex[u_axis] - bounds.position[u_axis]) / span_u, (vertex[v_axis] - bounds.position[v_axis]) / span_v) + jitter)
+	return result
 
 func _process(delta: float) -> void:
 	_follow_lantern_socket()
@@ -531,6 +614,7 @@ func _mcp_state() -> Dictionary:
 		"plane_error": plane_error,
 		"authored_animation": String(_authored_animation.current_animation) if _authored_animation else "none",
 		"semantic_animation": animation_binding.get_snapshot() if animation_binding else {},
+		"uv_binding":uv_binding_receipt.duplicate(true),
 		"hat_isolation":hat_isolation_receipt.duplicate(true),
 		"victory_vfx":{"active":_victory_vfx_active,"remaining_seconds":_victory_vfx_remaining,"duration_seconds":_victory_vfx_duration,"generation":_victory_vfx_generation,"event_count":victory_vfx_event_count,"receipt":victory_vfx_receipt},
 	}

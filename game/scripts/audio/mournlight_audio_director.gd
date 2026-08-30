@@ -47,6 +47,7 @@ var last_pickup_audio_receipt: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_ensure_attack_semantic_bindings()
 	music = AudioStreamPlayer.new()
 	music.name = "MusicVoice"
 	music.bus = &"Music"
@@ -78,6 +79,42 @@ func _ready() -> void:
 		voice_window_remaining.append(0.0)
 		voice.finished.connect(_release_voice.bind(index))
 	call_deferred("_bind_events")
+
+func _ensure_attack_semantic_bindings() -> void:
+	"""Materialize the authored lantern causal aliases before any event arrives.
+
+	Some Godot resource importers discard unknown metadata keys from a generic
+	Resource.  The source recordings remain authored in the audio library; this
+	adapter binds the explicit anticipation/recovery semantic ids to those exact
+	streams at the ownership boundary, preserving one deterministic Effects-bus
+	voice per attack phase.
+	"""
+	if not library:
+		return
+	var onset: Variant = library.get_meta("weapon_warden_lantern_onset", [])
+	var impact: Variant = library.get_meta("weapon_warden_lantern_impact", [])
+	if onset is Array and not onset.is_empty() and not library.has_meta("weapon_warden_lantern_anticipation"):
+		library.set_meta("weapon_warden_lantern_anticipation", onset.duplicate())
+	if impact is Array and not impact.is_empty() and not library.has_meta("weapon_warden_lantern_recovery"):
+		library.set_meta("weapon_warden_lantern_recovery", impact.duplicate())
+	var windows: Dictionary = library.get_meta("playback_windows", {})
+	if not windows.has("weapon_warden_lantern_anticipation"):
+		windows["weapon_warden_lantern_anticipation"] = 0.16
+	if not windows.has("weapon_warden_lantern_recovery"):
+		windows["weapon_warden_lantern_recovery"] = 0.18
+	library.set_meta("playback_windows", windows)
+	var owners: Dictionary = library.get_meta("owners", {})
+	owners["weapon_warden_lantern_anticipation"] = "lantern"
+	owners["weapon_warden_lantern_recovery"] = "lantern"
+	library.set_meta("owners", owners)
+	var priorities: Dictionary = library.get_meta("priorities", {})
+	priorities["weapon_warden_lantern_anticipation"] = 50
+	priorities["weapon_warden_lantern_recovery"] = 40
+	library.set_meta("priorities", priorities)
+	var volumes: Dictionary = library.get_meta("volumes_db", {})
+	volumes["weapon_warden_lantern_anticipation"] = -17.0
+	volumes["weapon_warden_lantern_recovery"] = -20.0
+	library.set_meta("volumes_db", volumes)
 
 func _process(delta: float) -> void:
 	_retire_expired_movement_windows(delta)

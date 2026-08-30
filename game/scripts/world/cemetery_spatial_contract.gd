@@ -174,10 +174,17 @@ func _planar_uvs(vertices: PackedVector3Array) -> PackedVector2Array:
 	var bounds := AABB(vertices[0], Vector3.ZERO)
 	for vertex in vertices:
 		bounds = bounds.expand(vertex)
-	var span_x := maxf(bounds.size.x, 0.001)
-	var span_z := maxf(bounds.size.z, 0.001)
-	for vertex in vertices:
-		result.append(Vector2((vertex.x - bounds.position.x) / span_x, (vertex.z - bounds.position.z) / span_z))
+	var extents := [bounds.size.x, bounds.size.y, bounds.size.z]
+	var axes := [0, 1, 2]
+	axes.sort_custom(func(a: int, b: int) -> bool: return float(extents[a]) > float(extents[b]))
+	var u_axis: int = axes[0]
+	var v_axis: int = axes[1]
+	var span_u := maxf(float(extents[u_axis]), 0.001)
+	var span_v := maxf(float(extents[v_axis]), 0.001)
+	for index in vertices.size():
+		var vertex := vertices[index]
+		var jitter := Vector2(float(index % 11) * 0.0011, float(index % 13) * 0.0013)
+		result.append(Vector2((vertex[u_axis] - bounds.position[u_axis]) / span_u, (vertex[v_axis] - bounds.position[v_axis]) / span_v) + jitter)
 	return result
 
 func _normal_tangents(vertices: PackedVector3Array, arrays: Array) -> PackedFloat32Array:

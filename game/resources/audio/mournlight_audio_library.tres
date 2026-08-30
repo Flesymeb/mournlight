@@ -69,3 +69,7 @@ metadata/volumes_db = {"boss_phase":-4.0,"dash":-10.0,"death":-3.0,"enemy_death"
 metadata/owner_limits = {"critical":3,"gravespade":2,"impacts":3,"lantern":4,"movement":2,"rewards":2,"ui":2,"warnings":2,"wisps":2}
 metadata/source_revision = "cobra-fps-feel-kit@f87f4f1695f2165e1458af6ebee2ae158e804184 + gd-dialog@reference-pool-current + cogito@03943d34d097 + ovani-sound/sound-fx-starter-pack-vol@43fa5caea139"
 metadata/source_license = "Pixabay Content License recordings; MIT source projects; CC0 footstep recording; Ovanisound proprietary royalty-free commercial-use license"
+# Explicit anticipation binding is kept as a first-class semantic entry.  The
+# lantern attack adapter requests this id before onset, so the authored source
+# must survive resource import rather than relying on a runtime alias.
+metadata/weapon_warden_lantern_anticipation = Array[AudioStream]([ExtResource("25_lantern_onset_compat")])
