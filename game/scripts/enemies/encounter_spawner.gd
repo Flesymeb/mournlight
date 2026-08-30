@@ -17,6 +17,7 @@ signal reward_dropped(event: Dictionary)
 @export var playable_min := Vector2(-9.25, -9.25)
 @export var playable_max := Vector2(10.4, 9.65)
 @export var protected_camera_half_extents := Vector2(5.8, 4.2)
+@export var spawn_ring_radius := 13.5
 @export_range(1, 12, 1) var telegraph_cue_cap := 4
 @export_range(0, 16, 1) var role_light_cap := 8
 @export_range(0, 8, 1) var hurt_light_cap := 3
@@ -274,7 +275,23 @@ func _spawn_one(role_offset: int) -> bool:
 
 func _spawn_lanes() -> Array[Vector3]:
 	if is_instance_valid(arena_contract):
-		return arena_contract.get_spawn_lanes()
+		var authored := arena_contract.get_spawn_lanes()
+		# The cemetery instance is intentionally larger than the combat pad. Keep
+		# its authored lane bearings, but pull distant perimeter lanes onto a
+		# readable outer ring around the Warden so the first threats enter the
+		# shipped camera during the teaching window. Validation still owns final
+		# collision, boundary, and protected-region admission below.
+		if is_instance_valid(player):
+			var result: Array[Vector3] = []
+			for lane in authored:
+				var offset := lane - player.global_position
+				offset.y = 0.0
+				if offset.length() > spawn_ring_radius:
+					lane = player.global_position + offset.normalized() * spawn_ring_radius
+				lane.y = 0.05
+				result.append(lane)
+			return result
+		return authored
 	var fallback: Array[Vector3] = []
 	fallback.assign(FALLBACK_LANES)
 	return fallback

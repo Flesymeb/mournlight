@@ -97,14 +97,16 @@ arena_contract = NodePath("../CemeteryGarden")
 near = 0.15
 far = 180.0
 arena_limit = Vector2(34.0, 32.0)
-normal_fov = 72.0
-follow_height = 30.0
-follow_distance = 27.0
+normal_fov = 56.0
+follow_height = 19.0
+follow_distance = 16.0
 # Product framing keeps the Warden readable while preserving the mausoleum and
 # bell in the north-safe lane; avoid aiming through the central landmark.
-framing_bias = Vector3(0, 0, -1.0)
+framing_bias = Vector3(0, 0, -0.5)
 arena_fill_limit = Vector2(33.0, 30.5)
 coverage_max_correction = 3.5
+coverage_threat_weight = 0.30
+coverage_radius = 16.0
 obstruction_height_boost = 1.2
 obstruction_lateral_bypass = 1.0
 dense_compositor_resolution_scale = 0.5

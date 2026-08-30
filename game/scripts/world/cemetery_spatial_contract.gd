@@ -2,7 +2,7 @@ class_name CemeterySpatialContract
 extends Node3D
 
 @export var camera_world_margin := Vector2(5.2, 4.8)
-@export var protected_camera_half_extents := Vector2(11.8, 8.6)
+@export var protected_camera_half_extents := Vector2(9.0, 7.0)
 @export var minimum_player_safe_radius := 10.5
 @export var spawn_clearance := 0.6
 @export var native_map_scale := 1.95
