@@ -92,6 +92,8 @@ static func contract() -> Dictionary:
 			"id": PREFLIGHT_ID,
 			"records_before_qualification": ["renderer", "hardware_eligibility", "frame_execution", "sample_availability", "cycle_provenance", "reset_isolation"],
 			"renderer_gate_order": "classify_before_sampling_gate_after_sampling",
+			"renderer_gate_deferred_until_sampling_complete": true,
+			"native_renderer_required_for_qualification": true,
 		},
 }
 
@@ -124,6 +126,9 @@ static func preflight(renderer: Dictionary, viewport: Dictionary, process_frame_
 			"samples_expected": frames_ran,
 			"samples_available": frame_samples_nonzero and physics_samples_nonzero,
 		},
+		"renderer_gate_order": "classify_before_sampling_gate_after_sampling",
+		"renderer_gate_deferred_until_sampling_complete": true,
+		"native_renderer_required_for_qualification": true,
 		"cycle_provenance": cycle_provenance.duplicate(true),
 		"reset_isolation": reset_isolation.duplicate(true),
 		"qualification_gate_deferred": true,
