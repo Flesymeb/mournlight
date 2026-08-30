@@ -1,6 +1,7 @@
-[gd_resource type="Theme" format=3 uid="uid://p5fy8jilfib2"]
+[gd_resource type="Theme" load_steps=13 format=3]
 
-[ext_resource type="FontFile" uid="uid://cjwfuupekk5pc" path="res://ui/menus/maaack/addons/fps_menu_skin/fonts/BarlowCondensed-Medium.ttf" id="1_medium"]
+[ext_resource type="FontFile" path="res://ui/menus/maaack/addons/fps_menu_skin/fonts/BarlowCondensed-Medium.ttf" id="1_medium"]
+[ext_resource type="FontFile" path="res://ui/menus/maaack/addons/fps_menu_skin/fonts/BarlowCondensed-SemiBold.ttf" id="2_semibold"]
 
 [sub_resource type="StyleBoxEmpty" id="Style_empty"]
 content_margin_left = 16.0
@@ -26,9 +27,6 @@ bg_color = Color(0.12, 0.22, 0.22, 0.5)
 border_width_left = 3
 border_color = Color(0.94, 0.76, 0.28, 1)
 
-[sub_resource type="StyleBoxLine" id="Style_separator"]
-color = Color(0.58, 0.75, 0.74, 0.34)
-
 [sub_resource type="StyleBoxFlat" id="Style_field"]
 content_margin_left = 10.0
 content_margin_top = 6.0
@@ -49,6 +47,15 @@ bg_color = Color(0.008, 0.025, 0.032, 0.9)
 border_width_left = 2
 border_color = Color(0.94, 0.76, 0.28, 0.9)
 
+[sub_resource type="StyleBoxFlat" id="Style_tab_selected"]
+content_margin_left = 16.0
+content_margin_top = 7.0
+content_margin_right = 16.0
+content_margin_bottom = 7.0
+bg_color = Color(0.02, 0.06, 0.07, 0.22)
+border_width_bottom = 2
+border_color = Color(0.94, 0.76, 0.28, 0.95)
+
 [sub_resource type="StyleBoxFlat" id="Style_progress_background"]
 bg_color = Color(0.01, 0.025, 0.03, 0.34)
 corner_radius_top_left = 2
@@ -63,14 +70,9 @@ corner_radius_top_right = 2
 corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
 
-[sub_resource type="StyleBoxFlat" id="Style_tab_selected"]
-content_margin_left = 16.0
-content_margin_top = 7.0
-content_margin_right = 16.0
-content_margin_bottom = 7.0
-bg_color = Color(0.02, 0.06, 0.07, 0.22)
-border_width_bottom = 2
-border_color = Color(0.94, 0.76, 0.28, 0.95)
+[sub_resource type="StyleBoxLine" id="Style_separator"]
+color = Color(0.58, 0.75, 0.74, 0.34)
+thickness = 1
 
 [resource]
 default_font = ExtResource("1_medium")

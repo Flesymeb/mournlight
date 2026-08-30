@@ -1,11 +1,15 @@
 extends MainMenu
 
+## Compatibility bridge for the product shell.  The curated menu component
+## exposes generic sub-menu signals, while RunController owns the authored
+## settings/credits pages; these signals keep that binding explicit without
+## opening the component's optional stock sub-menu windows.
+signal settings_requested
+signal credits_requested
+
 ## Product-ready skin keeps the template flow while allowing a host game to
 ## bind start_game through the existing game_started signal before a concrete
 ## gameplay scene path is known.
-
-signal settings_requested
-signal credits_requested
 
 @export_range(0.0, 24.0, 0.5) var background_parallax_pixels := 10.0
 @export_range(1.0, 16.0, 0.5) var background_parallax_response := 5.5

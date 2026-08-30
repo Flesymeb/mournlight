@@ -58,8 +58,12 @@ func _unhandled_input(event : InputEvent) -> void:
 func _on_close_button_pressed() -> void:
 	close()
 
-@warning_ignore("native_method_override")
-func show() -> void:
+# CanvasItem already owns show(); using that name here is a parser warning in
+# Godot 4.7 (warnings are treated as errors by the host project). Keep the
+# component's explicit signal-emitting entry point under a product-safe name;
+# callers that only need visibility continue to use the inherited show().
+# Avoid the pause-menu child's open_window data member as well.
+func present_window() -> void:
 	super.show()
 	opened.emit()
 
