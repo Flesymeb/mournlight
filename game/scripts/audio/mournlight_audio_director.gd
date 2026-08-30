@@ -175,17 +175,19 @@ func _bind_events() -> void:
 	_set_music("title")
 
 func _on_attack_authorized(event: Dictionary) -> void:
-	# Keep a short pre-impact cue on the same Effects owner before the onset
-	# report. Both are keyed to the authoritative attack id, so retries and
-	# presentation callbacks cannot duplicate the causal chain.
-	_emit_attack_audio(event, "anticipation")
+	# One bounded report belongs to each authoritative automatic attack. The
+	# onset is emitted here, before the bolt travels, so the audible transient
+	# lines up with AttackRuntime authorization without a duplicate anticipation
+	# voice or a retained presentation replay.
 	_emit_attack_audio(event, "onset")
 
 func _on_attack_hit(event: Dictionary) -> void:
 	_emit_attack_audio(event, "impact")
 
 func _on_attack_finished(event: Dictionary) -> void:
-	_emit_attack_audio(event, "recovery")
+	# Recovery is a lifecycle marker, not a second audible attack cue. Keeping it
+	# silent prevents cadence from stacking a second transient on the Effects bus.
+	return
 
 func _emit_attack_audio(event: Dictionary, phase: String) -> bool:
 	# AttackRuntime is the sole authority for these reports.  Deduplicate by the

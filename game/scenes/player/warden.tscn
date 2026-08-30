@@ -144,6 +144,7 @@ bolt_scene = ExtResource("12_bolt")
 unit_size = 5.0
 max_distance = 28.0
 max_polyphony = 4
+bus = &"Effects"
 
 [node name="GravespadeRuntime" type="Node3D" parent="Weapons" groups=["mcp_watch"]]
 position = Vector3(0, 0.08, 0)
