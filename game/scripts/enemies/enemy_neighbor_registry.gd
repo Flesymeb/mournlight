@@ -218,11 +218,13 @@ func query_neighbors(actor: EnemyActor, radius: float) -> Array[EnemyActor]:
 	_neighbor_cache_misses += 1
 	var origin := _cell_for(actor.global_position)
 	_candidate_buffer.clear()
+	var seen_ids: Dictionary = {}
 	for z_offset in range(-1, 2):
 		for x_offset in range(-1, 2):
 			var cell_key := Vector2i(origin.x + x_offset, origin.y + z_offset)
 			for stable_id in (_cells.get(cell_key, []) as Array):
-				if stable_id != actor.stable_id and not _candidate_buffer.has(stable_id):
+				if stable_id != actor.stable_id and not seen_ids.has(stable_id):
+					seen_ids[stable_id] = true
 					_candidate_buffer.append(stable_id)
 	var visits := 0
 	for stable_id in _candidate_buffer:

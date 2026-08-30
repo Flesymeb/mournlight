@@ -568,19 +568,19 @@ func _retire_expired_windows(delta: float) -> void:
 		var voice := voices[index]
 		# A deterministic game-time step can advance a large delta before the
 		# mixer renders its first frame. Let the decoder establish onset before
-		# retiring; keep a short wall-clock cap as the bounded fallback.
+		# retiring; never use wall-clock age as a proxy for audible completion.
 		var playback_position := voice.get_playback_position() if voice.playing else 0.0
-		var elapsed_wall := float(Time.get_ticks_msec() - voice_started_msec[index]) / 1000.0 if voice_started_msec[index] > 0 else 0.0
+		var startup_age := float(Time.get_ticks_msec() - voice_started_msec[index]) / 1000.0 if voice_started_msec[index] > 0 else 0.0
 		# AudioStreamPlayer reports playing=false for a short decoder/mixer
 		# startup window.  This is especially visible when GameLoop advances
 		# frozen game time faster than wall time.  Do not retire an allocated
 		# semantic voice merely because its first mixer frame has not landed yet;
 		# otherwise Effects captures lose the entire onset/impact despite a valid
 		# source and bus route.
-		if playback_position <= 0.001 and elapsed_wall < 0.9:
+		if playback_position <= 0.001 and startup_age < 0.35:
 			continue
 		voice_window_remaining[index] = maxf(0.0, voice_window_remaining[index] - delta)
-		if voice_window_remaining[index] <= 0.0 or not voice.playing or elapsed_wall >= 0.9:
+		if voice_window_remaining[index] <= 0.0 or not voice.playing:
 			voices[index].stop()
 			_release_voice(index)
 
