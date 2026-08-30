@@ -116,6 +116,7 @@ var _victory_fixture_hold_generation := -1
 var complete_run_ledger: CompleteRunLedger
 var _profile_physics_samples_ms: Array[float] = []
 var _profile_advance_generation := 0
+var _profile_process_frame_start := 0
 var validation_profile_matrix_samples: Array[Dictionary] = []
 var density_matrix_contract_checks: Dictionary = {}
 var _active_pickups: Dictionary = {}
@@ -1503,6 +1504,8 @@ func _prepare_final_profile() -> void:
 	var encounter := spawner.get_snapshot()
 	get_tree().paused = true
 	var renderer_receipt := _profile_renderer_receipt()
+	var prepare_process_frame := Engine.get_process_frames()
+	var cycle_provenance := {"branch_id":"final_wave_bellkeeper_profile", "run_serial":run_serial, "setup_generation":_validation_setup_generation, "phase":"prepare"}
 	validation_profile_receipt = {
 		"accepted":bool(preparation.get("accepted",false)) and is_instance_valid(boss),
 		"status":DenseWaveProfileClass.renderer_status(String(renderer_receipt.get("classification", "unknown")), bool(renderer_receipt.get("hardware_qualification_eligible", false))),
@@ -1532,6 +1535,8 @@ func _prepare_final_profile() -> void:
 		"qualification_mode":DenseWaveProfileClass.QUALIFICATION_MODE,
 		"qualification_contract":DenseWaveProfileClass.qualification_contract(),
 		"renderer_gate_status":DenseWaveProfileClass.renderer_status(String(renderer_receipt.get("classification", "unknown")), bool(renderer_receipt.get("hardware_qualification_eligible", false))),
+		"preflight":DenseWaveProfileClass.preflight(renderer_receipt, _profile_viewport_receipt(), prepare_process_frame, Engine.get_process_frames(), 0, 0, "prepare", cycle_provenance, {"required":true,"pending":true}),
+		"cycle_provenance":cycle_provenance,
 		"requested_profile":"representative_final_wave_and_bellkeeper",
 		"resolved_profile":"prepared_paused",
 		"preparation_paused":get_tree().paused,
@@ -1555,6 +1560,7 @@ func _advance_final_profile() -> void:
 	_profile_active = true
 	_profile_origin = "diagnostic_prepared"
 	_profile_advance_generation += 1
+	_profile_process_frame_start = Engine.get_process_frames()
 	_profile_start_counts = _profile_counts()
 	_profile_start_lifecycle = _lifecycle_counters()
 	var cohort := spawner.begin_validation_profile_cohort(32, int(validation_profile_receipt.get("setup_generation", 0)))
@@ -1584,6 +1590,8 @@ func _advance_final_profile() -> void:
 		"initial_observation":initial_observation,
 		"work_caps":_dense_work_caps(spawner.get_snapshot()),
 		"workload_start":_profile_workload_receipt(spawner.get_snapshot()),
+		"cycle_provenance":{"branch_id":validation_profile_receipt.get("branch_id", "final_wave_bellkeeper_profile"), "run_serial":run_serial, "setup_generation":validation_profile_receipt.get("setup_generation", 0), "advance_generation":_profile_advance_generation, "phase":"advance"},
+		"preflight":DenseWaveProfileClass.preflight(_profile_renderer_receipt(), _profile_viewport_receipt(), _profile_process_frame_start, _profile_process_frame_start, 0, 0, "advance_start", {"branch_id":validation_profile_receipt.get("branch_id", ""), "run_serial":run_serial, "setup_generation":validation_profile_receipt.get("setup_generation", 0), "advance_generation":_profile_advance_generation}, {"required":true,"pending":true}),
 	}
 	get_tree().paused = false
 
@@ -1781,6 +1789,12 @@ func _advance_profile_sample(delta: float) -> void:
 			"physics_samples_nonzero":not sorted_physics.is_empty(),
 			"renderer_gate_applied_after_sampling":true,
 		},
+		"frame_execution":{
+			"process_frame_start":int(sample_start.get("process_frame_start", _profile_process_frame_start)),
+			"process_frame_end":Engine.get_process_frames(),
+			"process_frame_delta":maxi(0, Engine.get_process_frames() - int(sample_start.get("process_frame_start", _profile_process_frame_start))),
+			"frames_ran":Engine.get_process_frames() > int(sample_start.get("process_frame_start", _profile_process_frame_start)),
+		},
 		"timestamp_msec":Time.get_ticks_msec(),
 		"fps":{"p50":60000.0 / maxf(0.001, _percentile(sorted,0.50)), "p95":60000.0 / maxf(0.001, _percentile(sorted,0.95)), "worst":1000.0 / maxf(0.001, sorted.back() if not sorted.is_empty() else 0.0)},
 		"frame_ms":{"p50":_percentile(sorted,0.50),"p95":_percentile(sorted,0.95),"p99":_percentile(sorted,0.99),"worst":sorted.back() if not sorted.is_empty() else 0.0,"maximum":sorted.back() if not sorted.is_empty() else 0.0,"budget_ms":16.67,"over_budget_16_67_count":over_budget_count,"over_budget_ratio":float(over_budget_count) / float(sorted.size()) if not sorted.is_empty() else 0.0,"long_frame_33_33_count":long_frame_count},
@@ -1805,8 +1819,20 @@ func _advance_profile_sample(delta: float) -> void:
 		"workload_end":end_workload,
 		"subsystem_window":_profile_workload_window(sample_start.get("workload_start", {}), end_workload),
 		"observation_work":_profile_observation_work_receipt(),
+		"cycle_provenance":sample_start.get("cycle_provenance", {"branch_id":sample_branch, "run_serial":run_serial, "setup_generation":sample_setup_generation, "phase":"advance"}),
 		"route_qualification":_route_qualification(wave_director.get_snapshot()),
 	}
+	validation_profile_sample["preflight"] = DenseWaveProfileClass.preflight(
+		validation_profile_sample.get("renderer", {}) as Dictionary,
+		validation_profile_sample.get("viewport", {}) as Dictionary,
+		int((validation_profile_sample.get("frame_execution", {}) as Dictionary).get("process_frame_start", _profile_process_frame_start)),
+		int((validation_profile_sample.get("frame_execution", {}) as Dictionary).get("process_frame_end", Engine.get_process_frames())),
+		int(validation_profile_sample.get("sample_count", 0)),
+		int(validation_profile_sample.get("physics_sample_count", 0)),
+		"advance_complete",
+		validation_profile_sample.get("cycle_provenance", {}) as Dictionary,
+		{"required":true,"pending":false}
+	)
 	validation_profile_sample["qualification"] = _profile_qualification(validation_profile_sample)
 	var profile_renderer := validation_profile_sample.get("renderer", {}) as Dictionary
 	var profile_classification := String(profile_renderer.get("classification", "unknown"))
@@ -1927,6 +1953,9 @@ func _profile_reset_sample(source_sample: Dictionary, source_run_serial: int, ne
 		"maximum_enemy_workload":0,
 		"end_enemy_workload":0,
 		"sample_count":0,
+		"physics_sample_count":0,
+		"sample_availability":{"frames_ran":false,"frame_samples_nonzero":false,"physics_samples_nonzero":false,"samples_available":false,"renderer_gate_applied_after_sampling":true},
+		"frame_execution":{"process_frame_start":Engine.get_process_frames(),"process_frame_end":Engine.get_process_frames(),"process_frame_delta":0,"frames_ran":false},
 		"window_seconds":0.0,
 		"cohort":{"requested":0,"start":0,"minimum":0,"maximum":0,"end_live":0,"replenished":0,"active":false},
 		"frame_ms":{"p50":0.0,"p95":0.0,"p99":0.0,"worst":0.0},
@@ -1934,6 +1963,8 @@ func _profile_reset_sample(source_sample: Dictionary, source_run_serial: int, ne
 		"observation_work":{"sampled_frame_scene_scans":0,"sampled_frame_group_inventories":0,"sampled_frame_counter_read_count":0},
 		"qualification":{"qualified":false,"ordinary_route_qualified":false,"density_qualified":false,"reasons":["retired_by_profile_reset"]},
 		"reset_process_frame":Engine.get_process_frames(),
+		"cycle_provenance":{"branch_id":source_branch,"source_run_serial":source_run_serial,"run_serial":next_run_serial,"setup_generation":setup_generation,"phase":"reset"},
+		"preflight":DenseWaveProfileClass.preflight(_profile_renderer_receipt(), _profile_viewport_receipt(), Engine.get_process_frames(), Engine.get_process_frames(), 0, 0, "reset", {"branch_id":source_branch,"source_run_serial":source_run_serial,"run_serial":next_run_serial,"setup_generation":setup_generation,"phase":"reset"}, {"required":true,"pending":false}),
 	}
 
 func _capture_profile_next_frame_isolation(setup_generation: int, expected_run_serial: int) -> void:
@@ -2216,6 +2247,10 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 				"renderer":(entry.get("renderer", {}) as Dictionary).duplicate(true),
 				"frame_ms":(entry.get("frame_ms", {}) as Dictionary).duplicate(true),
 				"physics_ms":(entry.get("physics_ms", {}) as Dictionary).duplicate(true),
+				"physics_sample_count":entry.get("physics_sample_count", 0),
+				"sample_availability":(entry.get("sample_availability", {}) as Dictionary).duplicate(true),
+				"preflight":(entry.get("preflight", {}) as Dictionary).duplicate(true),
+				"cycle_provenance":(entry.get("cycle_provenance", {}) as Dictionary).duplicate(true),
 				"counts":(entry.get("end_counts", entry.get("counts", {})) as Dictionary).duplicate(true),
 			}
 		elif phase == "reset_next_frame" and not current.is_empty():
@@ -2227,7 +2262,7 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 				"native_renderer":gate == DenseWaveProfileClass.NATIVE_STATUS,
 				"renderer_gate_status":gate,
 				"density_boundary":int(current.get("requested_density", -1)) == DenseWaveProfileClass.TARGET_ENEMIES and int(current.get("resolved_density", -1)) == DenseWaveProfileClass.TARGET_ENEMIES,
-				"sample_available":int((current.get("sample", {}) as Dictionary).get("sample_count", 0)) > 0 and int((current.get("sample", {}) as Dictionary).get("physics_sample_count", 0)) > 0,
+				"sample_available":bool((( ((current.get("sample", {}) as Dictionary).get("preflight", {}) as Dictionary).get("sample_availability", {}) as Dictionary).get("samples_available", false))),
 				"reset_isolation":bool(reset.get("next_frame_isolation", false)) and String(reset.get("next_frame_input_context", "")) == "active",
 			}
 			current["complete"] = true
@@ -3286,6 +3321,9 @@ func _mcp_state() -> Dictionary:
 		"profile_frame_sample_count":validation_profile_sample.get("sample_count", 0),
 		"profile_physics_sample_count":validation_profile_sample.get("physics_sample_count", 0),
 		"profile_sample_availability":validation_profile_sample.get("sample_availability", {}),
+		"profile_frame_execution":validation_profile_sample.get("frame_execution", {}),
+		"profile_preflight":validation_profile_sample.get("preflight", validation_profile_receipt.get("preflight", {})),
+		"profile_cycle_provenance":validation_profile_sample.get("cycle_provenance", validation_profile_receipt.get("cycle_provenance", {})),
 		"profile_sampling_renderer_independent":validation_profile_sample.get("sampling_renderer_independent", true),
 		"profile_frame_duration_seconds":validation_profile_sample.get("window_seconds", 0.0),
 		"profile_frames_over_budget":profile_frame_ms.get("over_budget_16_67_count", 0),
@@ -3317,6 +3355,11 @@ func _mcp_state() -> Dictionary:
 			"next_frame":validation_profile_receipt.get("next_frame_input_context", "pending"),
 			"live":input_router.context,
 			"run_state":run_state,
+		},
+		"profile_reset_isolation":{
+			"immediate":validation_profile_receipt.get("reset_isolation", false),
+			"next_frame":validation_profile_receipt.get("next_frame_isolation", false),
+			"pending":validation_profile_receipt.get("next_frame_isolation_pending", false),
 		},
 		"ordinary_wave_ids":wave_state.get("ordinary_route_wave_ids", []),
 		"ordinary_diagnostic_jumps":wave_state.get("diagnostic_jump_count", 0),

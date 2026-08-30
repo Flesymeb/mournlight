@@ -203,7 +203,15 @@ func _decision_changes(source_changes: Variant) -> Array[Dictionary]:
 	return result
 
 func _is_placeholder_value(value) -> bool:
-	return value is String and String(value).strip_edges().to_upper() in PLACEHOLDER_VALUES
+	if not value is String:
+		return false
+	var normalized := String(value).strip_edges().to_upper()
+	if normalized in PLACEHOLDER_VALUES:
+		return true
+	# Catalogs from older builds occasionally decorated placeholders (for
+	# example, "LOCKED CURRENT" or "NEW WEAPON"). Treat those as unavailable
+	# display values too so they can never leak into a CURRENT/NEW comparison.
+	return normalized.contains("NEW") or normalized.contains("LOCKED") or normalized.contains("UNAVAILABLE")
 
 func _display_values_equal(current, next) -> bool:
 	if current == null or next == null:

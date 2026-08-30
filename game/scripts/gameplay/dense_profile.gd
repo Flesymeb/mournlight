@@ -24,6 +24,7 @@ const NATIVE_STATUS := "qualified"
 const SOFTWARE_STATUS := "rejected_software_renderer"
 const UNKNOWN_STATUS := "pending_native_renderer"
 const QUALIFICATION_MODE := "native_renderer_three_cycle"
+const PREFLIGHT_ID := "mournlight.native_dense_preflight.v1"
 
 static func contract() -> Dictionary:
 	return {
@@ -76,7 +77,46 @@ static func contract() -> Dictionary:
 		},
 		"ordinary_balance_untouched": true,
 		"sample_availability_policy": "record_nonzero_samples_when_frames_run; renderer_gate_does_not_suppress_measurement",
+		"preflight": {
+			"id": PREFLIGHT_ID,
+			"records_before_qualification": ["renderer", "hardware_eligibility", "frame_execution", "sample_availability", "cycle_provenance", "reset_isolation"],
+			"renderer_gate_order": "classify_before_sampling_gate_after_sampling",
+		},
 }
+
+static func preflight(renderer: Dictionary, viewport: Dictionary, process_frame_start: int, process_frame_end: int, frame_sample_count: int, physics_sample_count: int, phase: String, cycle_provenance: Dictionary = {}, reset_isolation: Dictionary = {}) -> Dictionary:
+	var frames_delta := maxi(0, process_frame_end - process_frame_start)
+	var frames_ran := frames_delta > 0
+	var frame_samples_nonzero := frame_sample_count > 0
+	var physics_samples_nonzero := physics_sample_count > 0
+	var classification := String(renderer.get("classification", "unknown"))
+	var hardware_eligible := bool(renderer.get("hardware_qualification_eligible", false))
+	return {
+		"id": PREFLIGHT_ID,
+		"phase": phase,
+		"renderer": renderer.duplicate(true),
+		"renderer_classification": classification,
+		"hardware_qualification_eligible": hardware_eligible,
+		"renderer_gate_status": renderer_status(classification, hardware_eligible),
+		"viewport": viewport.duplicate(true),
+		"frame_execution": {
+			"process_frame_start": process_frame_start,
+			"process_frame_end": process_frame_end,
+			"process_frame_delta": frames_delta,
+			"frames_ran": frames_ran,
+		},
+		"sample_availability": {
+			"frame_sample_count": frame_sample_count,
+			"physics_sample_count": physics_sample_count,
+			"frame_samples_nonzero": frame_samples_nonzero,
+			"physics_samples_nonzero": physics_samples_nonzero,
+			"samples_expected": frames_ran,
+			"samples_available": frame_samples_nonzero and physics_samples_nonzero,
+		},
+		"cycle_provenance": cycle_provenance.duplicate(true),
+		"reset_isolation": reset_isolation.duplicate(true),
+		"qualification_gate_deferred": true,
+	}
 
 static func work_buckets() -> Dictionary:
 	# Every non-authoritative dense subsystem gets a deterministic token lane.
