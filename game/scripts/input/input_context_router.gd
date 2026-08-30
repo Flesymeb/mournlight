@@ -18,6 +18,8 @@ var last_activation_receipt: Dictionary = {}
 var last_context_receipt: Dictionary = {}
 var last_press_receipt: Dictionary = {}
 var last_release_receipt: Dictionary = {}
+var reset_generation := 0
+var last_reset_receipt: Dictionary = {}
 var active_transactions: Dictionary = {}
 var completed_transactions: Array[Dictionary] = []
 var active_device := "keyboard"
@@ -107,10 +109,18 @@ func get_movement_vector() -> Vector2:
 	return movement_vector
 
 func clear_movement_latch(reason := "reset") -> void:
+	reset_generation += 1
 	for action in _movement_actions.keys():
 		_movement_actions[action] = false
 	movement_vector = Vector2.ZERO
-	last_receipt = {"phase":"movement_reset", "reason":reason, "process_frame":Engine.get_process_frames()}
+	last_reset_receipt = {
+		"phase":"movement_reset", "reason":reason,
+		"reset_generation":reset_generation,
+		"context":context, "context_generation":context_generation,
+		"active_transactions_preserved":active_transactions.size(),
+		"process_frame":Engine.get_process_frames(),
+	}
+	last_receipt = last_reset_receipt.duplicate(true)
 
 func _observe_device(event: InputEvent) -> void:
 	var next_device := active_device
@@ -352,6 +362,8 @@ func _mcp_state() -> Dictionary:
 		"last_context_receipt":last_context_receipt,
 		"last_press_receipt":last_press_receipt,
 		"last_release_receipt":last_release_receipt,
+		"reset_generation":reset_generation,
+		"last_reset_receipt":last_reset_receipt,
 		"active_transactions":active_transactions,
 		"completed_transactions":completed_transactions,
 		"active_device":active_device,

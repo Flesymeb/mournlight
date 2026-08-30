@@ -27,6 +27,9 @@ enum DashPhase { READY, ANTICIPATION, ACTIVE, RECOVERY, COOLDOWN }
 @export var planar_velocity := Vector3.ZERO
 @export var movement_input_source := "none"
 @export var locomotion_state := "idle"
+@export var camera_relative_direction := Vector3.ZERO
+@export var camera_forward := Vector3.FORWARD
+@export var camera_right := Vector3.RIGHT
 @export var dash_phase := "ready"
 @export var dash_cooldown_remaining := 0.0
 @export var dash_invulnerable := false
@@ -50,6 +53,8 @@ var _consumed_dash_generation := -1
 var dash_activation_generation := -1
 var dash_cycle_count := 0
 var dash_command_receipt: Dictionary = {}
+var reset_generation := 0
+var last_reset_receipt: Dictionary = {}
 var _base_model_position := Vector3.ZERO
 var _base_lantern_position := Vector3.ZERO
 var _base_presentation_scale := Vector3.ONE
@@ -146,17 +151,24 @@ func _read_movement_input() -> Vector2:
 
 func _camera_relative_direction(input_vector: Vector2) -> Vector3:
 	if input_vector.length_squared() <= 0.001:
+		camera_relative_direction = Vector3.ZERO
 		return Vector3.ZERO
 	var camera := get_viewport().get_camera_3d()
 	if not camera:
-		return Vector3(input_vector.x, 0.0, input_vector.y).normalized()
+		camera_forward = Vector3.FORWARD
+		camera_right = Vector3.RIGHT
+		camera_relative_direction = Vector3(input_vector.x, 0.0, input_vector.y).normalized()
+		return camera_relative_direction
 	var camera_right := camera.global_transform.basis.x
 	var camera_forward := -camera.global_transform.basis.z
 	camera_right.y = 0.0
 	camera_forward.y = 0.0
 	camera_right = camera_right.normalized()
 	camera_forward = camera_forward.normalized()
-	return (camera_right * input_vector.x + camera_forward * -input_vector.y).limit_length(1.0)
+	self.camera_right = camera_right
+	self.camera_forward = camera_forward
+	camera_relative_direction = (camera_right * input_vector.x + camera_forward * -input_vector.y).limit_length(1.0)
+	return camera_relative_direction
 
 func _update_dash_state(delta: float, desired_direction: Vector3) -> void:
 	if _dash_phase_id != DashPhase.READY:
@@ -364,6 +376,7 @@ func reset_for_run(spawn_position: Vector3, reset_owner := "run_reset") -> void:
 	planar_velocity = Vector3.ZERO
 	movement_input = Vector2.ZERO
 	movement_input_source = "none"
+	camera_relative_direction = Vector3.ZERO
 	locomotion_state = "idle"
 	_dash_direction = Vector3.FORWARD
 	_last_move_direction = Vector3.FORWARD
@@ -443,9 +456,25 @@ func _restore_and_reapply_hat_isolation(reason: String) -> void:
 	_resolve_and_apply_shipped_camera_hat_isolation("%s_reapplied" % reason)
 
 func reset_input_latch(reason := "input_latch_reset") -> void:
+	reset_generation += 1
 	clear_dash_ownership(reason)
 	movement_input = Vector2.ZERO
 	movement_input_source = "none"
+	# Input ownership resets are also locomotion barriers. Clearing only the
+	# sampled input would leave a ready motor carrying its previous velocity
+	# through pause, draft, death, or retry and produce a one-frame post-resume
+	# slide. Zero the authoritative body velocity at the same boundary.
+	velocity = Vector3.ZERO
+	planar_velocity = Vector3.ZERO
+	locomotion_state = "idle"
+	last_reset_receipt = {
+		"phase":"input_latch_reset", "reason":reason,
+		"reset_generation":reset_generation,
+		"dash_generation":dash_activation_generation,
+		"dash_phase":dash_phase, "invulnerable":dash_invulnerable,
+		"velocity":planar_velocity,
+		"process_frame":Engine.get_process_frames(),
+	}
 	var router := get_node_or_null("../../InputContextRouter")
 	if router and router.has_method("clear_movement_latch"):
 		router.clear_movement_latch(reason)
@@ -454,6 +483,9 @@ func get_movement_snapshot() -> Dictionary:
 	return {
 		"movement_input": movement_input,
 		"movement_input_source": movement_input_source,
+		"camera_relative_direction": camera_relative_direction,
+		"camera_forward": camera_forward,
+		"camera_right": camera_right,
 		"velocity": planar_velocity,
 		"locomotion_state": locomotion_state,
 		"dash_phase": dash_phase,
@@ -465,6 +497,9 @@ func get_movement_snapshot() -> Dictionary:
 func _mcp_state() -> Dictionary:
 	return {
 		"movement_input": movement_input,
+		"camera_relative_direction":camera_relative_direction,
+		"camera_forward":camera_forward,
+		"camera_right":camera_right,
 		"planar_velocity": planar_velocity,
 		"planar_speed": planar_velocity.length(),
 		"locomotion_state": locomotion_state,
@@ -476,6 +511,8 @@ func _mcp_state() -> Dictionary:
 		"consumed_dash_generation":_consumed_dash_generation,
 		"dash_cycle_count":dash_cycle_count,
 		"dash_command_receipt":dash_command_receipt,
+		"reset_generation":reset_generation,
+		"last_reset_receipt":last_reset_receipt,
 		"movement_speed": movement_speed,
 		"dash_speed": dash_speed,
 		"pickup_collection_radius":pickup_collection_radius,

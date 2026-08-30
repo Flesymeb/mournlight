@@ -1411,6 +1411,12 @@ func _terminal_reset_invariants(destination: String) -> Dictionary:
 		"planar_velocity":movement.get("velocity", Vector3.ZERO),
 		"dash_phase":movement.get("dash_phase", ""),
 		"dash_invulnerable":movement.get("invulnerable", false),
+		"input_reset": {
+			"router_generation":input_router.reset_generation,
+			"warden_generation":warden.reset_generation,
+			"router_receipt":input_router.last_reset_receipt.duplicate(true),
+			"warden_receipt":warden.last_reset_receipt.duplicate(true),
+		},
 		"animation":animation,
 		"victory_vfx":victory_vfx,
 		"terminal_audio_lease":audio_state.get("terminal_audio_lease", {}),
@@ -3057,6 +3063,16 @@ func _lifecycle_counters() -> Dictionary:
 		"effects":int(counts.get("effects", 0)),
 		"input_owner_count":input_router.active_transactions.size(),
 		"input_context":input_router.context,
+		"input_reset": {
+			"router_generation":input_router.reset_generation,
+			"router_receipt":input_router.last_reset_receipt.duplicate(true),
+			"warden_generation":warden.reset_generation,
+			"warden_receipt":warden.last_reset_receipt.duplicate(true),
+			"ownership_aligned": input_router.context in ["active", "boss"] or (
+				warden.dash_phase == "ready" and not warden.dash_invulnerable
+				and warden.movement_input.length_squared() <= 0.0001
+			),
+		},
 		"terminal_commit_count":terminal_commit_count,
 	}
 
