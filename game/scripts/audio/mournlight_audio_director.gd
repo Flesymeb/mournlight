@@ -12,6 +12,7 @@ var voice_owners: Array[String] = []
 var voice_priorities: Array[int] = []
 var voice_semantics: Array[String] = []
 var voice_window_remaining: Array[float] = []
+var voice_started_msec: Array[int] = []
 var semantic_counts: Dictionary = {}
 var attack_audio_events: Array[Dictionary] = []
 var _attack_audio_seen: Dictionary = {}
@@ -77,6 +78,7 @@ func _ready() -> void:
 		voice_priorities.append(0)
 		voice_semantics.append("")
 		voice_window_remaining.append(0.0)
+		voice_started_msec.append(0)
 		voice.finished.connect(_release_voice.bind(index))
 	call_deferred("_bind_events")
 
@@ -417,6 +419,7 @@ func play_semantic(id: String) -> bool:
 		start_offset = float(semantic_offsets[cursor % semantic_offsets.size()])
 	voice_window_remaining[voice_index] = maxf(0.0, float(windows.get(id, 0.0)))
 	voice.play(start_offset)
+	voice_started_msec[voice_index] = Time.get_ticks_msec()
 	semantic_counts[id] = int(semantic_counts.get(id, 0)) + 1
 	return true
 
@@ -556,13 +559,22 @@ func _release_voice(index: int) -> void:
 	voice_priorities[index] = 0
 	voice_semantics[index] = ""
 	voice_window_remaining[index] = 0.0
+	voice_started_msec[index] = 0
 
 func _retire_expired_windows(delta: float) -> void:
 	for index in voices.size():
 		if voice_window_remaining[index] <= 0.0:
 			continue
+		var voice := voices[index]
+		# A deterministic game-time step can advance a large delta before the
+		# mixer renders its first frame. Let the decoder establish onset before
+		# retiring; keep a short wall-clock cap as the bounded fallback.
+		var playback_position := voice.get_playback_position() if voice.playing else 0.0
+		var elapsed_wall := float(Time.get_ticks_msec() - voice_started_msec[index]) / 1000.0 if voice_started_msec[index] > 0 else 0.0
+		if voice.playing and playback_position <= 0.001 and elapsed_wall < 0.9:
+			continue
 		voice_window_remaining[index] = maxf(0.0, voice_window_remaining[index] - delta)
-		if voice_window_remaining[index] <= 0.0:
+		if voice_window_remaining[index] <= 0.0 or not voice.playing or elapsed_wall >= 0.9:
 			voices[index].stop()
 			_release_voice(index)
 

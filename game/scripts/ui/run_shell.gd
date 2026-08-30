@@ -158,8 +158,9 @@ func _result_label(label_name: String, font_size: int, color: Color) -> Label:
 	label.add_theme_font_override("font", FONT_MEDIUM)
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
-	label.clip_text = true
-	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	label.clip_text = false
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.max_lines_visible = 2
 	return label
 
 func _notification(what: int) -> void:
@@ -225,34 +226,34 @@ func _layout_settings(center: Vector2, page_top: float) -> void:
 
 func _layout_result(center: Vector2, page_top: float) -> void:
 	var visible_cards := result_cards.filter(func(card: Panel) -> bool: return card.visible)
-	var card_width := 214.0
-	var gap := 16.0
+	var card_width := 300.0
+	var gap := 22.0
 	if not visible_cards.is_empty():
-		card_width = minf(card_width, maxf(132.0, (size.x - 64.0 - gap * float(visible_cards.size() - 1)) / float(visible_cards.size())))
+		card_width = minf(card_width, maxf(190.0, (size.x - 120.0 - gap * float(visible_cards.size() - 1)) / float(visible_cards.size())))
 	var total_width := visible_cards.size() * card_width + maxi(0,visible_cards.size()-1) * gap
 	for index in visible_cards.size():
 		var card: Panel = visible_cards[index]
 		card.position = Vector2(center.x-total_width*0.5+index*(card_width+gap),page_top+154)
-		card.size = Vector2(card_width,108)
+		card.size = Vector2(card_width,148)
 		var icon := card.get_node("WeaponIcon") as TextureRect
-		icon.position = Vector2(12,16); icon.size = Vector2(66,72)
+		icon.position = Vector2(16,20); icon.size = Vector2(82,92)
 		var name_label := card.get_node("WeaponName") as Label
-		name_label.position = Vector2(82,13); name_label.size = Vector2(124,36)
+		name_label.position = Vector2(108,18); name_label.size = Vector2(card_width-124.0,48)
 		var rank_label := card.get_node("WeaponRank") as Label
-		rank_label.position = Vector2(82,47); rank_label.size = Vector2(124,20)
+		rank_label.position = Vector2(108,72); rank_label.size = Vector2(card_width-124.0,22)
 		var value_label := card.get_node("WeaponValue") as Label
-		value_label.position = Vector2(82,68); value_label.size = Vector2(124,28)
-	var panel_width := minf(676.0, maxf(280.0, size.x - 64.0))
-	result_upgrade_panel.position = Vector2(center.x-panel_width*0.5,page_top+278)
-	result_upgrade_panel.size = Vector2(panel_width,92)
-	result_upgrade_icon.position = Vector2(18,13); result_upgrade_icon.size = Vector2(46,44)
-	result_upgrade_label.position = Vector2(78,8); result_upgrade_label.size = Vector2(maxf(120.0,panel_width-96.0),76)
+		value_label.position = Vector2(108,101); value_label.size = Vector2(card_width-124.0,34)
+	var panel_width := minf(920.0, maxf(420.0, size.x - 120.0))
+	result_upgrade_panel.position = Vector2(center.x-panel_width*0.5,page_top+322)
+	result_upgrade_panel.size = Vector2(panel_width,104)
+	result_upgrade_icon.position = Vector2(22,16); result_upgrade_icon.size = Vector2(56,56)
+	result_upgrade_label.position = Vector2(96,10); result_upgrade_label.size = Vector2(maxf(220.0,panel_width-118.0),84)
 	for index in buttons.size():
 		var button := buttons[index]
 		if button.visible:
-			var button_width := minf(360.0, maxf(220.0, size.x - 64.0))
-			button.position = Vector2(center.x-button_width*0.5,page_top+392+index*52)
-			button.size = Vector2(button_width,42)
+			var button_width := minf(480.0, maxf(300.0, size.x - 120.0))
+			button.position = Vector2(center.x-button_width*0.5,page_top+458+index*56)
+			button.size = Vector2(button_width,46)
 
 func set_mode(next_mode: String, next_summary: Dictionary = {}) -> void:
 	if next_mode in ["settings", "help", "credits"]:
@@ -375,22 +376,30 @@ func _bind_result_presentation() -> void:
 	result_upgrade_label.text = "SELECTED VIGIL\n%s" % _upgrade_summary(summary)
 
 func _apply_button_surface(button: Button, semantic_row: bool) -> void:
-	for surface in ["normal","hover","pressed"]:
+	for surface in ["normal","hover","pressed","focus","disabled"]:
 		button.remove_theme_stylebox_override(surface)
-	if not semantic_row:
-		return
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.015,0.022,0.05,0.34)
+	normal.bg_color = Color(0.015,0.022,0.05,0.56 if semantic_row else 0.72)
 	normal.border_width_bottom = 1
-	normal.border_color = Color(0.55,0.42,0.22,0.38)
-	normal.content_margin_left = 12.0; normal.content_margin_right = 8.0
+	normal.border_color = Color(0.55,0.42,0.22,0.48)
+	normal.content_margin_left = 16.0; normal.content_margin_right = 12.0
 	var hover := normal.duplicate() as StyleBoxFlat
 	hover.bg_color = Color(0.12,0.09,0.055,0.76)
 	hover.border_width_left = 3
 	hover.border_color = GOLD
+	var pressed := hover.duplicate() as StyleBoxFlat
+	pressed.bg_color = Color(0.20,0.13,0.055,0.92)
+	var focus := normal.duplicate() as StyleBoxFlat
+	focus.border_width_left = 3; focus.border_width_top = 1; focus.border_width_right = 1; focus.border_width_bottom = 1
+	focus.border_color = Color(0.42,0.96,0.86,0.95)
+	var disabled := normal.duplicate() as StyleBoxFlat
+	disabled.bg_color = Color(0.015,0.022,0.05,0.24)
+	disabled.border_color = Color(0.3,0.32,0.4,0.24)
 	button.add_theme_stylebox_override("normal",normal)
 	button.add_theme_stylebox_override("hover",hover)
-	button.add_theme_stylebox_override("pressed",hover)
+	button.add_theme_stylebox_override("pressed",pressed)
+	button.add_theme_stylebox_override("focus",focus)
+	button.add_theme_stylebox_override("disabled",disabled)
 
 func _result_card_style(index: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -480,6 +489,16 @@ func _draw() -> void:
 	draw_circle(seal+Vector2(-3,-2),21,Color("d4def6"))
 	draw_circle(seal+Vector2(8,-8),19,Color("101733"))
 	draw_line(Vector2(center.x-230,page_top+132),Vector2(center.x+230,page_top+132),BRASS,2,true)
+	var frame := Rect2(Vector2(42,42), size-Vector2(84,84))
+	draw_style_box(_page_frame_style(), frame)
+	draw_line(Vector2(frame.position.x, page_top+132), Vector2(frame.end.x, page_top+132), Color(0.67,0.50,0.25,0.34), 1.0, true)
+
+func _page_frame_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.008,0.012,0.035,0.20)
+	style.border_width_left = 1; style.border_width_top = 1; style.border_width_right = 1; style.border_width_bottom = 1
+	style.border_color = Color(0.50,0.42,0.30,0.32)
+	return style
 
 func _upgrade_summary(data: Dictionary) -> String:
 	var upgrades: Array = data.get("selected_upgrades",[])
