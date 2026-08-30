@@ -236,10 +236,30 @@ func _draw_weapon_cluster(origin: Vector2) -> void:
 		if not bool(weapon.get("equipped", false)):
 			continue
 		var center := origin + Vector2(42 + shown * 86, 38)
-		_draw_weapon_sigil(center, String(weapon.get("weapon_id", "")), int(weapon.get("rank", 1)))
+		var weapon_id := String(weapon.get("weapon_id", ""))
+		_draw_weapon_sigil(center, weapon_id, int(weapon.get("rank", 1)))
+		# Identity is intentionally compact: a recognizable sigil, a short name,
+		# and one defining attack-shape cue are enough to read the current build
+		# without turning the gameplay HUD into a stat table.
+		_draw_text(_weapon_short_name(weapon_id), center + Vector2(-38, 65), 9, INK, HORIZONTAL_ALIGNMENT_CENTER, 76)
+		_draw_text(_weapon_shape_cue(weapon_id), center + Vector2(-38, 78), 8, SILVER, HORIZONTAL_ALIGNMENT_CENTER, 76)
 		shown += 1
 	if shown == 0:
 		_draw_weapon_sigil(origin + Vector2(42, 38), "warden_lantern", 1)
+		_draw_text("LANTERN", origin + Vector2(4, 103), 9, INK, HORIZONTAL_ALIGNMENT_CENTER, 76)
+		_draw_text("FOCUSED", origin + Vector2(4, 116), 8, SILVER, HORIZONTAL_ALIGNMENT_CENTER, 76)
+
+func _weapon_short_name(weapon_id: String) -> String:
+	match weapon_id:
+		"gravespade": return "GRAVESPADE"
+		"wandering_wisps": return "WISPS"
+		_: return "LANTERN"
+
+func _weapon_shape_cue(weapon_id: String) -> String:
+	match weapon_id:
+		"gravespade": return "SWEEP"
+		"wandering_wisps": return "ORBIT"
+		_: return "FOCUSED"
 
 func _draw_dash_cluster(origin: Vector2) -> void:
 	var phase := String(snapshot.get("dash_phase", "ready"))

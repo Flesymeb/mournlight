@@ -13,6 +13,9 @@ var voice_priorities: Array[int] = []
 var voice_semantics: Array[String] = []
 var voice_window_remaining: Array[float] = []
 var semantic_counts: Dictionary = {}
+var attack_audio_events: Array[Dictionary] = []
+var _attack_audio_seen: Dictionary = {}
+var last_attack_audio_receipt: Dictionary = {}
 var rejected_counts: Dictionary = {}
 var missing_source_counts: Dictionary = {}
 var bounded_drop_counts: Dictionary = {}
@@ -105,10 +108,8 @@ func _bind_events() -> void:
 	controller.state_changed.connect(_on_state_changed)
 	var attack := controller.get_node_or_null("World/Warden/Weapons/AttackRuntime")
 	if attack:
-		attack.attack_authorized.connect(func(event: Dictionary) -> void:
-			play_semantic("weapon_" + String(event.get("weapon_id", "warden_lantern")) + "_onset"))
-		attack.hit_resolved.connect(func(event: Dictionary) -> void:
-			play_semantic("weapon_" + String(event.get("weapon_id", "warden_lantern")) + "_impact"))
+		attack.attack_authorized.connect(_on_attack_authorized)
+		attack.hit_resolved.connect(_on_attack_hit)
 	var health := controller.get_node_or_null("World/Warden/HealthComponent")
 	if health:
 		health.hurt.connect(func(_event: Dictionary) -> void: play_semantic("warden_hurt"))
@@ -133,6 +134,49 @@ func _bind_events() -> void:
 	if draft and draft.has_signal("choice_requested"):
 		draft.choice_requested.connect(func(_index: int) -> void: play_semantic("upgrade_confirm"))
 	_set_music("title")
+
+func _on_attack_authorized(event: Dictionary) -> void:
+	_emit_attack_audio(event, "onset")
+
+func _on_attack_hit(event: Dictionary) -> void:
+	_emit_attack_audio(event, "impact")
+
+func _emit_attack_audio(event: Dictionary, phase: String) -> bool:
+	# AttackRuntime is the sole authority for these reports.  Deduplicate by the
+	# stable transaction id and phase so presentation/VFX cannot replay a cue.
+	var attack_id := String(event.get("attack_id", ""))
+	if attack_id.is_empty():
+		return false
+	var event_key := "%s:%s" % [attack_id, phase]
+	if _attack_audio_seen.has(event_key):
+		return false
+	_attack_audio_seen[event_key] = true
+	var weapon_id := String(event.get("weapon_id", "warden_lantern"))
+	var semantic := "weapon_%s_%s" % [weapon_id, phase]
+	var started := play_semantic(semantic)
+	var source_paths: Array[String] = []
+	for stream in _streams_for(semantic):
+		if stream is AudioStream:
+			source_paths.append((stream as AudioStream).resource_path)
+	var receipt := {
+		"event_id": event_key,
+		"attack_id": attack_id,
+		"phase": phase,
+		"weapon_id": weapon_id,
+		"semantic": semantic,
+		"started": started,
+		"timestamp_msec": Time.get_ticks_msec(),
+		"process_frame": Engine.get_process_frames(),
+		"bus": "Effects",
+		"source_paths": source_paths,
+		"causal_owner": String(event.get("audio_owner", event.get("actor_id", "warden"))),
+		"bounded_window_seconds": float((library.get_meta("playback_windows", {}) as Dictionary).get(semantic, 0.0)) if library else 0.0,
+	}
+	attack_audio_events.append(receipt)
+	while attack_audio_events.size() > 24:
+		attack_audio_events.pop_front()
+	last_attack_audio_receipt = receipt.duplicate(true)
+	return started
 
 func _on_reward_collected(event: Dictionary) -> void:
 	pickup_audio_event_count += 1
@@ -520,6 +564,9 @@ func reset_for_run() -> void:
 		voices[index].stop()
 		_release_voice(index)
 	semantic_counts.clear()
+	_attack_audio_seen.clear()
+	attack_audio_events.clear()
+	last_attack_audio_receipt.clear()
 	rejected_counts.clear()
 	missing_source_counts.clear()
 	bounded_drop_counts.clear()
@@ -628,6 +675,10 @@ func _mcp_state() -> Dictionary:
 		"footstep_semantic_count":int(semantic_counts.get("footstep", 0)),
 		"pickup_semantic_count":int(semantic_counts.get("pickup", 0)),
 		"pickup_audio_event_count":pickup_audio_event_count,
+		"attack_audio_event_count":attack_audio_events.size(),
+		"attack_audio_events":attack_audio_events.duplicate(true),
+		"last_attack_audio_receipt":last_attack_audio_receipt.duplicate(true),
+		"attack_audio_dedup_keys":_attack_audio_seen.keys(),
 		"last_pickup_audio_receipt":last_pickup_audio_receipt,
 		"collector_localization_rule":"same_bus_control_silent_with_valid_route_requires_host_collector_or_driver_diagnosis",
 		"terminal_voice_bound":terminal_victory_voice != null,

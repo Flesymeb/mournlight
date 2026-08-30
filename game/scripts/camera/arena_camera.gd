@@ -5,6 +5,10 @@ extends Camera3D
 @export var arena_contract: CemeterySpatialContract
 @export var follow_height := 24.0
 @export var follow_distance := 22.0
+## Fixed three-quarter azimuth keeps the Warden out of the mausoleum's stair
+## silhouette while retaining a high-angle escape-lane read.  The rig still
+## follows the player; this is only the authored lateral offset of that rig.
+@export var follow_lateral := 7.5
 @export var follow_damping := 8.5
 @export var lead_distance := 2.4
 @export var lead_damping := 5.0
@@ -219,7 +223,7 @@ func _process(delta: float) -> void:
 	fov = normal_fov + dense_fov_boost * dense_fraction + obstruction_fov_boost * _obstruction_response_strength
 	var effective_height := follow_height + obstruction_height_boost * _obstruction_response_strength
 	var effective_distance := follow_distance - obstruction_distance_reduction * _obstruction_response_strength
-	var desired_position := framing_target + Vector3(0.0, effective_height, effective_distance)
+	var desired_position := framing_target + Vector3(follow_lateral, effective_height, effective_distance)
 	desired_position.x += _obstruction_bypass_sign * obstruction_lateral_bypass * _obstruction_response_strength
 	# Keep the shipped camera inside the intact authored world.  At the outer
 	# perimeter the follow offset can otherwise place the camera beyond the GLB
@@ -846,7 +850,7 @@ func _snap_to_target() -> void:
 	framing_target = target.global_position
 	_safe_frame_offset = Vector3.ZERO
 	_coverage_offset = Vector3.ZERO
-	global_position = framing_target + Vector3(0.0, follow_height, follow_distance)
+	global_position = framing_target + Vector3(follow_lateral, follow_height, follow_distance)
 	look_at(framing_target + Vector3(0.0, 0.65, 0.0), Vector3.UP)
 
 func _original_presentation_restored() -> bool:
@@ -916,6 +920,7 @@ func _mcp_state() -> Dictionary:
 		"movement_velocity": movement_velocity,
 		"follow_height": follow_height,
 		"follow_distance": follow_distance,
+		"follow_lateral": follow_lateral,
 		"occlusion_guard_active": occlusion_guard_active,
 		"direct_occluder_detection_active":_direct_detection_active,
 		"occluder_detection_source":_detection_source,

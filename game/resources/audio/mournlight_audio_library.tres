@@ -18,6 +18,8 @@
 [ext_resource type="AudioStream" path="res://ui/menus/maaack/addons/fps_menu_skin/audio/ui_back.wav" id="16_ui_back"]
 [ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/lantern_onset.mp3" id="17_lantern_onset"]
 [ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/lantern_impact.mp3" id="18_lantern_impact"]
+[ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/lantern_onset_compat.wav" id="25_lantern_onset_compat"]
+[ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/lantern_impact_compat.wav" id="26_lantern_impact_compat"]
 [ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/gravespade_onset.mp3" id="19_spade_onset"]
 [ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/gravespade_impact.mp3" id="20_spade_impact"]
 [ext_resource type="AudioStream" path="res://assets/audio_semantic/mournlight_weapons/wisps_onset.wav" id="21_wisps_onset"]
@@ -28,8 +30,8 @@
 [resource]
 resource_name = "Mournlight Semantic Audio Library"
 metadata/music = Array[AudioStream]([ExtResource("1_music")])
-metadata/weapon_warden_lantern_onset = Array[AudioStream]([ExtResource("17_lantern_onset")])
-metadata/weapon_warden_lantern_impact = Array[AudioStream]([ExtResource("18_lantern_impact")])
+metadata/weapon_warden_lantern_onset = Array[AudioStream]([ExtResource("25_lantern_onset_compat")])
+metadata/weapon_warden_lantern_impact = Array[AudioStream]([ExtResource("26_lantern_impact_compat")])
 metadata/weapon_gravespade_onset = Array[AudioStream]([ExtResource("19_spade_onset")])
 metadata/weapon_gravespade_impact = Array[AudioStream]([ExtResource("20_spade_impact")])
 metadata/weapon_wandering_wisps_onset = Array[AudioStream]([ExtResource("21_wisps_onset")])
@@ -40,7 +42,7 @@ metadata/impact = Array[AudioStream]([ExtResource("12_impact"), ExtResource("6_l
 metadata/warden_hurt = Array[AudioStream]([ExtResource("2_hurt")])
 metadata/footstep = Array[AudioStream]([ExtResource("23_footstep_stone")])
 metadata/playback_offsets = {"footstep":PackedFloat32Array(0.0)}
-metadata/playback_windows = {"footstep":0.28,"victory":1.5}
+metadata/playback_windows = {"footstep":0.28,"victory":1.5,"weapon_warden_lantern_onset":0.34,"weapon_warden_lantern_impact":0.48,"weapon_gravespade_onset":0.34,"weapon_gravespade_impact":0.48,"weapon_wandering_wisps_onset":0.34,"weapon_wandering_wisps_impact":0.48}
 metadata/dash = Array[AudioStream]([ExtResource("8_jump_a"), ExtResource("9_jump_b")])
 metadata/pickup = Array[AudioStream]([ExtResource("10_jump_c")])
 metadata/upgrade_open = Array[AudioStream]([ExtResource("14_ui_focus")])
