@@ -340,11 +340,9 @@ func _build_stat_row(change: Dictionary) -> Control:
 	# in a faux current-value cell.
 	var is_new := change.current == null
 	if is_new:
-		# A newly unlocked weapon has no prior numeric value, but the comparison
-		# still needs an explicit truthful marker.  An em dash communicates
-		# "not owned yet" without leaking NEW/LOCKED placeholder copy into the
-		# CURRENT column.
-		var empty_current := _value_label("—", false)
+		# A newly unlocked weapon has no prior numeric value.  Show the
+		# authoritative ownership state instead of an em-dash placeholder.
+		var empty_current := _value_label("UNOWNED", false)
 		empty_current.custom_minimum_size = Vector2(62, 0)
 		row.add_child(empty_current)
 	else:
@@ -371,7 +369,7 @@ func _value_label(value: String, result_value: bool) -> Label:
 	return label
 
 func _format_value(value, field: String) -> String:
-	if value == null: return "—"
+	if value == null: return "UNOWNED"
 	if value is String: return value
 	if field in ["count", "rank"]: return str(int(value))
 	if field in ["cooldown", "duration", "hit_interval", "dash_cooldown"]: return "%.2fs" % float(value)

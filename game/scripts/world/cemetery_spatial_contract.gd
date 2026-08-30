@@ -6,6 +6,7 @@ extends Node3D
 @export var minimum_player_safe_radius := 10.5
 @export var spawn_clearance := 0.6
 @export var native_map_scale := 1.95
+@export var authored_wrapper_scale_multiplier := 2.36
 
 @onready var ground_collision: StaticBody3D = $OuterDatum/GroundCollision
 @onready var north_boundary: StaticBody3D = $OuterDatum/NorthBoundary
@@ -38,7 +39,9 @@ func _ready() -> void:
 			# west-edge void.  Scaling the wrapper (rather than duplicating geometry
 			# or moving individual meshes) restores coherent external depth and keeps
 			# the map's streets/props/materials authoritative.
-			package_transform.scale = Vector3.ONE * 4.6
+			# Derive the wrapper from the authored datum scale so the visual package,
+			# perimeter and navigation remain one transform-space contract.
+			package_transform.scale = Vector3.ONE * maxf(1.0, native_map_scale * authored_wrapper_scale_multiplier)
 	_calibrate_authored_visibility()
 	# Run the bounded integration audit now that the intact GLB is instantiated.
 	# Several imported surfaces carry degenerate UVs; repairing those arrays on
@@ -441,6 +444,7 @@ func get_snapshot() -> Dictionary:
 			"native_export_rebased":is_instance_valid(package_root) and package_root.position.length() > 50.0,
 			"authoritative_instance":"AuthoredCemeteryPackage",
 			"datum_owner":"PackageTransform",
+			"scale_binding":"native_map_scale * authored_wrapper_scale_multiplier",
 		},
 		"anchor_ids":["PlayerSpawn","KeeperLanternPostAnchor","SmallMausoleumAnchor","CrackedMoonBellAnchor","TargetAnchorA","TargetAnchorB"],
 		# Landmark bodies use the camera-excluded layer 2; the Warden/enemy mask 7

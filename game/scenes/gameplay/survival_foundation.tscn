@@ -97,14 +97,14 @@ arena_contract = NodePath("../CemeteryGarden")
 near = 0.15
 far = 180.0
 arena_limit = Vector2(34.0, 32.0)
-normal_fov = 54.0
-follow_height = 16.0
-follow_distance = 8.0
-follow_lateral = 9.0
+normal_fov = 60.0
+follow_height = 28.0
+follow_distance = 22.0
+follow_lateral = 0.0
 # Keep the player and the central landmark in the same readable high-angle
 # composition.  The previous north-heavy bias pushed the sightline through the
 # mausoleum and left the Warden in its projected shadow on approach.
-framing_bias = Vector3(0.0, 0, 2.0)
+framing_bias = Vector3(0.0, 0, -4.0)
 arena_fill_limit = Vector2(33.0, 30.5)
 coverage_max_correction = 3.5
 coverage_threat_weight = 0.30

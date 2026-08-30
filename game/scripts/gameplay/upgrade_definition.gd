@@ -187,7 +187,7 @@ func _consequence_line(projection: Dictionary) -> String:
 
 func _format_value(value, field: String) -> String:
 	if value == null:
-		return "—"
+		return "UNOWNED"
 	if value is String:
 		return value
 	if field in ["count", "rank"]:
