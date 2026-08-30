@@ -181,7 +181,7 @@ shape = SubResource("KeeperPostShape")
 [node name="WarmLandmarkLight" type="OmniLight3D" parent="OuterDatum/KeeperLanternPostAnchor" unique_id=1551095271]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1, 0)
 light_color = Color(1, 0.53, 0.19, 1)
-light_energy = 3.2
+light_energy = 4.0
 shadow_enabled = true
 omni_range = 6.5
 
@@ -197,10 +197,26 @@ omni_range = 5.5
 [node name="RouteMoonFill" type="OmniLight3D" parent="OuterDatum" unique_id=1774219321]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.6, 6.8)
 light_color = Color(0.32, 0.48, 0.9, 1)
-light_energy = 1.05
+light_energy = 1.35
 light_specular = 0.2
 shadow_enabled = false
 omni_range = 10.0
+
+[node name="WestMoonRim" type="OmniLight3D" parent="OuterDatum" unique_id=1774219322]
+position = Vector3(-10.5, 4.8, 0.8)
+light_color = Color(0.22, 0.36, 0.78, 1)
+light_energy = 0.72
+light_specular = 0.1
+shadow_enabled = false
+omni_range = 13.0
+
+[node name="EastMoonRim" type="OmniLight3D" parent="OuterDatum" unique_id=1774219323]
+position = Vector3(10.8, 4.2, -1.6)
+light_color = Color(0.26, 0.42, 0.86, 1)
+light_energy = 0.62
+light_specular = 0.1
+shadow_enabled = false
+omni_range = 13.0
 
 [node name="CrackedMoonBellAnchor" type="Marker3D" parent="OuterDatum" unique_id=855017616 groups=["landmark_anchor"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.9, 0, -2.6)
