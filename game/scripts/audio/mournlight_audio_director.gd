@@ -7,6 +7,10 @@ var music: AudioStreamPlayer
 var voices: Array[AudioStreamPlayer] = []
 var movement_voices: Array[AudioStreamPlayer] = []
 var terminal_victory_voice: AudioStreamPlayer
+var lantern_onset_voice: AudioStreamPlayer
+var lantern_impact_voice: AudioStreamPlayer
+var lantern_onset_window_remaining := 0.0
+var lantern_impact_window_remaining := 0.0
 var movement_window_remaining: Array[float] = []
 var voice_owners: Array[String] = []
 var voice_priorities: Array[int] = []
@@ -59,6 +63,17 @@ func _ready() -> void:
 		terminal_victory_voice.max_polyphony = 1
 		terminal_voice_declared_source_path = terminal_victory_voice.stream.resource_path if terminal_victory_voice.stream else ""
 		terminal_victory_voice.finished.connect(_on_terminal_victory_finished)
+	# Lantern attack feedback has a dedicated pair of scene-bound voices.  The
+	# generic semantic pool remains the owner for every other cue, but these two
+	# voices are intentionally isolated so warnings/death/pickup traffic cannot
+	# overwrite a legal onset or impact before its bounded envelope is heard.
+	lantern_onset_voice = get_node_or_null("LanternOnsetVoice") as AudioStreamPlayer
+	lantern_impact_voice = get_node_or_null("LanternImpactVoice") as AudioStreamPlayer
+	for attack_voice in [lantern_onset_voice, lantern_impact_voice]:
+		if attack_voice:
+			attack_voice.bus = &"Effects"
+			attack_voice.max_polyphony = 1
+			attack_voice.stop()
 	for child_name in [&"FootstepVoiceA", &"FootstepVoiceB"]:
 		var movement_voice := get_node_or_null(NodePath(child_name)) as AudioStreamPlayer
 		if movement_voice:
@@ -121,6 +136,7 @@ func _ensure_attack_semantic_bindings() -> void:
 func _process(delta: float) -> void:
 	_retire_expired_movement_windows(delta)
 	_retire_expired_windows(delta)
+	_retire_expired_lantern_windows(delta)
 	_retire_expired_terminal_window(delta)
 	if get_tree().paused:
 		return
@@ -203,7 +219,7 @@ func _emit_attack_audio(event: Dictionary, phase: String) -> bool:
 	_attack_audio_seen[event_key] = true
 	var weapon_id := String(event.get("weapon_id", "warden_lantern"))
 	var semantic := "weapon_%s_%s" % [weapon_id, phase]
-	var started := play_semantic(semantic)
+	var started := _play_lantern_attack_voice(phase) if weapon_id == "warden_lantern" else play_semantic(semantic)
 	var source_paths: Array[String] = []
 	for stream in _streams_for(semantic):
 		if stream is AudioStream:
@@ -227,6 +243,39 @@ func _emit_attack_audio(event: Dictionary, phase: String) -> bool:
 		attack_audio_events.pop_front()
 	last_attack_audio_receipt = receipt.duplicate(true)
 	return started
+
+func _play_lantern_attack_voice(phase: String) -> bool:
+	var voice := lantern_onset_voice if phase == "onset" else lantern_impact_voice if phase == "impact" else null
+	if not voice:
+		return play_semantic("weapon_warden_lantern_%s" % phase)
+	var streams := _streams_for("weapon_warden_lantern_%s" % phase)
+	if streams.is_empty() or not streams[0] is AudioStream:
+		missing_source_counts["weapon_warden_lantern_%s" % phase] = int(missing_source_counts.get("weapon_warden_lantern_%s" % phase, 0)) + 1
+		return false
+	var semantic := "weapon_warden_lantern_%s" % phase
+	var volumes: Dictionary = library.get_meta("volumes_db", {}) if library else {}
+	var windows: Dictionary = library.get_meta("playback_windows", {}) if library else {}
+	voice.stop()
+	voice.stream = streams[0] as AudioStream
+	voice.volume_db = float(volumes.get(semantic, -12.0))
+	voice.pitch_scale = 1.0
+	voice.play(0.0)
+	semantic_counts[semantic] = int(semantic_counts.get(semantic, 0)) + 1
+	if phase == "onset":
+		lantern_onset_window_remaining = maxf(0.06, float(windows.get(semantic, 0.24)))
+	else:
+		lantern_impact_window_remaining = maxf(0.06, float(windows.get(semantic, 0.24)))
+	return true
+
+func _retire_expired_lantern_windows(delta: float) -> void:
+	if lantern_onset_window_remaining > 0.0:
+		lantern_onset_window_remaining = maxf(0.0, lantern_onset_window_remaining - delta)
+		if lantern_onset_window_remaining <= 0.0 and lantern_onset_voice:
+			lantern_onset_voice.stop()
+	if lantern_impact_window_remaining > 0.0:
+		lantern_impact_window_remaining = maxf(0.0, lantern_impact_window_remaining - delta)
+		if lantern_impact_window_remaining <= 0.0 and lantern_impact_voice:
+			lantern_impact_voice.stop()
 
 func _on_reward_collected(event: Dictionary) -> void:
 	pickup_audio_event_count += 1
@@ -515,6 +564,10 @@ func _active_movement_voice_count() -> int:
 
 func active_effect_voice_count() -> int:
 	var active := _active_movement_voice_count()
+	if lantern_onset_voice and lantern_onset_voice.playing:
+		active += 1
+	if lantern_impact_voice and lantern_impact_voice.playing:
+		active += 1
 	if terminal_victory_voice and terminal_victory_voice.playing:
 		active += 1
 	for voice in voices:
@@ -624,6 +677,12 @@ func _retire_movement_owner(reason: String) -> int:
 
 func reset_for_run() -> void:
 	_retire_terminal_victory("run_reset")
+	if lantern_onset_voice:
+		lantern_onset_voice.stop()
+	if lantern_impact_voice:
+		lantern_impact_voice.stop()
+	lantern_onset_window_remaining = 0.0
+	lantern_impact_window_remaining = 0.0
 	for index in movement_voices.size():
 		_retire_movement_voice(index, "run_reset")
 	for index in voices.size():
@@ -662,6 +721,14 @@ func retire_run_ownership(route: String, generation: int) -> Dictionary:
 	var owners_before: Array[String] = []
 	var movement_before := _active_movement_voice_count()
 	var terminal_voice_before := terminal_victory_voice != null and terminal_victory_voice.playing
+	var lantern_before := int(lantern_onset_voice != null and lantern_onset_voice.playing) + int(lantern_impact_voice != null and lantern_impact_voice.playing)
+	if lantern_onset_voice:
+		lantern_onset_voice.stop()
+	if lantern_impact_voice:
+		lantern_impact_voice.stop()
+	lantern_onset_window_remaining = 0.0
+	lantern_impact_window_remaining = 0.0
+	stopped_effects += lantern_before
 	if movement_before > 0:
 		owners_before.append("movement")
 		stopped_effects += _retire_movement_owner("route_%s" % route)
@@ -687,10 +754,17 @@ func retire_run_ownership(route: String, generation: int) -> Dictionary:
 		terminal_audio_owner = ""
 		terminal_audio_semantic = ""
 		terminal_audio_reset_generation += 1
-	return {"route":route, "generation":generation, "stopped_effects":stopped_effects, "owners_before":owners_before, "movement_before":movement_before, "terminal_voice_before":terminal_voice_before, "active_effect_voices":active_effect_voice_count(), "active_movement_voices":_active_movement_voice_count(), "music_state":music_state, "music_playing":music.playing, "released_terminal":released_terminal, "terminal_preserved":preserve_terminal}
+	return {"route":route, "generation":generation, "stopped_effects":stopped_effects, "owners_before":owners_before, "movement_before":movement_before, "terminal_voice_before":terminal_voice_before, "lantern_voices_before":lantern_before, "active_effect_voices":active_effect_voice_count(), "active_movement_voices":_active_movement_voice_count(), "music_state":music_state, "music_playing":music.playing, "released_terminal":released_terminal, "terminal_preserved":preserve_terminal}
 
 func _mcp_state() -> Dictionary:
 	var playing := _active_movement_voice_count()
+	var lantern_active := 0
+	if lantern_onset_voice and lantern_onset_voice.playing:
+		playing += 1
+		lantern_active += 1
+	if lantern_impact_voice and lantern_impact_voice.playing:
+		playing += 1
+		lantern_active += 1
 	var active_by_owner: Dictionary = {}
 	if playing > 0:
 		active_by_owner["movement"] = playing
@@ -745,6 +819,12 @@ func _mcp_state() -> Dictionary:
 		"attack_audio_events":attack_audio_events.duplicate(true),
 		"last_attack_audio_receipt":last_attack_audio_receipt.duplicate(true),
 		"attack_audio_dedup_keys":_attack_audio_seen.keys(),
+		"lantern_attack_voice_bound":lantern_onset_voice != null and lantern_impact_voice != null,
+		"lantern_attack_active_voice_count":lantern_active,
+		"lantern_attack_voice_paths":{
+			"onset":String(lantern_onset_voice.get_path()) if lantern_onset_voice else "",
+			"impact":String(lantern_impact_voice.get_path()) if lantern_impact_voice else "",
+		},
 		"last_pickup_audio_receipt":last_pickup_audio_receipt,
 		"collector_localization_rule":"same_bus_control_silent_with_valid_route_requires_host_collector_or_driver_diagnosis",
 		"terminal_voice_bound":terminal_victory_voice != null,
