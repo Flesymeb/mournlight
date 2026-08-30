@@ -73,6 +73,10 @@ func _ready() -> void:
 	lantern_impact_voice = get_node_or_null("LanternImpactVoice") as AudioStreamPlayer
 	for attack_voice in [lantern_onset_voice, lantern_impact_voice]:
 		if attack_voice:
+			# Attack transients must survive the run controller's pause/freeze
+			# ownership long enough for the Effects mixer to emit their onset.
+			# Scene-bound voices are still retired by the bounded windows below.
+			attack_voice.process_mode = Node.PROCESS_MODE_ALWAYS
 			attack_voice.bus = &"Effects"
 			attack_voice.max_polyphony = 1
 			attack_voice.stop()

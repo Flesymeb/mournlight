@@ -473,7 +473,7 @@ func get_snapshot() -> Dictionary:
 			"warm_anchor":"OuterDatum/KeeperLanternPostAnchor/WarmLandmarkLight",
 			"cool_fills":["OuterDatum/RouteMoonFill","OuterDatum/WestMoonRim","OuterDatum/EastMoonRim","OuterDatum/SmallMausoleumAnchor/MausoleumMoonLift"],
 			"escape_lane_policy":"native_street_network_preserved",
-			"camera_profile":{"fov":60.0,"follow_height":21.0,"follow_distance":12.0,"follow_lateral":12.0,"framing_bias":Vector3(2.0,0.0,2.0)},
+			"camera_profile":{"fov":63.0,"follow_height":27.0,"follow_distance":18.0,"follow_lateral":11.0,"framing_bias":Vector3(0.0,0.0,-4.0)},
 			"proxy_geometry_count":0,
 		},
 		"external_world":{"source":"intact_authored_package_native_terrain_and_perimeter", "procedural_scenery":false, "primitive_meshes":0, "opaque":true, "non_playable_depth_beyond_all_edges":true},
