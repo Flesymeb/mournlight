@@ -31,8 +31,20 @@ func _ready() -> void:
 	if is_instance_valid(package_root):
 		var package_transform := package_root.get_parent() as Node3D
 		if is_instance_valid(package_transform):
-			package_transform.scale = Vector3.ONE * 3.2
+			# Keep the authored GLB as a single intact instance while giving its
+			# native perimeter enough visual depth beyond the gameplay datum.  The
+			# prior 3.2 wrapper left only a ~2 m strip outside the collision fence;
+			# at the shipped high-angle lens that strip collapsed into a hard black
+			# west-edge void.  Scaling the wrapper (rather than duplicating geometry
+			# or moving individual meshes) restores coherent external depth and keeps
+			# the map's streets/props/materials authoritative.
+			package_transform.scale = Vector3.ONE * 4.6
 	_calibrate_authored_visibility()
+	# Run the bounded integration audit now that the intact GLB is instantiated.
+	# Several imported surfaces carry degenerate UVs; repairing those arrays on
+	# candidate-owned mesh copies prevents black/flat shading without mutating the
+	# registered source asset or splitting the authored package.
+	_audit_visible_uv_bindings()
 	# Keep the imported cemetery package intact.  UV/tangent inspection remains
 	# an evidence concern, but no runtime child-mesh surgery is performed here.
 	uv_binding_receipt = {

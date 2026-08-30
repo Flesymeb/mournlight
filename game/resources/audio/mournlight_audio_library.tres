@@ -30,13 +30,17 @@
 [resource]
 resource_name = "Mournlight Semantic Audio Library"
 metadata/music = Array[AudioStream]([ExtResource("1_music")])
-metadata/weapon_warden_lantern_onset = Array[AudioStream]([ExtResource("17_lantern_onset")])
-metadata/weapon_warden_lantern_impact = Array[AudioStream]([ExtResource("18_lantern_impact")])
+# Bind the runtime-facing semantic stems to the deterministic PCM derivatives.
+# The retained MP3 recordings remain immutable and are documented by the
+# adjacent receipts; Godot's MP3 decoder was silent on the live Effects route,
+# while these exact-content encodes are proven audible at the same bus.
+metadata/weapon_warden_lantern_onset = Array[AudioStream]([ExtResource("25_lantern_onset_compat")])
+metadata/weapon_warden_lantern_impact = Array[AudioStream]([ExtResource("26_lantern_impact_compat")])
 # The compatibility encodes are retained as the bounded lantern family. The
 # anticipation/recovery aliases keep the causal chain audible without adding
 # an unrelated tone or replacing the accepted source recordings.
-metadata/weapon_warden_lantern_anticipation = Array[AudioStream]([ExtResource("17_lantern_onset")])
-metadata/weapon_warden_lantern_recovery = Array[AudioStream]([ExtResource("18_lantern_impact")])
+metadata/weapon_warden_lantern_anticipation = Array[AudioStream]([ExtResource("25_lantern_onset_compat")])
+metadata/weapon_warden_lantern_recovery = Array[AudioStream]([ExtResource("26_lantern_impact_compat")])
 metadata/weapon_gravespade_onset = Array[AudioStream]([ExtResource("19_spade_onset")])
 metadata/weapon_gravespade_impact = Array[AudioStream]([ExtResource("20_spade_impact")])
 metadata/weapon_wandering_wisps_onset = Array[AudioStream]([ExtResource("21_wisps_onset")])
@@ -69,7 +73,8 @@ metadata/volumes_db = {"boss_phase":-4.0,"dash":-10.0,"death":-3.0,"enemy_death"
 metadata/owner_limits = {"critical":3,"gravespade":2,"impacts":3,"lantern":4,"movement":2,"rewards":2,"ui":2,"warnings":2,"wisps":2}
 metadata/source_revision = "cobra-fps-feel-kit@f87f4f1695f2165e1458af6ebee2ae158e804184 + gd-dialog@reference-pool-current + cogito@03943d34d097 + ovani-sound/sound-fx-starter-pack-vol@43fa5caea139"
 metadata/source_license = "Pixabay Content License recordings; MIT source projects; CC0 footstep recording; Ovanisound proprietary royalty-free commercial-use license"
+metadata/lantern_runtime_derivative_receipts = {"onset":{"source_path":"res://assets/audio_semantic/mournlight_weapons/lantern_onset.mp3","source_sha256":"f50140522ea9701f73d1699836bfdf7b0cbd06fe868775c1592effaa75a0ce1e","derivative_path":"res://assets/audio_semantic/mournlight_weapons/lantern_onset_compat.wav","derivative_sha256":"471fa6a146d909cc7539b36d49f2bcdd4e07fd1dfc3258143f662245a0a4acbd","conversion":"ffmpeg -c:a pcm_s16le"},"impact":{"source_path":"res://assets/audio_semantic/mournlight_weapons/lantern_impact.mp3","source_sha256":"4980bb4a61597e4da7ff365872993cfdae068fd82e234c96739daa35e15743ee","derivative_path":"res://assets/audio_semantic/mournlight_weapons/lantern_impact_compat.wav","derivative_sha256":"4c8089f36dd18b3efbd1ba4278670845cb392b158d7bac737b74012263b12b9b","conversion":"ffmpeg -c:a pcm_s16le"}}
 # Explicit anticipation binding is kept as a first-class semantic entry.  The
 # lantern attack adapter requests this id before onset, so the authored source
 # must survive resource import rather than relying on a runtime alias.
-metadata/weapon_warden_lantern_anticipation = Array[AudioStream]([ExtResource("17_lantern_onset")])
+metadata/weapon_warden_lantern_anticipation = Array[AudioStream]([ExtResource("25_lantern_onset_compat")])
