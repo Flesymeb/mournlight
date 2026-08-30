@@ -313,7 +313,16 @@ func _allocate_role_variant(role_id: String, stable_id: StringName, generation: 
 func prepare_validation_density(target_live: int) -> Dictionary:
 	if not OS.has_feature("editor") or not active:
 		return {"accepted": false, "reason": "release_guard_or_inactive"}
-	var bounded_target := clampi(target_live, 1, live_cap)
+	# The final-wave diagnostic is allowed to request its authored 32 actors even
+	# if a stale phase callback left the ordinary live cap behind. Keep the
+	# override editor-only, pool-bounded, and scoped to Bellkeeper; production
+	# spawning remains governed by configure_pressure.
+	var admission_cap := live_cap
+	if String(_wave_id) == "bellkeeper" and target_live >= 32:
+		admission_cap = clampi(maxi(live_cap, target_live), 1, pool_size)
+		live_cap = admission_cap
+		_spawn_budget = maxi(_spawn_budget, target_live)
+	var bounded_target := clampi(target_live, 1, admission_cap)
 	if _active_count() > bounded_target:
 		_reconcile_to_cap(bounded_target, "validation_density_checkpoint")
 	var attempts := 0

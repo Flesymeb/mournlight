@@ -3,12 +3,12 @@ extends Camera3D
 
 @export var target: Node3D
 @export var arena_contract: CemeterySpatialContract
-@export var follow_height := 21.0
-@export var follow_distance := 12.0
+@export var follow_height := 16.0
+@export var follow_distance := 8.0
 ## Fixed three-quarter azimuth keeps the Warden out of the mausoleum's stair
 ## silhouette while retaining a high-angle escape-lane read.  The rig still
 ## follows the player; this is only the authored lateral offset of that rig.
-@export var follow_lateral := 12.0
+@export var follow_lateral := 9.0
 @export var follow_damping := 8.5
 @export var lead_distance := 2.4
 @export var lead_damping := 5.0
@@ -17,7 +17,7 @@ extends Camera3D
 # samples behind the landmark and under-reported shipped visibility.
 @export var framing_bias: Vector3 = Vector3(2.0, 0.0, 2.0)
 @export var arena_limit := Vector2(34.0, 32.0)
-@export var normal_fov := 60.0
+@export var normal_fov := 54.0
 @export var safe_frame_fraction := Vector2(0.08, 0.10)
 @export var safe_frame_activation_buffer := 0.04
 @export var safe_frame_correction_damping := 11.0
@@ -259,8 +259,11 @@ func _process(delta: float) -> void:
 	# not move or replace any imported geometry.
 	var landmark_anchor := get_node_or_null("../CemeteryGarden/OuterDatum/SmallMausoleumAnchor") as Node3D
 	if is_instance_valid(landmark_anchor):
-		effective_height += 6.0
-		effective_distance += 15.0
+		# Preserve the landmark silhouette while keeping the Warden readable at
+		# ordinary traversal distance. External depth comes from the intact map,
+		# not from pushing the shipped lens into a thumbnail view.
+		effective_height += 1.5
+		effective_distance += 3.0
 	var desired_position := framing_target + Vector3(follow_lateral, effective_height, effective_distance)
 	desired_position.x += _obstruction_bypass_sign * obstruction_lateral_bypass * _obstruction_response_strength
 	# Keep the shipped camera inside the intact authored world.  At the outer
@@ -287,7 +290,7 @@ func _process(delta: float) -> void:
 	# the lower safe band; no authored child transform is altered.
 	var look_height := 0.65
 	if is_instance_valid(get_node_or_null("../CemeteryGarden/OuterDatum/SmallMausoleumAnchor")):
-		look_height = 3.8
+		look_height = 2.6
 	look_at(framing_target + Vector3(0.0, look_height, 0.0), Vector3.UP)
 	var warden_after := _measure_projected_safe_frame()
 	var after: Dictionary
@@ -383,7 +386,9 @@ func _compose_arena_target(requested_target: Vector3, subjects: Array[Node3D]) -
 	if is_instance_valid(landmark):
 		var landmark_target := landmark.global_position
 		landmark_target.y = composed.y
-		composed = composed.lerp(landmark_target, 0.22)
+		# Give the Warden priority in the shipped frame; the landmark remains in
+		# the upper composition without becoming a camera-target attractor.
+		composed = composed.lerp(landmark_target, 0.10)
 	_coverage_obstructed_count = 0
 	_coverage_obstructing_path = ""
 	_coverage_obstructing_paths.clear()

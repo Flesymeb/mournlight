@@ -1525,6 +1525,11 @@ func _prepare_final_profile() -> void:
 	# from advancement, but every workload receipt now truthfully names the
 	# Bellkeeper wave it is qualifying.
 	wave_director.prepare_test_wave(4)
+	# Re-apply the resolved final-wave pressure immediately before admission so
+	# frozen diagnostic preparation cannot observe a stale ordinary live cap.
+	var final_definition: Dictionary = wave_director.get_snapshot().get("definition", {})
+	if String(final_definition.get("id", "")) == "bellkeeper":
+		spawner.configure_pressure(final_definition)
 	var attack_count_before := world.attack_runtime.authorized_count
 	var preparation := spawner.prepare_validation_density(32)
 	var frontline := spawner.prepare_validation_frontline(6)
@@ -3254,7 +3259,13 @@ func _prepare_validation_density_checkpoint(target_live: int) -> void:
 	experience_threshold = 9999
 	get_tree().paused = true
 	var build_receipt := inventory.prepare_legal_build("representative")
-	wave_director.prepare_test_wave(3)
+	# Bind the final Bellkeeper definition before density admission. This keeps
+	# the editor-only 32-enemy checkpoint from inheriting a stale ordinary cap.
+	var checkpoint_wave := 4 if target_live >= DenseWaveProfileClass.TARGET_ENEMIES else 3
+	wave_director.prepare_test_wave(checkpoint_wave)
+	var checkpoint_definition: Dictionary = wave_director.get_snapshot().get("definition", {})
+	if not checkpoint_definition.is_empty():
+		spawner.configure_pressure(checkpoint_definition)
 	_record_validation_density(target_live, build_receipt)
 
 func _record_validation_density(target_live: int, build_receipt: Dictionary = {}) -> void:
