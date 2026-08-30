@@ -118,7 +118,12 @@ func _observe_device(event: InputEvent) -> void:
 		next_device = "gamepad"
 	elif event is InputEventJoypadMotion and absf((event as InputEventJoypadMotion).axis_value) >= 0.35:
 		next_device = "gamepad"
-	elif event is InputEventKey or event is InputEventMouseButton or event is InputEventMouseMotion:
+	elif event is InputEventMouseButton or event is InputEventMouseMotion:
+		# Mouse is a first-class focus device for drafts and contextual guidance.
+		# Keeping it distinct from keyboard prevents pointer hover/click from
+		# reporting stale key glyphs or an incorrect focus-device snapshot.
+		next_device = "mouse"
+	elif event is InputEventKey:
 		next_device = "keyboard"
 	else:
 		return

@@ -10,6 +10,8 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 	var ledger_matrix: Dictionary = ledger_snapshot.get("matrix", {})
 	var ledger_current: Dictionary = ledger_snapshot.get("current_run", {})
 	var terminal: Dictionary = controller.terminal_snapshot if controller.terminal_snapshot is Dictionary else {}
+	var arena_camera := world.get_node_or_null("ArenaCamera") if world else null
+	var cemetery_contract := world.get_node_or_null("CemeteryGarden") if world else null
 	return {
 		"serial": int(controller.run_serial),
 		"state": String(controller.run_state),
@@ -67,6 +69,8 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 		"reward_feedback":controller._reward_feedback_snapshot(),
 		"warden_animation": warden.animation_binding.get_snapshot() if warden and warden.animation_binding else {},
 		"warden_movement": warden.get_movement_snapshot() if warden else {},
+		"camera_visibility": arena_camera._mcp_state() if arena_camera and arena_camera.has_method("_mcp_state") else {},
+		"arena_collision": cemetery_contract._mcp_state() if cemetery_contract and cemetery_contract.has_method("_mcp_state") else {},
 		"terminal_reset_invariants": controller._terminal_reset_invariants("snapshot"),
 		"upgrade_draft": controller.draft_controller.get_snapshot(),
 		"teardown_receipt": controller.teardown_receipt.duplicate(true),

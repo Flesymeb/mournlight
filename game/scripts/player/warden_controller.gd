@@ -363,6 +363,7 @@ func reset_for_run(spawn_position: Vector3, reset_owner := "run_reset") -> void:
 	velocity = Vector3.ZERO
 	planar_velocity = Vector3.ZERO
 	movement_input = Vector2.ZERO
+	movement_input_source = "none"
 	locomotion_state = "idle"
 	_dash_direction = Vector3.FORWARD
 	_last_move_direction = Vector3.FORWARD
@@ -444,6 +445,7 @@ func _restore_and_reapply_hat_isolation(reason: String) -> void:
 func reset_input_latch(reason := "input_latch_reset") -> void:
 	clear_dash_ownership(reason)
 	movement_input = Vector2.ZERO
+	movement_input_source = "none"
 	var router := get_node_or_null("../../InputContextRouter")
 	if router and router.has_method("clear_movement_latch"):
 		router.clear_movement_latch(reason)
@@ -451,11 +453,13 @@ func reset_input_latch(reason := "input_latch_reset") -> void:
 func get_movement_snapshot() -> Dictionary:
 	return {
 		"movement_input": movement_input,
+		"movement_input_source": movement_input_source,
 		"velocity": planar_velocity,
 		"locomotion_state": locomotion_state,
 		"dash_phase": dash_phase,
 		"cooldown_remaining": dash_cooldown_remaining,
 		"invulnerable": dash_invulnerable,
+		"facing_direction": _last_move_direction,
 	}
 
 func _mcp_state() -> Dictionary:
