@@ -23,6 +23,7 @@ var semantic_counts: Dictionary = {}
 var attack_audio_events: Array[Dictionary] = []
 var _attack_audio_seen: Dictionary = {}
 var last_attack_audio_receipt: Dictionary = {}
+var disabled_world_surface_impact_count := 0
 var rejected_counts: Dictionary = {}
 var missing_source_counts: Dictionary = {}
 var bounded_drop_counts: Dictionary = {}
@@ -242,7 +243,13 @@ func _emit_attack_audio(event: Dictionary, phase: String) -> bool:
 	var semantic := "weapon_%s_%s" % [weapon_id, phase]
 	if weapon_id == "warden_lantern" and phase == "impact":
 		semantic = _lantern_impact_semantic(event)
-	var started := _play_lantern_attack_voice(phase, semantic) if weapon_id == "warden_lantern" else play_semantic(semantic)
+	# World/terrain material tags are not authoritative in every imported map.
+	# Keep the transaction receipt, but deliberately suppress a generic ringing
+	# cue rather than misclassifying it as metal and polluting the Effects bus.
+	var world_surface_disabled := semantic == "weapon_warden_lantern_world_disabled"
+	if world_surface_disabled:
+		disabled_world_surface_impact_count += 1
+	var started := false if world_surface_disabled else (_play_lantern_attack_voice(phase, semantic) if weapon_id == "warden_lantern" else play_semantic(semantic))
 	var source_paths: Array[String] = []
 	for stream in _lantern_streams_for_phase(phase) if weapon_id == "warden_lantern" else _streams_for(semantic):
 		if stream is AudioStream:
@@ -259,6 +266,8 @@ func _emit_attack_audio(event: Dictionary, phase: String) -> bool:
 		"weapon_id": weapon_id,
 		"semantic": semantic,
 		"started": started,
+		"disabled": world_surface_disabled,
+		"disabled_reason": "unreliable_world_surface_material" if world_surface_disabled else "",
 		"timestamp_msec": Time.get_ticks_msec(),
 		"process_frame": Engine.get_process_frames(),
 		"bus": "Effects",
@@ -280,7 +289,7 @@ func _lantern_impact_semantic(event: Dictionary) -> String:
 	if material in ["metal", "stone", "armour", "armor", "bell"]:
 		return "weapon_warden_lantern_metal_hit"
 	if material in ["world", "ground", "terrain", "environment"]:
-		return "weapon_warden_lantern_metal_hit"
+		return "weapon_warden_lantern_world_disabled"
 	return "weapon_warden_lantern_character_hit"
 
 func _play_lantern_attack_voice(phase: String, semantic_override: String = "") -> bool:
@@ -916,6 +925,7 @@ func _mcp_state() -> Dictionary:
 		"pickup_semantic_count":int(semantic_counts.get("pickup", 0)),
 		"pickup_audio_event_count":pickup_audio_event_count,
 		"attack_audio_event_count":attack_audio_events.size(),
+		"disabled_world_surface_impact_count":disabled_world_surface_impact_count,
 		"attack_audio_events":attack_audio_events.duplicate(true),
 		"last_attack_audio_receipt":last_attack_audio_receipt.duplicate(true),
 		"attack_audio_dedup_keys":_attack_audio_seen.keys(),
