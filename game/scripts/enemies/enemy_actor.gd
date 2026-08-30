@@ -1,6 +1,8 @@
 class_name EnemyActor
 extends CharacterBody3D
 
+const DenseProfile := preload("res://scripts/gameplay/dense_profile.gd")
+
 signal lifecycle_event(event: Dictionary)
 signal defeated(actor: EnemyActor, event: Dictionary)
 signal drop_committed(event: Dictionary)
@@ -45,6 +47,7 @@ var _body_motion_steps_total := 0
 var _steering_query_skips := 0
 var _cached_separation := Vector3.ZERO
 var _steering_bucket := 0
+var _vitality_bucket := 0
 var _vitality_refresh_remaining := 0.0
 var _vitality_updates := 0
 var _vitality_skips := 0
@@ -78,12 +81,13 @@ func activate(next_profile: EnemyProfile, next_target: WardenController, at_posi
 	death_count = 0
 	_pool_return_pending = false
 	_flank_sign = -1.0 if (String(stable_id).hash() + generation) % 2 == 0 else 1.0
-	_facing_bucket = posmod(String(stable_id).hash() + generation, EnemySemanticPresenter.DENSE_APPROACH_ANIMATION_BUCKETS)
+	_facing_bucket = DenseProfile.bucket_for(stable_id, generation, EnemySemanticPresenter.DENSE_APPROACH_ANIMATION_BUCKETS)
 	_facing_updates = 0
 	_facing_skips = 0
 	_steering_query_skips = 0
 	_cached_separation = Vector3.ZERO
-	_steering_bucket = posmod(String(stable_id).hash() + generation, DENSE_STEERING_BUCKETS)
+	_steering_bucket = DenseProfile.bucket_for(stable_id, generation, DENSE_STEERING_BUCKETS)
+	_vitality_bucket = DenseProfile.bucket_for(stable_id, generation, DenseProfile.VITALITY_BUCKET_COUNT)
 	_vitality_refresh_remaining = 0.0
 	_vitality_updates = 0
 	_vitality_skips = 0
@@ -220,7 +224,7 @@ func _steer_approach(delta: float) -> void:
 		desired = (desired + Vector3(-desired.z, 0.0, desired.x) * _flank_sign * 0.62).normalized()
 	# Neighbor broad-phase queries are the dominant dense-wave CPU cost. Keep
 	# steering deterministic while staggering the expensive query across two
-	# stable actor buckets; the cached vector is blended into every frame's
+	# three stable actor buckets; the cached vector is blended into every frame's
 	# desired velocity so actors never stop or teleport between query ticks.
 	var separation := _cached_separation
 	var query_due := posmod(Engine.get_physics_frames(), DENSE_STEERING_BUCKETS) == _steering_bucket
@@ -434,9 +438,14 @@ func get_workload_counters() -> Dictionary:
 		"body_motion_steps":_body_motion_steps_total,
 		"steering_query_skips":_steering_query_skips,
 		"steering_query_bucket_count":DENSE_STEERING_BUCKETS,
+		"steering_bucket":_steering_bucket,
+		"neighbor_query_bucket":_steering_bucket,
+		"neighbor_query_bucket_count":DenseProfile.NEIGHBOR_QUERY_BUCKET_COUNT,
 		"explicit_space_queries":0,
 		"vitality_updates":_vitality_updates,
 		"vitality_skips":_vitality_skips,
 		"vitality_refresh_seconds":DENSE_VITALITY_REFRESH_SECONDS,
+		"vitality_bucket":_vitality_bucket,
+		"vitality_bucket_count":DenseProfile.VITALITY_BUCKET_COUNT,
 		"space_query_policy":"registry_neighbors_and_move_and_slide_only",
 	}

@@ -2662,6 +2662,7 @@ func _dense_work_caps(encounter: Dictionary) -> Dictionary:
 		"audio_effect_voices":int(audio_state.get("voice_limit", 0)),
 		"completed_attack_history":int(attack_state.get("history_limit", 0)),
 		"dense_presentation":(encounter.get("dense_presentation_budget", {}) as Dictionary).duplicate(true),
+		"shared_work_buckets":DenseWaveProfileClass.work_buckets(),
 		"secondary_visibility_compositor":camera_budget,
 		"steering_update_budget":{"bucket_count":DenseWaveProfileClass.STEERING_BUCKET_COUNT,"cached_separation":true,"query_policy":"staggered_deterministic_actor_buckets"},
 	}
@@ -2690,6 +2691,7 @@ func _profile_workload_receipt(encounter: Dictionary) -> Dictionary:
 		"steering":{"steps":actor_work.get("steering_steps", 0),"neighbor_queries":neighbor_work.get("total_queries", 0),"candidate_visits":neighbor_work.get("total_candidate_visits", 0)},
 		"physics":{"actor_steps":actor_work.get("physics_steps", 0),"body_motion_steps":actor_work.get("body_motion_steps", 0),"explicit_space_queries":actor_work.get("explicit_space_queries", 0)},
 		"presentation_updates":(encounter.get("dense_presentation_budget", {}) as Dictionary).duplicate(true),
+		"shared_work_buckets":DenseWaveProfileClass.work_buckets(),
 		"secondary_visibility_compositor":camera_budget,
 		"light_owners":{"active":light_budget.get("active", 0),"role":(light_budget.get("role", {}) as Dictionary).duplicate(true),"hurt":(light_budget.get("hurt", {}) as Dictionary).duplicate(true)},
 		"telegraph_admission":(encounter.get("telegraph_admission", {}) as Dictionary).duplicate(true),

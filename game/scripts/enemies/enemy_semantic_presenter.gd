@@ -1,6 +1,8 @@
 class_name EnemySemanticPresenter
 extends Node3D
 
+const DenseProfile := preload("res://scripts/gameplay/dense_profile.gd")
+
 const ROLE_DESCRIPTORS := {
 	"mossling": "mossling.myconid_guardians.v2",
 	"wispbat": "wispbat.gargoyle_lanterns.v2",
@@ -41,14 +43,14 @@ var motion_signature := "none"
 
 func configure(next_role_id: String, _accent: Color, stable_id: StringName, generation: int, allocated_variant_index: int = -1) -> void:
 	role_id = next_role_id
-	_animation_bucket = posmod(String(stable_id).hash() + generation, DENSE_APPROACH_ANIMATION_BUCKETS)
+	_animation_bucket = DenseProfile.bucket_for(stable_id, generation, DENSE_APPROACH_ANIMATION_BUCKETS)
 	binding_status = "binding"
 	binding_error = ""
 	_pending_animation_delta = 0.0
 	_presentation_updates = 0
 	_presentation_skips = 0
 	_priority_updates = 0
-	var variant_index := clampi(allocated_variant_index, 0, 1) if allocated_variant_index >= 0 else posmod(String(stable_id).hash() + generation * 17, 2)
+	var variant_index := clampi(allocated_variant_index, 0, 1) if allocated_variant_index >= 0 else DenseProfile.bucket_for(stable_id, generation * 17, 2)
 	motion_signature = "%s:%s" % [next_role_id, variant_index]
 	variant_id = "%s.variant_%s" % [ROLE_DESCRIPTORS.get(role_id, "unknown"), ["a", "b"][variant_index]]
 	_build_role(variant_index)

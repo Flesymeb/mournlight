@@ -13,6 +13,10 @@ const WINDOW_SECONDS := 4.0
 const SAMPLE_INTERVAL_SECONDS := 0.1
 const SAMPLE_HISTORY_CAP := 128
 const STEERING_BUCKET_COUNT := 3
+const NEIGHBOR_QUERY_BUCKET_COUNT := 3
+const VITALITY_BUCKET_COUNT := 4
+const LIGHT_BUCKET_COUNT := 8
+const OPTIONAL_EFFECT_BUCKET_COUNT := 5
 const PRESENTATION_UPDATE_BUDGET_SECONDS := 0.1
 const SECONDARY_COMPOSITOR_RESOLUTION_SCALE := 0.5
 const SECONDARY_COMPOSITOR_REFRESH_SECONDS := 0.12
@@ -47,6 +51,9 @@ static func contract() -> Dictionary:
 		"sample_interval_seconds": SAMPLE_INTERVAL_SECONDS,
 		"sample_history_cap": SAMPLE_HISTORY_CAP,
 		"dense_update_budget": {
+			"scheduler_version": "owner_snapshot_token_buckets.v1",
+			"shared_bucket_policy": "stable_id_hash_plus_spawn_generation",
+			"buckets": work_buckets(),
 			"steering_bucket_count": STEERING_BUCKET_COUNT,
 			"presentation_refresh_seconds": PRESENTATION_UPDATE_BUDGET_SECONDS,
 			"secondary_compositor_resolution_scale": SECONDARY_COMPOSITOR_RESOLUTION_SCALE,
@@ -69,7 +76,24 @@ static func contract() -> Dictionary:
 		},
 		"ordinary_balance_untouched": true,
 		"sample_availability_policy": "record_nonzero_samples_when_frames_run; renderer_gate_does_not_suppress_measurement",
+}
+
+static func work_buckets() -> Dictionary:
+	# Every non-authoritative dense subsystem gets a deterministic token lane.
+	# The lane is derived from stable actor ownership, so reset/replay produces
+	# the same work distribution without scanning the scene tree on sampled frames.
+	return {
+		"neighbor_queries": {"bucket_count": NEIGHBOR_QUERY_BUCKET_COUNT, "cadence_frames": 3, "authoritative": false},
+		"steering": {"bucket_count": STEERING_BUCKET_COUNT, "cadence_frames": 3, "authoritative": false},
+		"vitality": {"bucket_count": VITALITY_BUCKET_COUNT, "cadence_seconds": 0.05, "authoritative": false},
+		"presentation": {"bucket_count": STEERING_BUCKET_COUNT, "cadence_seconds": PRESENTATION_UPDATE_BUDGET_SECONDS, "authoritative": false},
+		"lights": {"bucket_count": LIGHT_BUCKET_COUNT, "cadence_seconds": 0.1, "authoritative": false},
+		"optional_effects": {"bucket_count": OPTIONAL_EFFECT_BUCKET_COUNT, "cadence_seconds": 0.12, "authoritative": false},
+		"authoritative_events": {"bucket_count": 1, "cadence_seconds": 0.0, "authoritative": true, "events": ["telegraph", "accepted_hit", "damage", "death", "drop", "pool_retirement"]},
 	}
+
+static func bucket_for(stable_id: StringName, generation: int, bucket_count: int) -> int:
+	return posmod(String(stable_id).hash() + generation, maxi(1, bucket_count))
 
 static func renderer_status(classification: String, hardware_eligible: bool) -> String:
 	# Renderer identity is an evidence gate, never a tuning override. Unknown
