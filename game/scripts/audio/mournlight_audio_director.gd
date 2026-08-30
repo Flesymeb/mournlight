@@ -206,6 +206,13 @@ func _on_attack_authorized(event: Dictionary) -> void:
 	_emit_attack_audio(event, "onset")
 
 func _on_attack_hit(event: Dictionary) -> void:
+	# Lantern attacks already emit their single bounded report at authorization.
+	# A second impact voice made one automatic shot read as two firearm reports
+	# (and could overlap the next cadence). Keep the impact phase in the attack
+	# timeline for causality, but do not replay an audible transient. Other
+	# weapon families retain their distinct onset/impact semantics.
+	if String(event.get("weapon_id", "")) == "warden_lantern":
+		return
 	_emit_attack_audio(event, "impact")
 
 func _on_attack_finished(event: Dictionary) -> void:

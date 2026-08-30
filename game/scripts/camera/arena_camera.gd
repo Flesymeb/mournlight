@@ -253,6 +253,14 @@ func _process(delta: float) -> void:
 	fov = normal_fov + dense_fov_boost * dense_fraction + obstruction_fov_boost * _obstruction_response_strength
 	var effective_height := follow_height + obstruction_height_boost * _obstruction_response_strength
 	var effective_distance := follow_distance - obstruction_distance_reduction * _obstruction_response_strength
+	# The authored mausoleum is a tall native landmark. Keep a little more
+	# breathing room in the shipped lens so its roof/door silhouette and the
+	# Warden remain readable together; this is an additive camera datum and does
+	# not move or replace any imported geometry.
+	var landmark_anchor := get_node_or_null("../CemeteryGarden/OuterDatum/SmallMausoleumAnchor") as Node3D
+	if is_instance_valid(landmark_anchor):
+		effective_height += 6.0
+		effective_distance += 15.0
 	var desired_position := framing_target + Vector3(follow_lateral, effective_height, effective_distance)
 	desired_position.x += _obstruction_bypass_sign * obstruction_lateral_bypass * _obstruction_response_strength
 	# Keep the shipped camera inside the intact authored world.  At the outer
@@ -274,7 +282,13 @@ func _process(delta: float) -> void:
 		desired_position.x = clampf(desired_position.x, visual_rect.position.x + camera_margin, visual_rect.end.x - camera_margin)
 		desired_position.z = clampf(desired_position.z, visual_rect.position.y + camera_margin, visual_rect.end.y - camera_margin)
 	global_position = global_position.lerp(desired_position, 1.0 - exp(-follow_damping * delta))
-	look_at(framing_target + Vector3(0.0, 0.65, 0.0), Vector3.UP)
+	# Aim slightly above the street datum when the native mausoleum is present.
+	# This keeps its tall doorway/roof in-frame while the Warden remains inside
+	# the lower safe band; no authored child transform is altered.
+	var look_height := 0.65
+	if is_instance_valid(get_node_or_null("../CemeteryGarden/OuterDatum/SmallMausoleumAnchor")):
+		look_height = 3.8
+	look_at(framing_target + Vector3(0.0, look_height, 0.0), Vector3.UP)
 	var warden_after := _measure_projected_safe_frame()
 	var after: Dictionary
 	if coverage_due:
@@ -360,6 +374,16 @@ func _compose_arena_target(requested_target: Vector3, subjects: Array[Node3D]) -
 		threat_center /= float(subjects.size() - 1)
 		threat_center.y = composed.y
 		composed = composed.lerp(threat_center, coverage_threat_weight)
+	# Keep the authored mausoleum landmark in the same readable band as the
+	# Warden during the critical route. The imported cemetery is intentionally
+	# one intact instance and its native Crypt bounds extend high above the
+	# street; a small datum-level focus bias avoids the old north-edge crop
+	# without tracking proxy geometry or moving any authored child mesh.
+	var landmark := get_node_or_null("../CemeteryGarden/OuterDatum/SmallMausoleumAnchor") as Node3D
+	if is_instance_valid(landmark):
+		var landmark_target := landmark.global_position
+		landmark_target.y = composed.y
+		composed = composed.lerp(landmark_target, 0.22)
 	_coverage_obstructed_count = 0
 	_coverage_obstructing_path = ""
 	_coverage_obstructing_paths.clear()
