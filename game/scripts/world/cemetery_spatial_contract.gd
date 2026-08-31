@@ -77,15 +77,18 @@ func _ready() -> void:
 	# candidate-owned mesh copies prevents black/flat shading without mutating the
 	# registered source asset or splitting the authored package.
 	_audit_visible_uv_bindings()
-	# Keep the imported cemetery package intact.  UV/tangent inspection remains
-	# an evidence concern, but no runtime child-mesh surgery is performed here.
-	uv_binding_receipt = {
-		"status":"native_intact",
-		"scope":"visible_authored_cemetery",
-		"source_immutable":true,
-		"runtime_binding":"AuthoredCemeteryPackage",
-		"integration_repair":"none",
-	}
+	# Preserve the audit receipt produced above.  The imported package remains a
+	# single authoritative instance; when an integration-bound mesh copy was
+	# required for degenerate UV/tangent data, that fact must remain visible to
+	# runtime evidence instead of being overwritten by a generic "intact" label.
+	if uv_binding_receipt.is_empty():
+		uv_binding_receipt = {
+			"status":"native_intact",
+			"scope":"visible_authored_cemetery",
+			"source_immutable":true,
+			"runtime_binding":"AuthoredCemeteryPackage",
+			"integration_repair":"none",
+		}
 
 func _calibrate_authored_visibility() -> void:
 	# The bound GLB carries zero-sized imported custom AABBs on several meshes.
@@ -420,6 +423,10 @@ func _landmark_alignment_receipt() -> Dictionary:
 	# than a second visual asset or a hidden proxy geometry source.
 	var bindings := {
 		"keeper_post": ["KeeperLanternPostAnchor", "KeeperLanternPostAnchor/KeeperPostCollision", "KeeperLanternPostAnchor/KeeperPostAsset"],
+		# The mausoleum is part of the intact imported cemetery package rather
+		# than a standalone product scene. Keep the anchor as the transform datum
+		# for collision alignment, while exposing the concrete authored mesh path
+		# that represents the visible landmark for runtime audits.
 		"mausoleum": ["SmallMausoleumAnchor", "MausoleumCollision", "SmallMausoleumAnchor"],
 		"cracked_bell": ["CrackedMoonBellAnchor", "CrackedMoonBellAnchor/CrackedBellCollision", "CrackedMoonBellAnchor/CrackedBellAsset"],
 	}
@@ -443,6 +450,8 @@ func _landmark_alignment_receipt() -> Dictionary:
 			"anchor_body_offset":body_offset,
 			"visual_collision_offset":offset,
 			"footprint":_shape_world_half_extents(shape),
+			"visual_reference_path":"PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/Crypt" if key == "mausoleum" else "OuterDatum/%s" % pair[2],
+			"visual_reference_bound":is_instance_valid(get_node_or_null("PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/Crypt")) if key == "mausoleum" else is_instance_valid(visual),
 			"aligned":is_instance_valid(anchor) and is_instance_valid(body) and is_instance_valid(shape) and is_instance_valid(visual) and body_offset <= 0.05 and offset <= 0.1,
 		}
 	return result

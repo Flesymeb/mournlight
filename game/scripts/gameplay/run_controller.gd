@@ -2473,12 +2473,18 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 				"sample_count":entry.get("sample_count", 0),
 				"window_seconds":entry.get("window_seconds", 0.0),
 				"renderer":(entry.get("renderer", {}) as Dictionary).duplicate(true),
+				"renderer_gate_status":entry.get("renderer_gate_status", DenseWaveProfileClass.UNKNOWN_STATUS),
+				"target_viewport":(entry.get("target_viewport", {}) as Dictionary).duplicate(true),
 				"frame_ms":(entry.get("frame_ms", {}) as Dictionary).duplicate(true),
 				"physics_ms":(entry.get("physics_ms", {}) as Dictionary).duplicate(true),
 				"physics_sample_count":entry.get("physics_sample_count", 0),
 				"sample_availability":(entry.get("sample_availability", {}) as Dictionary).duplicate(true),
 				"preflight":(entry.get("preflight", {}) as Dictionary).duplicate(true),
 				"cycle_provenance":(entry.get("cycle_provenance", {}) as Dictionary).duplicate(true),
+				"high_water_marks":(entry.get("high_water_marks", {}) as Dictionary).duplicate(true),
+				"lifecycle_deltas":(entry.get("lifecycle_deltas", {}) as Dictionary).duplicate(true),
+				"workload_window":(entry.get("subsystem_window", {}) as Dictionary).duplicate(true),
+				"coverage":(entry.get("coverage", {}) as Dictionary).duplicate(true),
 				"counts":(entry.get("end_counts", entry.get("counts", {})) as Dictionary).duplicate(true),
 			}
 		elif phase == "reset_next_frame" and not current.is_empty() and String(entry.get("cycle_id", "")) == String(current.get("cycle_id", "")):
@@ -2493,6 +2499,11 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 				"sample_available":bool((( ((current.get("sample", {}) as Dictionary).get("preflight", {}) as Dictionary).get("sample_availability", {}) as Dictionary).get("samples_available", false))),
 				"reset_isolation":bool(reset.get("next_frame_isolation", false)) and String(reset.get("next_frame_input_context", "")) == "active",
 			}
+			# Keep the cycle-level verdict self-contained so host aggregation does not
+			# have to reconstruct evidence from the raw phase records.
+			(current["qualification"] as Dictionary)["target_viewport"] = (current.get("sample", {}).get("target_viewport", {}) as Dictionary).duplicate(true)
+			(current["qualification"] as Dictionary)["high_water_marks_present"] = not (current.get("sample", {}).get("high_water_marks", {}) as Dictionary).is_empty()
+			(current["qualification"] as Dictionary)["lifecycle_deltas_present"] = not (current.get("sample", {}).get("lifecycle_deltas", {}) as Dictionary).is_empty()
 			current["complete"] = true
 			completed.append(current.duplicate(true))
 			current.clear()
