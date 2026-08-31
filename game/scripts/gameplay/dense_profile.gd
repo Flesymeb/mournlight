@@ -125,6 +125,7 @@ static func preflight(renderer: Dictionary, viewport: Dictionary, process_frame_
 			"physics_samples_nonzero": physics_samples_nonzero,
 			"samples_expected": frames_ran,
 			"samples_available": frame_samples_nonzero and physics_samples_nonzero,
+			"qualification_ready": frames_ran and frame_samples_nonzero and physics_samples_nonzero,
 		},
 		"renderer_gate_order": "classify_before_sampling_gate_after_sampling",
 		"renderer_gate_deferred_until_sampling_complete": true,

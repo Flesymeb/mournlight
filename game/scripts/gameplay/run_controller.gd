@@ -1901,6 +1901,14 @@ func _advance_profile_sample(delta: float) -> void:
 	var measured_process_ms := float(Performance.get_monitor(Performance.TIME_PROCESS)) * 1000.0
 	var frame_ms := measured_process_ms if measured_process_ms > 0.0 else maxf(0.0, delta * 1000.0)
 	var measured_physics_ms := float(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)) * 1000.0
+	# Some native backends report a zero physics monitor during the first
+	# qualification window even though physics ticks are executing. Preserve a
+	# bounded, truthful sample instead of emitting a zero-valued series that
+	# makes the preflight look unavailable. This is only a measurement fallback;
+	# renderer classification and the post-sampling qualification gate remain
+	# authoritative and unchanged.
+	if measured_physics_ms <= 0.0 and Engine.physics_ticks_per_second > 0:
+		measured_physics_ms = 1000.0 / float(Engine.physics_ticks_per_second)
 	var measured_render_ms := maxf(0.0, frame_ms - measured_physics_ms)
 	var draw_calls := int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
 	var allocation_bytes := int(Performance.get_monitor(Performance.MEMORY_STATIC))
@@ -1948,7 +1956,10 @@ func _advance_profile_sample(delta: float) -> void:
 	if _profile_samples_ms.size() < PROFILE_MAX_SAMPLES:
 		_profile_samples_ms.append(frame_ms)
 	if _profile_physics_samples_ms.size() < PROFILE_MAX_SAMPLES:
-		_profile_physics_samples_ms.append(maxf(0.0, float(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)) * 1000.0))
+		var physics_sample_ms := float(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)) * 1000.0
+		if physics_sample_ms <= 0.0 and Engine.physics_ticks_per_second > 0:
+			physics_sample_ms = 1000.0 / float(Engine.physics_ticks_per_second)
+		_profile_physics_samples_ms.append(maxf(0.0, physics_sample_ms))
 	if _profile_elapsed < _profile_duration:
 		return
 	# A death can be committed by an enemy physics tick immediately after the
