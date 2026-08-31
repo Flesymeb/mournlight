@@ -1524,8 +1524,68 @@ func _transition(next_state: String) -> void:
 	state_history.append(next_state)
 	state_changed.emit(previous, next_state)
 
+func _record_profile_control_rejection(requested_profile: String, reason: String) -> void:
+	# Keep tester controls auditable even when invoked before an ordinary run is
+	# active.  A rejected control must never mutate gameplay state or masquerade
+	# as a native qualification receipt.
+	var renderer_receipt := _profile_renderer_receipt()
+	var renderer_status := DenseWaveProfileClass.renderer_status(
+		String(renderer_receipt.get("classification", "unknown")),
+		bool(renderer_receipt.get("hardware_qualification_eligible", false))
+	)
+	var cycle_provenance := {
+		"identity": "mournlight.native_dense_three_cycle.v1",
+		"cycle_index": _dense_cycle_index,
+		"cycle_id": "",
+		"branch_id": "final_wave_bellkeeper_profile",
+		"run_serial": run_serial,
+		"setup_generation": _validation_setup_generation,
+		"advance_generation": _profile_advance_generation,
+		"phase": "control_rejected",
+	}
+	validation_profile_receipt = {
+		"contract_id": DenseWaveProfileClass.CONTRACT_ID,
+		"contract_version": DenseWaveProfileClass.CONTRACT_VERSION,
+		"contract_signature": DenseWaveProfileClass.CONTRACT_SIGNATURE,
+		"accepted": false,
+		"status": "rejected",
+		"requested_profile": requested_profile,
+		"resolved_profile": "control_rejected",
+		"rejection_reason": reason,
+		"run_state": run_state,
+		"run_serial": run_serial,
+		"setup_generation": _validation_setup_generation,
+		"requested_density": DenseWaveProfileClass.TARGET_ENEMIES,
+		"resolved_density": 0,
+		"target_density": DenseWaveProfileClass.TARGET_ENEMIES,
+		"target_viewport": {"width": 1920, "height": 1080},
+		"viewport": _profile_viewport_receipt(),
+		"renderer": renderer_receipt,
+		"renderer_gate_status": renderer_status,
+		"qualification_mode": DenseWaveProfileClass.QUALIFICATION_MODE,
+		"phase_sample_availability": {},
+		"cycle_provenance": cycle_provenance,
+		"preflight": DenseWaveProfileClass.preflight(
+			renderer_receipt,
+			_profile_viewport_receipt(),
+			Engine.get_process_frames(),
+			Engine.get_process_frames(),
+			0,
+			0,
+			"control_rejected",
+			cycle_provenance,
+			{"required": true, "pending": false}
+		),
+	}
+	validation_density_receipt = validation_profile_receipt.duplicate(true)
+	_record_profile_cycle("control_rejected", validation_profile_receipt)
+	_emit_snapshot()
+
 func _prepare_final_profile() -> void:
-	if not OS.has_feature("editor") or run_state not in ["active", "boss"]:
+	if not OS.has_feature("editor"):
+		return
+	if run_state not in ["active", "boss"]:
+		_record_profile_control_rejection("tester_dense_prepare", "ordinary_run_required:%s" % run_state)
 		return
 	_dense_cycle_index += 1
 	_profile_active = false
@@ -1624,7 +1684,12 @@ func _prepare_final_profile() -> void:
 	_emit_snapshot()
 
 func _advance_final_profile() -> void:
-	if not OS.has_feature("editor") or not bool(validation_profile_receipt.get("accepted",false)) or _profile_active:
+	if not OS.has_feature("editor"):
+		return
+	if _profile_active:
+		return
+	if not bool(validation_profile_receipt.get("accepted", false)):
+		_record_profile_control_rejection("tester_dense_advance", "accepted_prepare_required")
 		return
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
