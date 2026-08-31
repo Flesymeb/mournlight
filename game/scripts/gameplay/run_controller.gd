@@ -491,6 +491,7 @@ func _begin_terminal_title_handoff() -> void:
 	if _terminal_handoff_active:
 		return
 	_terminal_handoff_generation += 1
+	_terminal_handoff_active = true
 	_begin_shell_title_handoff("result", "confirm")
 	terminal_handoff_receipt = context_handoff_receipt.duplicate(true)
 

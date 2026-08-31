@@ -3,12 +3,12 @@ extends Camera3D
 
 @export var target: Node3D
 @export var arena_contract: CemeterySpatialContract
-@export var follow_height := 33.0
-@export var follow_distance := 23.0
+@export var follow_height := 27.0
+@export var follow_distance := 24.0
 ## Fixed three-quarter azimuth keeps the Warden out of the mausoleum's stair
 ## silhouette while retaining a high-angle escape-lane read.  The rig still
 ## follows the player; this is only the authored lateral offset of that rig.
-@export var follow_lateral := 15.0
+@export var follow_lateral := 5.0
 @export var follow_damping := 8.5
 @export var lead_distance := 2.4
 @export var lead_damping := 5.0
@@ -18,9 +18,9 @@ extends Camera3D
 # Aim slightly into the south escape lane so the mausoleum/bell stay in the
 # upper third while the Warden and nearby threats occupy the readable lower
 # safe lane. This is an authored target datum, not a landmark hide/fade.
-@export var framing_bias: Vector3 = Vector3(0.0, 0.0, 2.0)
+@export var framing_bias: Vector3 = Vector3(0.0, 0.0, 5.0)
 @export var arena_limit := Vector2(34.0, 32.0)
-@export var normal_fov := 68.0
+@export var normal_fov := 72.0
 @export var safe_frame_fraction := Vector2(0.08, 0.10)
 @export var safe_frame_activation_buffer := 0.04
 @export var safe_frame_correction_damping := 11.0
@@ -138,12 +138,16 @@ func _ready() -> void:
 	# instanced scene resources can retain serialized east-side values even after
 	# the product scene is edited; applying the release datum here keeps the live
 	# camera, player spawn, and authored landmark in the same transform contract.
-	follow_height = 31.0
-	follow_distance = 27.0
-	follow_lateral = -4.0
-	framing_bias = Vector3(0.0, 0.0, 4.0)
+	# Match the authored composition datum in CemeterySpatialContract.  This
+	# keeps the shipped player silhouette large enough to read while the native
+	# package, external depth, and escape lanes remain in frame.
+	follow_height = 27.0
+	follow_distance = 24.0
+	follow_lateral = 5.0
+	framing_bias = Vector3(0.0, 0.0, 5.0)
 	obstruction_lateral_bypass = 0.0
 	current = true
+	normal_fov = 72.0
 	fov = normal_fov
 	if target:
 		_normalize_occluder_bindings()
@@ -835,7 +839,7 @@ func _update_visibility_isolation(delta: float) -> void:
 		# Perimeter bodies constrain the player but sit between an exterior camera
 		# sample and the actor when the camera follows near an edge. Only authored
 		# landmark occluders participate in the fallback sight test.
-		query.collision_mask = 2
+		query.collision_mask = arena_contract.get_camera_visibility_collision_mask() if is_instance_valid(arena_contract) else 2
 		query.exclude = exclude
 		query.collide_with_areas = false
 		var hit := space_state.intersect_ray(query)

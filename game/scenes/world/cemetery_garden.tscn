@@ -205,7 +205,7 @@ omni_range = 10.0
 [node name="RouteWarmPool" type="OmniLight3D" parent="OuterDatum" unique_id=1774219324]
 position = Vector3(0, 2.8, 7.2)
 light_color = Color(1, 0.58, 0.22, 1)
-light_energy = 2.4
+light_energy = 3.2
 light_specular = 0.35
 shadow_enabled = false
 omni_range = 8.5
@@ -213,7 +213,7 @@ omni_range = 8.5
 [node name="SouthWarmPool" type="OmniLight3D" parent="OuterDatum" unique_id=1774219325]
 position = Vector3(-6.8, 2.2, 12.4)
 light_color = Color(1, 0.42, 0.16, 1)
-light_energy = 1.8
+light_energy = 2.5
 light_specular = 0.25
 shadow_enabled = false
 omni_range = 6.5

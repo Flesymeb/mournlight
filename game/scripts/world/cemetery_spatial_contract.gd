@@ -7,6 +7,11 @@ extends Node3D
 @export var spawn_clearance := 0.6
 @export var native_map_scale := 1.95
 @export var authored_wrapper_scale_multiplier := 2.36
+## Visibility probes intentionally use the perimeter/landmark layer only.  The
+## gameplay layer stays authoritative for Warden/enemy collision, while this
+## separate mask prevents GroundCollision and MausoleumCollision from becoming
+## false camera blockers.
+@export_flags_3d_physics var camera_visibility_collision_mask := 2
 
 @onready var ground_collision: StaticBody3D = $OuterDatum/GroundCollision
 @onready var north_boundary: StaticBody3D = $OuterDatum/NorthBoundary
@@ -493,7 +498,7 @@ func get_snapshot() -> Dictionary:
 		# on layer 2 for boundary probes. Warden/enemy masks include both layers,
 		# while camera coverage mask 1 audits the sight lane without treating the
 		# central building as a physics occluder.
-		"collision_layers":{"ground":4,"perimeter":2,"landmarks":4,"mausoleum_gameplay":4,"camera_query_excluded":2,"navigation":0},
+		"collision_layers":{"ground":4,"perimeter":2,"landmarks":4,"mausoleum_gameplay":4,"camera_query_excluded":camera_visibility_collision_mask,"navigation":0},
 		"navigation_region":{"path":"OuterDatum/NativeNavigationRegion","layers":1,"source":"native_authored_streets","enabled":is_instance_valid(get_node_or_null("OuterDatum/NativeNavigationRegion"))},
 		"playable_rect":playable,
 		"playable_area":playable.size.x * playable.size.y,
@@ -520,7 +525,7 @@ func get_snapshot() -> Dictionary:
 			"warm_anchor":"OuterDatum/KeeperLanternPostAnchor/WarmLandmarkLight",
 			"cool_fills":["OuterDatum/RouteMoonFill","OuterDatum/WestMoonRim","OuterDatum/EastMoonRim","OuterDatum/SmallMausoleumAnchor/MausoleumMoonLift"],
 			"escape_lane_policy":"native_street_network_preserved",
-			"camera_profile":{"fov":64.0,"follow_height":24.0,"follow_distance":19.0,"follow_lateral":5.0,"framing_bias":Vector3(0.0,0.0,1.5)},
+			"camera_profile":{"fov":72.0,"follow_height":27.0,"follow_distance":24.0,"follow_lateral":5.0,"framing_bias":Vector3(0.0,0.0,5.0),"visibility_collision_mask":camera_visibility_collision_mask},
 			"proxy_geometry_count":0,
 		},
 		"external_world":{"source":"intact_authored_package_native_terrain_and_perimeter", "procedural_scenery":false, "primitive_meshes":0, "opaque":true, "non_playable_depth_beyond_all_edges":true},
@@ -539,3 +544,6 @@ func get_snapshot() -> Dictionary:
 
 func _mcp_state() -> Dictionary:
 	return get_snapshot()
+
+func get_camera_visibility_collision_mask() -> int:
+	return camera_visibility_collision_mask

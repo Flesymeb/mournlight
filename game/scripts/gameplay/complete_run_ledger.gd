@@ -81,6 +81,12 @@ func record_boss(event: String, payload: Dictionary, elapsed: float, route_kind:
 	(current_run["milestones"] as Array).append(_milestone(event, elapsed, entry))
 
 func record_terminal(terminal: Dictionary, wave_snapshot: Dictionary) -> void:
+	# Terminal ownership is exactly-once even if a death/boss signal arrives on
+	# the same frame as a deferred presentation callback.  Keep the first
+	# authoritative snapshot and reject duplicate commits as diagnostics.
+	if not current_run.is_empty() and not (current_run.get("terminal", {}) as Dictionary).is_empty():
+		_record_diagnostic("terminal_commit_duplicate", float(terminal.get("elapsed", 0.0)), {"run_serial":terminal.get("commit_run_serial", -1),"commit_count":terminal.get("commit_count", 0)})
+		return
 	var route_kind := String(terminal.get("route_kind", ""))
 	var diagnostic_jumps := int(wave_snapshot.get("diagnostic_jump_count", 0))
 	if route_kind != "ordinary" or diagnostic_jumps != 0:
@@ -102,12 +108,23 @@ func record_terminal(terminal: Dictionary, wave_snapshot: Dictionary) -> void:
 	_append_completed_row()
 
 func record_result_presented(run_serial: int, outcome: String) -> void:
+	var row := _row_for_serial(run_serial)
+	if not row.is_empty() and bool(row.get("result_presented", false)):
+		# Presentation callbacks can be deferred across a terminal handoff; a
+		# second callback must not create a second milestone or alter the outcome.
+		return
 	_update_row(run_serial, "result_presented", true)
 	_update_row(run_serial, "result_outcome", outcome)
 	var terminal: Dictionary = current_run.get("terminal", {})
 	_append_row_milestone(run_serial, _milestone("result_presented", float(terminal.get("elapsed", 0.0)), {"outcome":outcome}))
 
 func record_exit(run_serial: int, exit_kind: String, elapsed: float) -> void:
+	var row := _row_for_serial(run_serial)
+	var observed_key := "%s_observed" % exit_kind
+	if not row.is_empty() and bool(row.get(observed_key, false)):
+		return
+	if int(current_run.get("run_serial", -1)) == run_serial and bool(current_run.get(observed_key, false)):
+		return
 	if exit_kind == "retry":
 		_update_row(run_serial, "retry_observed", true)
 	elif exit_kind == "title":
@@ -116,6 +133,13 @@ func record_exit(run_serial: int, exit_kind: String, elapsed: float) -> void:
 	if int(current_run.get("run_serial", -1)) == run_serial:
 		current_run["%s_observed" % exit_kind] = true
 		(current_run["milestones"] as Array).append(_milestone(exit_kind, elapsed, {"player_caused":true}))
+
+func _row_for_serial(run_serial: int) -> Dictionary:
+	for row_value in completed_rows:
+		var row: Dictionary = row_value
+		if int(row.get("run_serial", -1)) == run_serial:
+			return row
+	return {}
 
 func record_credits(run_serial: int, shell_mode: String) -> void:
 	var receipt := {

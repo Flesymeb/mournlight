@@ -35,7 +35,7 @@ ambient_light_color = Color(0.40, 0.45, 0.66, 1)
 ambient_light_energy = 1.18
 reflected_light_source = 2
 tonemap_mode = 2
-tonemap_exposure = 1.12
+tonemap_exposure = 1.24
 adjustment_enabled = true
 adjustment_brightness = 1.10
 adjustment_contrast = 1.06
@@ -72,14 +72,14 @@ directional_shadow_max_distance = 42.0
 [node name="ShadowLift" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-38, 148, 0)
 light_color = Color(0.36, 0.39, 0.55, 1)
-light_energy = 0.82
+light_energy = 0.94
 light_specular = 0.0
 shadow_enabled = false
 
 [node name="RouteWarmFill" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-52, -24, 0)
 light_color = Color(1, 0.68, 0.42, 1)
-light_energy = 0.74
+light_energy = 0.82
 light_specular = 0.0
 shadow_enabled = false
 
@@ -112,15 +112,15 @@ arena_limit = Vector2(34.0, 32.0)
 # Release framing keeps the Warden in the lower-safe lane while exposing the
 # native cross-route, perimeter depth, and both landmark silhouettes.
 normal_fov = 72.0
-follow_height = 31.0
-follow_distance = 27.0
+follow_height = 27.0
+follow_distance = 24.0
 # Keep the camera near the south sight lane. The authored crypt occupies the
 # north route; a centered lateral rebase preserves the intact package while
 # keeping the player silhouette, keeper post, bell, and escape lanes readable.
-follow_lateral = -4.0
+follow_lateral = 5.0
 # Keep the player in the lower-safe lane while the authored mausoleum and bell
 # sit above the route instead of filling the camera's center sight lane.
-framing_bias = Vector3(0.0, 0, 4.0)
+framing_bias = Vector3(0.0, 0, 5.0)
 arena_fill_limit = Vector2(33.0, 30.5)
 coverage_max_correction = 3.5
 coverage_threat_weight = 0.18
