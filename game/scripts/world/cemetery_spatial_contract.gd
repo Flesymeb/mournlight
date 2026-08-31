@@ -31,20 +31,20 @@ func _ready() -> void:
 	# default layer (1), which makes landmark/perimeter bodies invisible to the
 	# Warden mask and inconsistent with camera coverage metadata.
 	# All authored prop blockers use the environment layer so movement masks (7)
-	# still collide with them while camera-coverage probes on gameplay layer 1
+	# still collide with them while camera-coverage probes on landmark layer 2
 	# measure actor visibility rather than treating a low coffin/grave as a
 	# sightline occluder.
 	for prop in find_children("*", "StaticBody3D", true, false):
 		var authored_prop := prop as StaticBody3D
 		if is_instance_valid(authored_prop):
-			# Gameplay bodies use layer 4 so camera-coverage probes on the
-			# landmark/boundary layer 2 do not treat ordinary graves as opaque
+	# Gameplay bodies use layer 4 so camera-coverage probes on the
+	# landmark/boundary layer 2 do not treat ordinary graves as opaque
 			# sightline blockers. Warden/enemy masks include both layers.
 			authored_prop.collision_layer = 4
 			authored_prop.collision_mask = 1
 	for body in [north_boundary, south_boundary, east_boundary, west_boundary]:
 		if is_instance_valid(body):
-			body.collision_layer = 2
+			body.collision_layer = 4
 			body.collision_mask = 1
 	if is_instance_valid(ground_collision):
 		ground_collision.collision_layer = 4
@@ -494,11 +494,11 @@ func get_snapshot() -> Dictionary:
 			"scale_binding":"native_map_scale * authored_wrapper_scale_multiplier",
 		},
 		"anchor_ids":["PlayerSpawn","KeeperLanternPostAnchor","SmallMausoleumAnchor","CrackedMoonBellAnchor","TargetAnchorA","TargetAnchorB"],
-		# Landmark bodies use authored environment layer 2; perimeter bodies remain
-		# on layer 2 for boundary probes. Warden/enemy masks include both layers,
-		# while camera coverage mask 1 audits the sight lane without treating the
+		# Landmark and perimeter bodies use authored environment layer 4. Warden/
+		# enemy masks include this layer, while camera coverage mask 2 audits only
+		# explicit boundary markers without treating the gameplay shell as a
 		# central building as a physics occluder.
-		"collision_layers":{"ground":4,"perimeter":2,"landmarks":4,"mausoleum_gameplay":4,"camera_query_excluded":camera_visibility_collision_mask,"navigation":0},
+		"collision_layers":{"ground":4,"perimeter":4,"landmarks":4,"mausoleum_gameplay":4,"camera_query_excluded":camera_visibility_collision_mask,"navigation":0},
 		"navigation_region":{"path":"OuterDatum/NativeNavigationRegion","layers":1,"source":"native_authored_streets","enabled":is_instance_valid(get_node_or_null("OuterDatum/NativeNavigationRegion"))},
 		"playable_rect":playable,
 		"playable_area":playable.size.x * playable.size.y,
@@ -525,7 +525,7 @@ func get_snapshot() -> Dictionary:
 			"warm_anchor":"OuterDatum/KeeperLanternPostAnchor/WarmLandmarkLight",
 			"cool_fills":["OuterDatum/RouteMoonFill","OuterDatum/WestMoonRim","OuterDatum/EastMoonRim","OuterDatum/SmallMausoleumAnchor/MausoleumMoonLift"],
 			"escape_lane_policy":"native_street_network_preserved",
-			"camera_profile":{"fov":72.0,"follow_height":27.0,"follow_distance":24.0,"follow_lateral":5.0,"framing_bias":Vector3(0.0,0.0,5.0),"visibility_collision_mask":camera_visibility_collision_mask},
+			"camera_profile":{"fov":78.0,"follow_height":28.0,"follow_distance":26.0,"follow_lateral":12.0,"framing_bias":Vector3(0.0,0.0,5.0),"visibility_collision_mask":camera_visibility_collision_mask},
 			"proxy_geometry_count":0,
 		},
 		"external_world":{"source":"intact_authored_package_native_terrain_and_perimeter", "procedural_scenery":false, "primitive_meshes":0, "opaque":true, "non_playable_depth_beyond_all_edges":true},

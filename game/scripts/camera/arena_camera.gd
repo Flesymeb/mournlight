@@ -141,13 +141,13 @@ func _ready() -> void:
 	# Match the authored composition datum in CemeterySpatialContract.  This
 	# keeps the shipped player silhouette large enough to read while the native
 	# package, external depth, and escape lanes remain in frame.
-	follow_height = 22.0
-	follow_distance = 19.0
-	follow_lateral = 5.0
+	follow_height = 28.0
+	follow_distance = 26.0
+	follow_lateral = 12.0
 	framing_bias = Vector3(0.0, 0.0, 5.0)
 	obstruction_lateral_bypass = 0.0
 	current = true
-	normal_fov = 72.0
+	normal_fov = 78.0
 	fov = normal_fov
 	if target:
 		_normalize_occluder_bindings()
