@@ -61,6 +61,11 @@ func _emit_attack(target: Node3D, stats: Dictionary) -> void:
 		focused_bar.reveal_focus()
 	await get_tree().create_timer(0.11).timeout
 	if generation != _runtime_generation:
+		# A pause/retry/terminal teardown can invalidate an in-flight anticipation
+		# while its timer is still pending.  Retire the local emission latch as
+		# well as the authoritative ledger so a subsequent run cannot inherit a
+		# stale "anticipation" phase or remain blocked from automatic fire.
+		_abort_emission_for_generation_change()
 		return
 	if not is_instance_valid(target) or not target.is_inside_tree() or not target.is_legal_target():
 		attack_runtime.reject_attack(weapon_id, "target_invalid_during_anticipation", {"target_id": selected_target_id})
@@ -89,6 +94,7 @@ func _emit_attack(target: Node3D, stats: Dictionary) -> void:
 			_track_presentation(bolt)
 	await get_tree().create_timer(0.18 + TRAVEL_VARIANTS[presentation_variant]).timeout
 	if generation != _runtime_generation:
+		_abort_emission_for_generation_change()
 		return
 	attack_phase = "impact"
 	attack_runtime.record_phase(last_attack_id, "impact", {"target_id": selected_target_id})
@@ -97,6 +103,7 @@ func _emit_attack(target: Node3D, stats: Dictionary) -> void:
 		resolved_hit_count += 1
 	await get_tree().create_timer(0.12).timeout
 	if generation != _runtime_generation:
+		_abort_emission_for_generation_change()
 		return
 	attack_phase = "recovery"
 	attack_runtime.finish_attack(String(event.attack_id), "recovery")
@@ -164,6 +171,13 @@ func reset_runtime() -> void:
 	last_attack_id = ""
 	_emitting = false
 	set_physics_process(true)
+
+func _abort_emission_for_generation_change() -> void:
+	_emitting = false
+	attack_phase = "retired"
+	selected_target_id = ""
+	last_attack_id = ""
+	cooldown_remaining = 0.12
 
 func _mcp_state() -> Dictionary:
 	var stats := inventory.get_stats(weapon_id) if inventory else {}
