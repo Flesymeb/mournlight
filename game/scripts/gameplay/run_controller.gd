@@ -142,6 +142,7 @@ var _first_run_guidance_dismissed := false
 var _guidance_movement_observed := false
 var _guidance_dash_observed := false
 var _guidance_attack_observed := false
+var _guidance_progress_stage := 0
 var _guidance_attack_baseline := 0
 var _guidance_reset_generation := 0
 var _guidance_reset_receipt: Dictionary = {}
@@ -221,8 +222,10 @@ func _process(delta: float) -> void:
 		run_elapsed += delta
 		if not _guidance_movement_observed and warden.planar_velocity.length() > 0.45:
 			_guidance_movement_observed = true
+			_guidance_progress_stage = maxi(_guidance_progress_stage, 1)
 		if not _guidance_attack_observed and world.attack_runtime.authorized_count > _guidance_attack_baseline:
 			_guidance_attack_observed = true
+			_guidance_progress_stage = maxi(_guidance_progress_stage, 3)
 	_snapshot_clock -= delta
 	if _snapshot_clock <= 0.0:
 		_snapshot_clock = 0.1
@@ -383,6 +386,7 @@ func _begin_run() -> void:
 	_guidance_movement_observed = false
 	_guidance_dash_observed = false
 	_guidance_attack_observed = false
+	_guidance_progress_stage = 0
 	_guidance_attack_baseline = world.attack_runtime.authorized_count
 	if not _first_run_guidance_completed:
 		_first_run_guidance_dismissed = false
@@ -900,6 +904,7 @@ func _on_build_changed(_snapshot: Dictionary) -> void:
 func _on_dash_changed(_phase: String, _invulnerable: bool) -> void:
 	if _phase == "active":
 		_guidance_dash_observed = true
+		_guidance_progress_stage = maxi(_guidance_progress_stage, 2)
 	_emit_snapshot()
 
 func _on_logical_press_edge(action: StringName, activation: int, receipt: Dictionary) -> void:
@@ -3085,19 +3090,27 @@ func _first_run_guidance_snapshot() -> Dictionary:
 		prompt = "MOVE CLOSE; FALLEN WISPS ACCELERATE TOWARD YOUR LANTERN"
 		action_label = String(bindings.move)
 		icon = "wisp"
-	elif not _guidance_movement_observed:
+	elif _guidance_progress_stage < 1 and not _guidance_movement_observed:
 		stage = "movement"
-	elif not _guidance_dash_observed:
+	elif _guidance_progress_stage < 2 and not _guidance_dash_observed:
 		stage = "dash"
 		prompt = "DASH THROUGH PRESSURE; THE BRIEF FLASH MARKS SAFETY"
 		action_label = String(bindings.dash)
 		icon = "dash"
-	elif not _guidance_attack_observed:
+	elif _guidance_progress_stage < 3 and not _guidance_attack_observed:
 		stage = "automatic_attack"
 		prompt = "FACE THE THREAT; THE WARDEN LANTERN ATTACKS AUTOMATICALLY"
 		action_label = "NO FIRE BUTTON"
 		icon = "lantern"
-	return {"visible":not _first_run_guidance_dismissed,"stage":stage,"title":title,"prompt":prompt,"action_label":action_label,"icon":icon,"completed":false,"bindings":bindings,"inputmap_bound":true,"device":input_router.active_device,"device_generation":input_router.device_generation,"dismissal":"toggle_guidance_help_action","dismissed":_first_run_guidance_dismissed,"persists_across_retry_after_completion":true,"help_surface":"pause_controls_and_help","illustration":"res://assets/ui/guidance/first_run_gameplay.png","reset":_guidance_reset_receipt.duplicate(true)}
+	elif _guidance_progress_stage >= 3:
+		# Keep the last combat teaching cue visible until the first authored
+		# death-position drop appears.  A monotonic progress receipt must not
+		# fall back to the opening movement card between milestones.
+		stage = "automatic_attack"
+		prompt = "FACE THE THREAT; THE WARDEN LANTERN ATTACKS AUTOMATICALLY"
+		action_label = "NO FIRE BUTTON"
+		icon = "lantern"
+	return {"visible":not _first_run_guidance_dismissed,"stage":stage,"progress_stage":_guidance_progress_stage,"title":title,"prompt":prompt,"action_label":action_label,"icon":icon,"completed":false,"bindings":bindings,"inputmap_bound":true,"device":input_router.active_device,"device_generation":input_router.device_generation,"dismissal":"toggle_guidance_help_action","dismissed":_first_run_guidance_dismissed,"persists_across_retry_after_completion":true,"help_surface":"pause_controls_and_help","illustration":"res://assets/ui/guidance/first_run_gameplay.png","reset":_guidance_reset_receipt.duplicate(true)}
 
 func _qa_reset_first_run_guidance() -> void:
 	if not OS.has_feature("editor"):
@@ -3109,6 +3122,7 @@ func _qa_reset_first_run_guidance() -> void:
 	_guidance_movement_observed = false
 	_guidance_dash_observed = false
 	_guidance_attack_observed = false
+	_guidance_progress_stage = 0
 	_guidance_attack_baseline = world.attack_runtime.authorized_count
 	_guidance_reset_receipt = {
 		"requested":true, "resolved":true,
