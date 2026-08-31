@@ -13,11 +13,15 @@ signal reward_dropped(event: Dictionary)
 @export var pool_size := 40
 @export var live_cap := 10
 @export var minimum_player_safe_radius := 7.0
-@export var playable_half_extents := Vector2(10.7, 9.2)
-@export var playable_min := Vector2(-9.25, -9.25)
-@export var playable_max := Vector2(10.4, 9.65)
-@export var protected_camera_half_extents := Vector2(5.8, 4.2)
-@export var spawn_ring_radius := 13.5
+## Fallback datum mirrors the authored cemetery contract (~63 x 64 m).  The
+## live scene supplies CemeterySpatialContract, but keeping these values in
+## the same scale prevents a missing/late binding from resurrecting the old
+## camera-sized 20 m combat pad during import or replay.
+@export var playable_half_extents := Vector2(31.5, 32.0)
+@export var playable_min := Vector2(-30.0, -30.0)
+@export var playable_max := Vector2(30.0, 30.0)
+@export var protected_camera_half_extents := Vector2(9.0, 7.0)
+@export var spawn_ring_radius := 18.0
 @export_range(1, 12, 1) var telegraph_cue_cap := 4
 @export_range(0, 16, 1) var role_light_cap := 8
 @export_range(0, 8, 1) var hurt_light_cap := 3

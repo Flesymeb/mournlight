@@ -9,6 +9,10 @@ const WAVE_SEQUENCE := preload("res://resources/waves/mournlight_wave_sequence.t
 const ROLE_KEYS := ["mossling", "wispbat", "bone_slinger", "grave_brute"]
 const MAX_LIVE_ENEMIES := 40
 const MAX_SPAWN_BUDGET := 160
+## Keep a short authored warning beat at the start of the Bellkeeper wave.
+## The director remains the sole owner of boss timing; this delay gives the
+## HUD/camera a deterministic transition window before the boss is requested.
+const BOSS_ENTRY_DELAY_SECONDS := 1.5
 
 var phase := "idle"
 var wave_index := -1
@@ -17,6 +21,7 @@ var warmup_remaining := 4.0
 var total_elapsed := 0.0
 var boss_spawned := false
 var boss_request_count := 0
+var boss_entry_elapsed := 0.0
 var terminated := false
 var terminal_transition_count := 0
 var ordinary_route_wave_ids: Array[String] = []
@@ -33,6 +38,7 @@ func reset() -> void:
 	total_elapsed = 0.0
 	boss_spawned = false
 	boss_request_count = 0
+	boss_entry_elapsed = 0.0
 	terminated = false
 	terminal_transition_count = 0
 	ordinary_route_wave_ids.clear()
@@ -73,6 +79,9 @@ func _process(delta: float) -> void:
 		return
 	wave_elapsed += delta
 	if wave_index == _boss_wave_index() and not boss_spawned:
+		boss_entry_elapsed += delta
+		last_transition_receipt["boss_entry_elapsed"] = boss_entry_elapsed
+	if wave_index == _boss_wave_index() and not boss_spawned and boss_entry_elapsed >= BOSS_ENTRY_DELAY_SECONDS:
 		boss_spawned = true
 		boss_request_count += 1
 		last_transition_receipt["boss_trigger"] = "final_wave_elapsed"
@@ -98,6 +107,9 @@ func _start_wave(index: int, ordinary_progression: bool) -> void:
 		return
 	wave_index = bounded_index
 	wave_elapsed = 0.0
+	# A fresh fifth-wave entry always owns a new warning window, including
+	# editor-only retests that revisit the final wave after a prior boss request.
+	boss_entry_elapsed = 0.0
 	phase = "active"
 	transition_serial += 1
 	var wave_id := String(_definition(wave_index).get("id", ""))
@@ -105,6 +117,8 @@ func _start_wave(index: int, ordinary_progression: bool) -> void:
 		"serial":transition_serial, "wave_index":wave_index, "wave":wave_index + 1,
 		"wave_id":wave_id, "ordinary_progression":ordinary_progression,
 		"diagnostic_jump_count":diagnostic_jump_count, "elapsed_before":total_elapsed,
+		"boss_entry_delay_seconds":BOSS_ENTRY_DELAY_SECONDS if bounded_index == _boss_wave_index() else 0.0,
+		"boss_entry_elapsed":0.0,
 	}
 	transition_history.append(last_transition_receipt.duplicate(true))
 	while transition_history.size() > 8:
@@ -133,7 +147,9 @@ func get_snapshot() -> Dictionary:
 	return {"phase":phase,"wave":wave_index + 1,"wave_count":_wave_count(),"wave_elapsed":wave_elapsed,
 		"wave_duration":float(definition.get("duration",0.0)),"title":String(definition.get("title","WARMUP")),
 		"warning":String(definition.get("warning","PREPARE")),"total_elapsed":total_elapsed,
-		"boss_spawned":boss_spawned,"boss_request_count":boss_request_count,"boss_requested_exactly_once":boss_request_count == 1 if boss_spawned else true,"terminated":terminated,"definition":definition,
+		"boss_spawned":boss_spawned,"boss_request_count":boss_request_count,"boss_requested_exactly_once":boss_request_count == 1 if boss_spawned else true,
+		"boss_entry_elapsed":boss_entry_elapsed,"boss_entry_delay_seconds":BOSS_ENTRY_DELAY_SECONDS if wave_index == _boss_wave_index() else 0.0,
+		"terminated":terminated,"definition":definition,
 		"expected_route_wave_ids":Array(expected_ids),
 		"ordinary_route_wave_ids":ordinary_route_wave_ids.duplicate(),
 		"ordinary_route_complete":route_complete,
