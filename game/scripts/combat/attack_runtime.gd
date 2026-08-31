@@ -44,6 +44,7 @@ func authorize(weapon_id: StringName, target: Node3D, stats: Dictionary, hit_pol
 		"cooldown": float(stats.get("cooldown", 0.0)),
 		"range": float(stats.get("range", 0.0)),
 		"generation": _retirement_generation,
+		"authorized_timestamp_msec": Time.get_ticks_msec(),
 	}
 	_hit_ledgers[attack_id] = {
 		"event": event.duplicate(true),
@@ -78,6 +79,7 @@ func resolve_hit(attack_event: Dictionary, target: Node3D) -> Dictionary:
 	if not health or not health.has_method("apply_damage"):
 		return _reject(StringName(attack_event.get("weapon_id", "unknown")), "missing_health_component", {"attack_id":attack_id, "accepted":false, "hit_material":"miss"})
 	var resolved_event := attack_event.duplicate(true)
+	resolved_event["hit_timestamp_msec"] = Time.get_ticks_msec()
 	var profile_value: Variant = target.get("profile")
 	var role_id := String(profile_value.get("role_id")) if profile_value is Resource else ""
 	# Surface material is a semantic hint for audio only; gameplay damage stays
@@ -167,7 +169,7 @@ func _reject(weapon_id: StringName, reason: String, context: Dictionary = {}) ->
 
 func _phase_entry(phase: String, details: Dictionary = {}) -> Dictionary:
 	_event_serial += 1
-	return {"sequence": _event_serial, "phase": phase, "details": details.duplicate(true)}
+	return {"sequence": _event_serial, "phase": phase, "timestamp_msec": Time.get_ticks_msec(), "process_frame": Engine.get_process_frames(), "details": details.duplicate(true)}
 
 func _trim_history(history: Array[Dictionary]) -> void:
 	while history.size() > HISTORY_LIMIT:
