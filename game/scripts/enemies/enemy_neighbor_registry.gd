@@ -2,6 +2,7 @@ class_name EnemyNeighborRegistry
 extends Node
 
 const MAX_CANDIDATES := 12
+const MAX_TARGET_CANDIDATES := 40
 
 var cell_size := 2.5
 var _entries: Dictionary = {}
@@ -41,6 +42,7 @@ var _maximum_neighbor_queries_per_physics_frame := 0
 var _maximum_neighbor_candidate_visits_per_physics_frame := 0
 var _maximum_target_queries_per_physics_frame := 0
 var _maximum_target_candidate_visits_per_physics_frame := 0
+var _target_budget_exhaustions := 0
 var _target_query_cache: Dictionary = {}
 var _target_cache_frame := -1
 var _target_cache_hits := 0
@@ -188,6 +190,7 @@ func reset_telemetry() -> void:
 	_maximum_neighbor_candidate_visits_per_physics_frame = 0
 	_maximum_target_queries_per_physics_frame = 0
 	_maximum_target_candidate_visits_per_physics_frame = 0
+	_target_budget_exhaustions = 0
 	_target_query_cache.clear()
 	_target_cache_frame = -1
 	_target_cache_hits = 0
@@ -288,10 +291,21 @@ func _query_target_candidates(origin: Vector3, radius: float) -> Array[Node3D]:
 	var center := _cell_for(origin)
 	var cell_radius := ceili(radius / cell_size)
 	var radius_squared := radius * radius
+	var candidate_visits := 0
+	var budget_exhausted := false
 	for z_offset in range(-cell_radius, cell_radius + 1):
+		if budget_exhausted:
+			break
 		for x_offset in range(-cell_radius, cell_radius + 1):
+			if budget_exhausted:
+				break
 			var cell_key := Vector2i(center.x + x_offset, center.y + z_offset)
 			for stable_id_value in (_cells.get(cell_key, []) as Array):
+				if candidate_visits >= MAX_TARGET_CANDIDATES:
+					budget_exhausted = true
+					_target_budget_exhaustions += 1
+					break
+				candidate_visits += 1
 				var stable_id: StringName = stable_id_value
 				_target_frame_candidate_visits += 1
 				_total_target_candidate_visits += 1
@@ -380,6 +394,8 @@ func get_snapshot() -> Dictionary:
 		"maximum_query_size": _last_frame_max_query_size,
 		"current_frame": {"physics_frame":_telemetry_frame, "rebuild_count":_frame_rebuilds, "query_count":_frame_queries, "candidate_visits":_frame_candidate_visits, "maximum_query_size":_frame_max_query_size},
 		"candidate_budget": MAX_CANDIDATES,
+		"target_candidate_budget": MAX_TARGET_CANDIDATES,
+		"target_budget_exhaustions": _target_budget_exhaustions,
 		"stable_order_cache_size":_sorted_ids.size(),
 		"total_rebuilds": _total_rebuilds,
 		"total_queries": _total_queries,

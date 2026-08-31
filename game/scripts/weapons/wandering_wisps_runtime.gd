@@ -18,8 +18,11 @@ var _gameplay_time := 0.0
 var _retired := false
 var _retirement_generation := 0
 var _contact_refresh_remaining := 0.0
+var _wisp_high_water := 0
+var _wisp_count_clamps := 0
 
 const CONTACT_REFRESH_SECONDS := 0.05
+const WISP_POOL_CAP := 8
 
 func configure_target_registry(registry: EnemyNeighborRegistry) -> void:
 	target_registry = registry
@@ -44,6 +47,10 @@ func _physics_process(delta: float) -> void:
 		_resolve_contacts(stats)
 
 func _sync_wisp_count(count: int) -> void:
+	var requested_count := maxi(0, count)
+	count = mini(requested_count, WISP_POOL_CAP)
+	if requested_count > count:
+		_wisp_count_clamps += 1
 	while _wisps.size() < count:
 		var wisp: Node3D
 		while not _wisp_pool.is_empty() and not is_instance_valid(_wisp_pool.back()):
@@ -65,6 +72,7 @@ func _sync_wisp_count(count: int) -> void:
 			removed.remove_from_group("friendly_attack")
 			_wisp_pool.append(removed)
 	active_wisp_count = _wisps.size()
+	_wisp_high_water = maxi(_wisp_high_water, active_wisp_count)
 
 func _resolve_contacts(stats: Dictionary) -> void:
 	const CONTACT_RADIUS := 1.35
@@ -125,6 +133,8 @@ func retire_runtime(reason: String, generation: int) -> Dictionary:
 func reset_runtime() -> void:
 	retire_runtime("reset", _retirement_generation + 1)
 	contact_hit_count = 0
+	_wisp_high_water = 0
+	_wisp_count_clamps = 0
 	_retired = false
 	# retire_runtime disables processing while invalidating active handles;
 	# explicitly re-enable it for the next fresh run so pooled wisps can be
@@ -136,6 +146,7 @@ func _mcp_state() -> Dictionary:
 		"weapon_id": String(weapon_id), "equipped": inventory.is_equipped(weapon_id), "rank": inventory.get_rank(weapon_id),
 		"active_wisp_count": active_wisp_count, "contact_hit_count": contact_hit_count,
 		"wisp_pool_available": _wisp_pool.size(), "wisp_pool_total": _wisp_pool.size() + _wisps.size(),
+		"wisp_pool_cap":WISP_POOL_CAP, "wisp_high_water":_wisp_high_water, "wisp_count_clamps":_wisp_count_clamps,
 		"per_target_interval_count": _target_next_hit_time.size(), "orbit_phase": orbit_phase,
 		"gameplay_clock": _gameplay_time, "retired": _retired,
 		"contact_refresh_seconds": CONTACT_REFRESH_SECONDS,

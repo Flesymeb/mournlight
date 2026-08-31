@@ -81,13 +81,13 @@ func set_semantic(next_state: String) -> void:
 	_restore_pose()
 	_play_authored_motion()
 
-func advance(delta: float, planar_velocity: Vector3, remaining: float = 0.0, duration: float = 0.0) -> void:
+func advance(delta: float, planar_velocity: Vector3, remaining: float = 0.0, duration: float = 0.0, priority_override: bool = false) -> void:
 	_time += delta
 	_state_time += delta
 	_pending_animation_delta += delta
 	if not is_instance_valid(_active_variant):
 		return
-	var priority_state := semantic_state != "approach"
+	var priority_state := semantic_state != "approach" or priority_override
 	var presentation_due := priority_state or posmod(Engine.get_physics_frames(), DENSE_APPROACH_ANIMATION_BUCKETS) == _animation_bucket
 	if not presentation_due:
 		_presentation_skips += 1

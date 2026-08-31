@@ -106,13 +106,13 @@ func _ready() -> void:
 	# Match the authored composition datum in CemeterySpatialContract.  This
 	# keeps the shipped player silhouette large enough to read while the native
 	# package, external depth, and escape lanes remain in frame.
-	follow_height = 28.0
+	follow_height = 30.0
 	follow_distance = 26.0
-	follow_lateral = 12.0
+	follow_lateral = 0.0
 	framing_bias = Vector3(0.0, 0.0, 5.0)
 	obstruction_lateral_bypass = 0.0
 	current = true
-	normal_fov = 78.0
+	normal_fov = 74.0
 	fov = normal_fov
 	if target:
 		_normalize_occluder_bindings()
@@ -217,8 +217,11 @@ func _process(delta: float) -> void:
 	_safe_frame_offset = _coverage_offset
 	_safe_frame_screen_shift = _coverage_screen_shift
 	framing_target = arena_target + _coverage_offset
-	framing_target.x = clampf(framing_target.x, -arena_fill_limit.x, arena_fill_limit.x)
-	framing_target.z = clampf(framing_target.z, -arena_fill_limit.y, arena_fill_limit.y)
+	if is_instance_valid(arena_contract):
+		framing_target = arena_contract.clamp_camera_target(framing_target)
+	else:
+		framing_target.x = clampf(framing_target.x, -arena_fill_limit.x, arena_fill_limit.x)
+		framing_target.z = clampf(framing_target.z, -arena_fill_limit.y, arena_fill_limit.y)
 	var dense_fraction := clampf(
 		float(_coverage_active_count - dense_fov_start_count) / float(maxi(1, dense_fov_full_count - dense_fov_start_count)),
 		0.0,
@@ -255,7 +258,7 @@ func _process(delta: float) -> void:
 		# Keep enough native cemetery depth in every cardinal view. At the old
 		# eight-metre inset the high-angle frustum crossed the authored edge and
 		# exposed the empty world background as a hard dark band.
-		var camera_margin := 14.0
+		var camera_margin := 18.0
 		desired_position.x = clampf(desired_position.x, visual_rect.position.x + camera_margin, visual_rect.end.x - camera_margin)
 		desired_position.z = clampf(desired_position.z, visual_rect.position.y + camera_margin, visual_rect.end.y - camera_margin)
 	global_position = global_position.lerp(desired_position, 1.0 - exp(-follow_damping * delta))
@@ -278,7 +281,11 @@ func _process(delta: float) -> void:
 	projected_margins = (warden_after.get("margins", {}) as Dictionary).duplicate(true)
 	var coverage_inside := bool(after.get("inside_fraction", false))
 	var warden_inside := bool(warden_after.get("inside_fraction", false))
-	var arena_fill_ok := absf(framing_target.x) <= arena_fill_limit.x + 0.01 and absf(framing_target.z) <= arena_fill_limit.y + 0.01
+	var arena_fill_ok := true
+	if is_instance_valid(arena_contract):
+		arena_fill_ok = arena_contract.get_camera_fill_rect().has_point(Vector2(framing_target.x, framing_target.z))
+	else:
+		arena_fill_ok = absf(framing_target.x) <= arena_fill_limit.x + 0.01 and absf(framing_target.z) <= arena_fill_limit.y + 0.01
 	var obstruction_resolved := _coverage_obstructed_count == 0 or (_coverage_occluder_visual_bindings.size() > 0 and _obstruction_response_strength >= 0.65)
 	safe_frame_ok = warden_inside and coverage_inside and arena_fill_ok and obstruction_resolved
 	safe_frame_correction_active = _coverage_offset.length_squared() > 0.0025 or not safe_frame_ok or _arena_containment_active
@@ -404,6 +411,12 @@ func _find_registered_subject_occluder(subject: Node3D) -> String:
 	var subject_points := [subject.global_position + Vector3.UP * 0.35, subject.global_position + Vector3.UP * 1.0]
 	for binding in _tall_occluder_bindings:
 		if not bool(binding.get("bound", false)):
+			continue
+		var visual_bounds: AABB = binding.get("visual_bounds", AABB())
+		if visual_bounds.size.length_squared() > 0.001:
+			for subject_point in subject_points:
+				if _segment_intersects_world_aabb(global_position, subject_point, visual_bounds.grow(direct_sight_volume_radius)):
+					return String(binding.get("resolved_path", binding.get("source_path", "")))
 			continue
 		for shape in binding.get("shapes", []):
 			if not is_instance_valid(shape) or shape.disabled:
@@ -569,21 +582,33 @@ func _screen_to_target_plane(screen: Vector2) -> Vector3:
 
 func _bind_tall_occluders() -> void:
 	_tall_occluder_bindings.clear()
-	for source_path in tall_occluders:
+	for index in tall_occluders.size():
+		var source_path := tall_occluders[index]
 		var body := get_node_or_null(source_path) as CollisionObject3D
 		var shapes: Array[CollisionShape3D] = []
 		if is_instance_valid(body):
 			for child in body.find_children("*", "CollisionShape3D", true, false):
 				if child is CollisionShape3D and is_instance_valid((child as CollisionShape3D).shape):
 					shapes.append(child as CollisionShape3D)
+		var visual_path := coverage_occluder_visuals[index] if index < coverage_occluder_visuals.size() else NodePath()
+		var visual_bounds := AABB()
+		if is_instance_valid(arena_contract) and not visual_path.is_empty():
+			var visual_node := get_node_or_null(visual_path)
+			if is_instance_valid(visual_node):
+				visual_bounds = arena_contract.get_visual_subtree_aabb(String(arena_contract.get_path_to(visual_node)))
 		_tall_occluder_bindings.append({
 			"source_path":String(source_path),
 			"resolved_path":String(body.get_path()) if is_instance_valid(body) else "",
+			"visual_path":String(visual_path),
+			"visual_bounds":visual_bounds,
 			"body":body,
 			"shapes":shapes,
-			"bound":is_instance_valid(body) and not shapes.is_empty(),
+			"bound":is_instance_valid(body) and not shapes.is_empty() and visual_bounds.size.length_squared() > 0.001,
 			"shape_count":shapes.size(),
 		})
+
+func _segment_intersects_world_aabb(from_world: Vector3, to_world: Vector3, bounds: AABB) -> bool:
+	return bounds.intersects_segment(from_world, to_world) != null
 
 func _bind_coverage_occluder_visuals() -> void:
 	_coverage_occluder_visual_bindings.clear()
@@ -766,7 +791,7 @@ func _mcp_state() -> Dictionary:
 		"original_presentation_restored":true,
 		"primary_camera_cull_mask":cull_mask,
 		"source_visual_count":0,
-		"visibility_strategy":"single_primary_camera_multi_subject_containment_with_selective_reversible_landmark_fade",
+		"visibility_strategy":"single_primary_camera_package_bound_visual_aabb_with_selective_reversible_landmark_fade",
 		"dense_render_budget": {
 			"secondary_render_pass":false,
 			"secondary_camera_count":0,
@@ -779,6 +804,7 @@ func _mcp_state() -> Dictionary:
 			"bound_count":_tall_occluder_bindings.filter(func(binding: Dictionary) -> bool: return bool(binding.get("bound", false))).size(),
 			"bindings":_tall_occluder_bindings.map(func(binding: Dictionary) -> Dictionary: return {
 				"source_path":binding.get("source_path", ""), "resolved_path":binding.get("resolved_path", ""),
+				"visual_path":binding.get("visual_path", ""), "visual_bounds":binding.get("visual_bounds", AABB()),
 				"bound":binding.get("bound", false), "shape_count":binding.get("shape_count", 0),
 			}),
 			"sight_volume_radius":direct_sight_volume_radius,

@@ -291,7 +291,7 @@ func set_mode(next_mode: String, next_summary: Dictionary = {}) -> void:
 			var won := String(summary.get("outcome","failure")) == "victory"
 			var time := float(summary.get("elapsed",0.0))
 			_configure("DAWN ANSWERS" if won else "FLAME EXTINGUISHED","VICTORY" if won else "THE WATCH ENDS",
-				"%02d:%02d   ·   WAVE %d/%d   ·   LEVEL %d   ·   %d BANISHED\n%d DEALT   ·   %d TAKEN\nPROVENANCE BOUND  ·  ASSET_PROVENANCE.JSON" % [int(time)/60,int(time)%60,int(summary.get("wave",1)),int(summary.get("wave_count",5)),int(summary.get("level",1)),int(summary.get("defeated",0)),int(summary.get("damage_dealt",0)),int(summary.get("damage_taken",0))],
+				"%02d:%02d   ·   WAVE %d/%d   ·   LEVEL %d   ·   %d BANISHED\n%d DAMAGE DEALT   ·   %d DAMAGE TAKEN\nYOUR VIGIL IS RECORDED IN THE GARDEN ARCHIVE" % [int(time)/60,int(time)%60,int(summary.get("wave",1)),int(summary.get("wave_count",5)),int(summary.get("level",1)),int(summary.get("defeated",0)),int(summary.get("damage_dealt",0)),int(summary.get("damage_taken",0))],
 				[["retry","RETRY"],["title","RETURN TO TITLE"],["credits","CREDITS & NOTICES"]])
 			_bind_result_presentation()
 		"draft":

@@ -7,6 +7,8 @@ extends Node3D
 @export var spawn_clearance := 0.6
 @export var native_map_scale := 1.95
 @export var authored_wrapper_scale_multiplier := 2.36
+@export var authored_playable_inset := 8.5
+@export var landmark_collision_margin := 0.35
 ## Visibility probes intentionally use the perimeter/landmark layer only.  The
 ## gameplay layer stays authoritative for Warden/enemy collision, while this
 ## separate mask prevents GroundCollision and MausoleumCollision from becoming
@@ -21,6 +23,7 @@ extends Node3D
 @onready var player_spawn: Marker3D = $OuterDatum/PlayerSpawn
 @onready var package_root: Node3D = $PackageTransform/AuthoredCemeteryPackage
 var uv_binding_receipt: Dictionary = {}
+var datum_binding_receipt: Dictionary = {}
 
 const AUTHORED_LOCAL_MIN := Vector2(-12.143, -11.415)
 const AUTHORED_LOCAL_MAX := Vector2(12.149, 11.418)
@@ -81,6 +84,13 @@ func _ready() -> void:
 			# perimeter and navigation remain one transform-space contract.
 			package_transform.scale = Vector3.ONE * maxf(1.0, native_map_scale * authored_wrapper_scale_multiplier)
 	_calibrate_authored_visibility()
+	# Bind every product-owned spatial surface from the rendered package after
+	# the wrapper transform is final.  Earlier revisions scaled the complete GLB
+	# without recalibrating the outer datum, leaving a small collision shell and
+	# stale anchors inside a much larger visible crypt.  The package remains one
+	# immutable instance; only candidate-owned collision, navigation metadata,
+	# spawn/route markers, and perimeter bodies are authored from its world AABBs.
+	_bind_outer_datum_to_authored_package()
 	# Run the bounded integration audit now that the intact GLB is instantiated.
 	# Several imported surfaces carry degenerate UVs; repairing those arrays on
 	# candidate-owned mesh copies prevents black/flat shading without mutating the
@@ -111,6 +121,157 @@ func _calibrate_authored_visibility() -> void:
 			continue
 		mesh.extra_cull_margin = 32.0
 		mesh.custom_aabb = AABB(Vector3(-64.0, -32.0, -64.0), Vector3(128.0, 64.0, 128.0))
+
+func _bind_outer_datum_to_authored_package() -> void:
+	var visual_rect := get_authored_visual_rect()
+	if visual_rect.size.x <= authored_playable_inset * 2.0 or visual_rect.size.y <= authored_playable_inset * 2.0:
+		datum_binding_receipt = {"bound":false, "reason":"authored_visual_bounds_unavailable", "visual_rect":visual_rect}
+		return
+	var playable := Rect2(
+		visual_rect.position + Vector2.ONE * authored_playable_inset,
+		visual_rect.size - Vector2.ONE * authored_playable_inset * 2.0
+	)
+	_bind_perimeter_to_world_rect(playable)
+	var crypt_path := "PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/Crypt"
+	var crypt_bounds := get_visual_subtree_aabb(crypt_path)
+	var crypt_bound := _bind_box_collision_to_visual("OuterDatum/MausoleumCollision", crypt_bounds, landmark_collision_margin)
+	if crypt_bound:
+		var crypt_anchor := get_node_or_null("OuterDatum/SmallMausoleumAnchor") as Marker3D
+		if is_instance_valid(crypt_anchor):
+			crypt_anchor.global_position = Vector3(crypt_bounds.get_center().x, 0.0, crypt_bounds.get_center().z)
+	var tree_bindings := {
+		"northeast_tree":"PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/DeadTree3",
+		"northwest_tree":"PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/DeadTree",
+		"southeast_tree":"PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/DeadTree2",
+	}
+	var tree_bodies := {
+		"northeast_tree":"OuterDatum/NortheastTreeCollision",
+		"northwest_tree":"OuterDatum/NorthwestTreeCollision",
+		"southeast_tree":"OuterDatum/SoutheastTreeCollision",
+	}
+	var tree_receipts: Dictionary = {}
+	for key in tree_bindings:
+		var tree_bounds := get_visual_subtree_aabb(String(tree_bindings[key]))
+		tree_receipts[key] = _bind_tree_collision_to_visual(String(tree_bodies[key]), tree_bounds)
+	var spawn_z := minf(playable.end.y - 5.0, maxf(visual_rect.get_center().y + 6.0, crypt_bounds.end.z + 10.0 if crypt_bound else visual_rect.get_center().y + 7.0))
+	player_spawn.global_position = Vector3(visual_rect.get_center().x, 0.05, spawn_z)
+	_bind_route_checkpoints(playable, crypt_bounds)
+	var navigation := get_node_or_null("OuterDatum/NativeNavigationRegion") as NavigationRegion3D
+	if is_instance_valid(navigation):
+		navigation.set_meta(&"_spatial_contract", "authored_package_world_bounds")
+		navigation.set_meta(&"_playable_minimum", playable.position)
+		navigation.set_meta(&"_playable_maximum", playable.end)
+	datum_binding_receipt = {
+		"bound":crypt_bound,
+		"strategy":"rendered_package_aabb_to_product_outer_datum",
+		"visual_rect":visual_rect,
+		"playable_rect":playable,
+		"external_depth":authored_playable_inset,
+		"player_spawn":player_spawn.global_position,
+		"mausoleum":{"visual_path":crypt_path,"bounds":crypt_bounds,"collision_bound":crypt_bound},
+		"trees":tree_receipts,
+		"perimeter_bound":true,
+		"navigation_metadata_bound":is_instance_valid(navigation),
+		"imported_children_modified":false,
+	}
+
+func _bind_perimeter_to_world_rect(playable: Rect2) -> void:
+	var center := playable.get_center()
+	var wall_thickness := 0.8
+	var wall_height := 2.6
+	_bind_box_body_world(ground_collision, Vector3(center.x, -0.38, center.y), Vector3(playable.size.x, 0.7, playable.size.y))
+	_bind_box_body_world(north_boundary, Vector3(center.x, wall_height * 0.5, playable.position.y - wall_thickness * 0.5), Vector3(playable.size.x + wall_thickness * 2.0, wall_height, wall_thickness))
+	_bind_box_body_world(south_boundary, Vector3(center.x, wall_height * 0.5, playable.end.y + wall_thickness * 0.5), Vector3(playable.size.x + wall_thickness * 2.0, wall_height, wall_thickness))
+	_bind_box_body_world(west_boundary, Vector3(playable.position.x - wall_thickness * 0.5, wall_height * 0.5, center.y), Vector3(wall_thickness, wall_height, playable.size.y + wall_thickness * 2.0))
+	_bind_box_body_world(east_boundary, Vector3(playable.end.x + wall_thickness * 0.5, wall_height * 0.5, center.y), Vector3(wall_thickness, wall_height, playable.size.y + wall_thickness * 2.0))
+
+func _bind_box_body_world(body: StaticBody3D, world_center: Vector3, world_size: Vector3) -> bool:
+	if not is_instance_valid(body):
+		return false
+	var shape_node := _first_shape(body)
+	if not is_instance_valid(shape_node) or not shape_node.shape is BoxShape3D:
+		return false
+	body.global_position = world_center
+	var basis_scale := shape_node.global_transform.basis.get_scale().abs()
+	(shape_node.shape as BoxShape3D).size = Vector3(
+		world_size.x / maxf(0.001, basis_scale.x),
+		world_size.y / maxf(0.001, basis_scale.y),
+		world_size.z / maxf(0.001, basis_scale.z)
+	)
+	return true
+
+func _bind_box_collision_to_visual(body_path: String, bounds: AABB, margin: float) -> bool:
+	if bounds.size.length_squared() <= 0.001:
+		return false
+	var expanded := bounds.grow(margin)
+	return _bind_box_body_world(get_node_or_null(body_path) as StaticBody3D, expanded.get_center(), expanded.size)
+
+func _bind_tree_collision_to_visual(body_path: String, bounds: AABB) -> Dictionary:
+	var body := get_node_or_null(body_path) as StaticBody3D
+	var shape_node := _first_shape(body) if is_instance_valid(body) else null
+	if bounds.size.length_squared() <= 0.001 or not is_instance_valid(shape_node) or not shape_node.shape is CylinderShape3D:
+		return {"bound":false,"body_path":body_path,"visual_bounds":bounds}
+	# Collision follows the visible trunk datum, while the camera separately uses
+	# the complete branch AABB for obstruction.  This keeps escape lanes honest
+	# without turning the canopy into an invisible gameplay wall.
+	var trunk_height := maxf(3.2, bounds.size.y * 0.58)
+	var trunk_radius := clampf(minf(bounds.size.x, bounds.size.z) * 0.16, 0.9, 2.2)
+	body.global_position = Vector3(bounds.get_center().x, bounds.position.y + trunk_height * 0.5, bounds.get_center().z)
+	var basis_scale := shape_node.global_transform.basis.get_scale().abs()
+	var cylinder := shape_node.shape as CylinderShape3D
+	cylinder.height = trunk_height / maxf(0.001, basis_scale.y)
+	cylinder.radius = trunk_radius / maxf(0.001, maxf(basis_scale.x, basis_scale.z))
+	return {"bound":true,"body_path":body_path,"visual_bounds":bounds,"world_radius":trunk_radius,"world_height":trunk_height}
+
+func _bind_route_checkpoints(playable: Rect2, crypt_bounds: AABB) -> void:
+	var center := playable.get_center()
+	var west := playable.position.x + 4.5
+	var east := playable.end.x - 4.5
+	var north := playable.position.y + 3.2
+	var south := playable.end.y - 4.5
+	var positions := {
+		"00_Spawn":player_spawn.global_position,
+		"01_South":Vector3(center.x,0.05,south),
+		"02_Southeast":Vector3(east,0.05,south),
+		"03_East":Vector3(east,0.05,center.y),
+		"04_Northeast":Vector3(east,0.05,north),
+		"05_North":Vector3(center.x,0.05,north),
+		"06_Northwest":Vector3(west,0.05,north),
+		"07_West":Vector3(west,0.05,center.y),
+		"08_KeeperPost":Vector3(-9.8,0.05,5.8),
+		"09_CrackedBell":Vector3(12.0,0.05,-5.1),
+		"10_Mausoleum":Vector3(crypt_bounds.end.x + 3.2,0.05,crypt_bounds.get_center().z),
+		"11_CrossRouteEast":Vector3(crypt_bounds.end.x + 4.0,0.05,crypt_bounds.end.z + 4.5),
+		"12_Return":player_spawn.global_position,
+	}
+	for checkpoint_name in positions:
+		var checkpoint := get_node_or_null("OuterDatum/RouteCheckpoints/%s" % checkpoint_name) as Marker3D
+		if is_instance_valid(checkpoint):
+			checkpoint.global_position = positions[checkpoint_name]
+
+func get_visual_subtree_aabb(node_path: String) -> AABB:
+	var source := get_node_or_null(node_path)
+	if not is_instance_valid(source):
+		return AABB()
+	var result := AABB()
+	var has_bounds := false
+	var meshes: Array[Node] = []
+	if source is MeshInstance3D:
+		meshes.append(source)
+	meshes.append_array(source.find_children("*", "MeshInstance3D", true, false))
+	for value in meshes:
+		var mesh_instance := value as MeshInstance3D
+		if not is_instance_valid(mesh_instance) or not is_instance_valid(mesh_instance.mesh):
+			continue
+		var local_bounds := mesh_instance.mesh.get_aabb()
+		for corner in 8:
+			var world_point := mesh_instance.global_transform * local_bounds.get_endpoint(corner)
+			if not has_bounds:
+				result = AABB(world_point, Vector3.ZERO)
+				has_bounds = true
+			else:
+				result = result.expand(world_point)
+	return result
 
 func _audit_visible_uv_bindings() -> void:
 	# Imported source meshes remain immutable. Record the integration-boundary
@@ -450,7 +611,12 @@ func _landmark_alignment_receipt() -> Dictionary:
 		# landmark's height; alignment is a traversability/footprint contract, so
 		# compare only the ground-plane (x/z) datum.
 		var body_offset := Vector2(anchor.global_position.x, anchor.global_position.z).distance_to(Vector2(body.global_position.x, body.global_position.z)) if is_instance_valid(anchor) and is_instance_valid(body) else INF
-		var offset := Vector2(shape.global_position.x, shape.global_position.z).distance_to(Vector2(visual.global_position.x, visual.global_position.z)) if is_instance_valid(shape) and is_instance_valid(visual) else INF
+		var visual_position := visual.global_position if is_instance_valid(visual) else Vector3.ZERO
+		if key == "mausoleum":
+			var crypt_bounds := get_visual_subtree_aabb("PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/Crypt")
+			if crypt_bounds.size.length_squared() > 0.001:
+				visual_position = crypt_bounds.get_center()
+		var offset := Vector2(shape.global_position.x, shape.global_position.z).distance_to(Vector2(visual_position.x, visual_position.z)) if is_instance_valid(shape) else INF
 		result[key] = {
 			"anchor_path":"OuterDatum/%s" % pair[0],
 			"collision_path":"OuterDatum/%s" % pair[1],
@@ -516,16 +682,17 @@ func get_snapshot() -> Dictionary:
 		"protected_camera_half_extents":protected_camera_half_extents,
 		"minimum_player_safe_radius":minimum_player_safe_radius,
 		"authored_package_instances":1 if is_instance_valid(package_root) else 0,
-		"collision_source":"scaled_outer_datum_static_bodies_with_camera_query_split",
+		"collision_source":"rendered_package_aabb_bound_outer_datum_with_camera_query_split",
+		"datum_binding":datum_binding_receipt.duplicate(true),
 		"background_mode":"single_intact_authored_cemetery_with_restrained_fog",
 		"composition_layers":{
-			"strategy":"additive_authored_package_readability",
+			"strategy":"single_wrapper_render_bounds_drive_collision_navigation_and_camera",
 			"native_instance_count":1,
 			"depth_hierarchy":["foreground_graves_and_fence","midground_native_streets_and_landmarks","perimeter_trees_and_external_terrain"],
 			"warm_anchor":"OuterDatum/KeeperLanternPostAnchor/WarmLandmarkLight",
 			"cool_fills":["OuterDatum/RouteMoonFill","OuterDatum/WestMoonRim","OuterDatum/EastMoonRim","OuterDatum/SmallMausoleumAnchor/MausoleumMoonLift"],
 			"escape_lane_policy":"native_street_network_preserved",
-			"camera_profile":{"fov":78.0,"follow_height":28.0,"follow_distance":26.0,"follow_lateral":12.0,"framing_bias":Vector3(0.0,0.0,5.0),"visibility_collision_mask":camera_visibility_collision_mask},
+			"camera_profile":{"fov":74.0,"follow_height":30.0,"follow_distance":26.0,"follow_lateral":0.0,"framing_bias":Vector3(0.0,0.0,5.0),"visibility_collision_mask":camera_visibility_collision_mask},
 			"proxy_geometry_count":0,
 		},
 		"external_world":{"source":"intact_authored_package_native_terrain_and_perimeter", "procedural_scenery":false, "primitive_meshes":0, "opaque":true, "non_playable_depth_beyond_all_edges":true},

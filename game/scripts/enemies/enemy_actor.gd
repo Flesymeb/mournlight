@@ -51,6 +51,8 @@ var _vitality_bucket := 0
 var _vitality_refresh_remaining := 0.0
 var _vitality_updates := 0
 var _vitality_skips := 0
+var _priority_presentation_updates := 0
+var _staggered_presentation_updates := 0
 ## Hurt is a presentation interrupt, not a second gameplay state.  Keep the
 ## authoritative attack/approach state intact while the authored presenter
 ## runs its short recoil clip, then restore the current semantic deterministically.
@@ -101,6 +103,8 @@ func activate(next_profile: EnemyProfile, next_target: WardenController, at_posi
 	_vitality_refresh_remaining = 0.0
 	_vitality_updates = 0
 	_vitality_skips = 0
+	_priority_presentation_updates = 0
+	_staggered_presentation_updates = 0
 	health.actor_id = stable_id
 	health.maximum_health = profile.maximum_health
 	health.current_health = profile.maximum_health
@@ -179,11 +183,12 @@ func _physics_process(delta: float) -> void:
 	var target_offset := target.global_position - global_position
 	target_offset.y = 0.0
 	var target_distance_squared := target_offset.length_squared()
+	var dense_priority := _is_dense_priority(target_distance_squared)
 	# Health changes still reveal immediately through the authoritative signal;
 	# proximity/fade presentation is capped at 20 Hz to keep a 25–40 actor wave
 	# from paying one UI update per physics tick.
 	_vitality_refresh_remaining = maxf(0.0, _vitality_refresh_remaining - delta)
-	var vitality_due := _vitality_refresh_remaining <= 0.0 or state != "approach"
+	var vitality_due := _vitality_refresh_remaining <= 0.0 or dense_priority
 	if vitality_due:
 		_vitality_refresh_remaining = DENSE_VITALITY_REFRESH_SECONDS
 		_vitality_updates += 1
@@ -225,9 +230,13 @@ func _physics_process(delta: float) -> void:
 	global_position.y = 0.05
 	if is_instance_valid(neighbor_registry):
 		neighbor_registry.update_actor_position(self)
-	model_pivot.advance(delta, velocity, state_remaining, _state_duration(state))
+	model_pivot.advance(delta, velocity, state_remaining, _state_duration(state), dense_priority)
+	if dense_priority:
+		_priority_presentation_updates += 1
+	else:
+		_staggered_presentation_updates += 1
 	if velocity.length_squared() > 0.04 and state == "approach":
-		if posmod(Engine.get_physics_frames(), EnemySemanticPresenter.DENSE_APPROACH_ANIMATION_BUCKETS) == _facing_bucket:
+		if dense_priority or posmod(Engine.get_physics_frames(), EnemySemanticPresenter.DENSE_APPROACH_ANIMATION_BUCKETS) == _facing_bucket:
 			presentation_root.look_at(global_position + velocity, Vector3.UP)
 			_facing_updates += 1
 		else:
@@ -242,11 +251,11 @@ func _steer_approach(delta: float) -> void:
 	if profile.attack_kind == "flank" and target_distance_squared > 5.76:
 		desired = (desired + Vector3(-desired.z, 0.0, desired.x) * _flank_sign * 0.62).normalized()
 	# Neighbor broad-phase queries are the dominant dense-wave CPU cost. Keep
-	# steering deterministic while staggering the expensive query across two
-	# three stable actor buckets; the cached vector is blended into every frame's
+	# steering deterministic while staggering the expensive query across three
+	# stable actor buckets; the cached vector is blended into every frame's
 	# desired velocity so actors never stop or teleport between query ticks.
 	var separation := _cached_separation
-	var query_due := posmod(Engine.get_physics_frames(), DENSE_STEERING_BUCKETS) == _steering_bucket
+	var query_due := target_distance_squared <= DenseProfile.PRIORITY_THREAT_RADIUS * DenseProfile.PRIORITY_THREAT_RADIUS or posmod(Engine.get_physics_frames(), DENSE_STEERING_BUCKETS) == _steering_bucket
 	if query_due:
 		separation = Vector3.ZERO
 		var neighbors: Array[EnemyActor] = neighbor_registry.query_neighbors(self, profile.separation_radius) if is_instance_valid(neighbor_registry) else []
@@ -262,6 +271,13 @@ func _steer_approach(delta: float) -> void:
 		_steering_query_skips += 1
 	var target_velocity := (desired + separation * 0.72).normalized() * profile.movement_speed
 	velocity = velocity.move_toward(target_velocity, 9.0 * delta)
+
+func _is_dense_priority(target_distance_squared: float) -> bool:
+	return (
+		state in ["waiting_admission", "telegraph", "damage"]
+		or _hurt_motion_remaining > 0.0
+		or target_distance_squared <= DenseProfile.PRIORITY_THREAT_RADIUS * DenseProfile.PRIORITY_THREAT_RADIUS
+	)
 
 func _request_telegraph_admission() -> void:
 	if not is_instance_valid(encounter_owner):
@@ -472,6 +488,9 @@ func get_presentation_budget_snapshot() -> Dictionary:
 	receipt["facing_updates"] = _facing_updates
 	receipt["facing_skips"] = _facing_skips
 	receipt["non_priority_facing_staggered"] = true
+	receipt["priority_updates"] = _priority_presentation_updates
+	receipt["staggered_lane_updates"] = _staggered_presentation_updates
+	receipt["priority_radius"] = DenseProfile.PRIORITY_THREAT_RADIUS
 	return receipt
 
 func reset_workload_counters() -> void:
@@ -481,6 +500,8 @@ func reset_workload_counters() -> void:
 	_steering_query_skips = 0
 	_vitality_updates = 0
 	_vitality_skips = 0
+	_priority_presentation_updates = 0
+	_staggered_presentation_updates = 0
 
 func get_workload_counters() -> Dictionary:
 	return {
@@ -498,5 +519,8 @@ func get_workload_counters() -> Dictionary:
 		"vitality_refresh_seconds":DENSE_VITALITY_REFRESH_SECONDS,
 		"vitality_bucket":_vitality_bucket,
 		"vitality_bucket_count":DenseProfile.VITALITY_BUCKET_COUNT,
+		"priority_presentation_updates":_priority_presentation_updates,
+		"staggered_presentation_updates":_staggered_presentation_updates,
+		"priority_threat_radius":DenseProfile.PRIORITY_THREAT_RADIUS,
 		"space_query_policy":"registry_neighbors_and_move_and_slide_only",
 	}

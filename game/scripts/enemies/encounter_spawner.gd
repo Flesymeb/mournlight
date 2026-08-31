@@ -991,6 +991,8 @@ func _mcp_state() -> Dictionary:
 		"neighbor_stable_order_cache_size":neighbors.get("stable_order_cache_size", 0),
 		"target_queries":neighbors.get("target_query_count", 0),
 		"target_candidate_visits":neighbors.get("target_candidate_visits", 0),
+		"target_candidate_budget":neighbors.get("target_candidate_budget", EnemyNeighborRegistry.MAX_TARGET_CANDIDATES),
+		"target_budget_exhaustions":neighbors.get("target_budget_exhaustions", 0),
 		"target_registry_members":neighbors.get("registered_count", 0),
 		"target_full_group_inventories":neighbors.get("full_group_inventory_count", 0),
 		"roles":snapshot.get("roles", {}),

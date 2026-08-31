@@ -17,6 +17,8 @@ const NEIGHBOR_QUERY_BUCKET_COUNT := 3
 const VITALITY_BUCKET_COUNT := 4
 const LIGHT_BUCKET_COUNT := 8
 const OPTIONAL_EFFECT_BUCKET_COUNT := 5
+const PRIORITY_THREAT_RADIUS := 8.0
+const TARGET_CANDIDATE_CAP := 40
 const PRESENTATION_UPDATE_BUDGET_SECONDS := 0.1
 const SECONDARY_COMPOSITOR_RESOLUTION_SCALE := 0.5
 const SECONDARY_COMPOSITOR_REFRESH_SECONDS := 0.12
@@ -65,6 +67,9 @@ static func contract() -> Dictionary:
 			"secondary_compositor_resolution_scale": SECONDARY_COMPOSITOR_RESOLUTION_SCALE,
 			"secondary_compositor_refresh_seconds": SECONDARY_COMPOSITOR_REFRESH_SECONDS,
 			"policy": "stable_actor_buckets_with_cached_separation_and_staggered_presentation",
+			"priority_policy": "telegraph_damage_recent_hurt_and_nearby_threats_update_first",
+			"priority_threat_radius": PRIORITY_THREAT_RADIUS,
+			"target_candidate_cap": TARGET_CANDIDATE_CAP,
 		},
 		"enemy_range": {"minimum": MIN_ENEMIES, "maximum": MAX_ENEMIES, "target": TARGET_ENEMIES},
 		"metrics": [
@@ -146,6 +151,7 @@ static func work_buckets() -> Dictionary:
 		"presentation": {"bucket_count": STEERING_BUCKET_COUNT, "cadence_seconds": PRESENTATION_UPDATE_BUDGET_SECONDS, "authoritative": false},
 		"lights": {"bucket_count": LIGHT_BUCKET_COUNT, "cadence_seconds": 0.1, "authoritative": false},
 		"optional_effects": {"bucket_count": OPTIONAL_EFFECT_BUCKET_COUNT, "cadence_seconds": 0.12, "authoritative": false},
+		"priority_threats": {"bucket_count": 1, "cadence_seconds": 0.0, "authoritative": false, "radius": PRIORITY_THREAT_RADIUS, "states": ["waiting_admission", "telegraph", "damage", "recent_hurt"]},
 		"authoritative_events": {"bucket_count": 1, "cadence_seconds": 0.0, "authoritative": true, "events": ["telegraph", "accepted_hit", "damage", "death", "drop", "pool_retirement"]},
 	}
 
