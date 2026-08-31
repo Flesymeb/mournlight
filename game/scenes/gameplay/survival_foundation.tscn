@@ -31,18 +31,18 @@ background_color = Color(0.018, 0.028, 0.09, 1)
 background_energy_multiplier = 1.18
 sky = SubResource("Sky_mournlight")
 ambient_light_source = 2
-ambient_light_color = Color(0.40, 0.49, 0.82, 1)
-ambient_light_energy = 3.65
+ambient_light_color = Color(0.46, 0.50, 0.66, 1)
+ambient_light_energy = 4.15
 reflected_light_source = 2
 tonemap_mode = 2
 glow_enabled = true
 glow_intensity = 0.58
 bloom = 0.08
 fog_enabled = true
-fog_light_color = Color(0.12, 0.14, 0.30, 1)
-fog_light_energy = 0.46
-fog_density = 0.009
-fog_sky_affect = 0.58
+fog_light_color = Color(0.16, 0.18, 0.30, 1)
+fog_light_energy = 0.36
+fog_density = 0.0065
+fog_sky_affect = 0.48
 fog_aerial_perspective = 0.2
 fog_depth_begin = 8.0
 fog_depth_end = 58.0
@@ -66,8 +66,15 @@ directional_shadow_max_distance = 42.0
 
 [node name="ShadowLift" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-38, 148, 0)
-light_color = Color(0.28, 0.32, 0.58, 1)
-light_energy = 2.25
+light_color = Color(0.36, 0.39, 0.55, 1)
+light_energy = 1.65
+light_specular = 0.0
+shadow_enabled = false
+
+[node name="RouteWarmFill" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-52, -24, 0)
+light_color = Color(1, 0.68, 0.42, 1)
+light_energy = 0.32
 light_specular = 0.0
 shadow_enabled = false
 
@@ -97,13 +104,13 @@ arena_contract = NodePath("../CemeteryGarden")
 near = 0.15
 far = 180.0
 arena_limit = Vector2(34.0, 32.0)
-normal_fov = 68.0
-follow_height = 27.0
-follow_distance = 18.0
-follow_lateral = 10.0
+normal_fov = 66.0
+follow_height = 29.0
+follow_distance = 23.0
+follow_lateral = 8.0
 # Keep the player in the lower-safe lane while the authored mausoleum and bell
 # sit above the route instead of filling the camera's center sight lane.
-framing_bias = Vector3(0.0, 0, -7.0)
+framing_bias = Vector3(0.0, 0, 2.5)
 arena_fill_limit = Vector2(33.0, 30.5)
 coverage_max_correction = 3.5
 coverage_threat_weight = 0.30

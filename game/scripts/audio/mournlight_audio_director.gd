@@ -22,6 +22,8 @@ var voice_started_msec: Array[int] = []
 var semantic_counts: Dictionary = {}
 var attack_audio_events: Array[Dictionary] = []
 var _attack_audio_seen: Dictionary = {}
+var player_report_count := 0
+var last_player_report_receipt: Dictionary = {}
 var last_attack_audio_receipt: Dictionary = {}
 var disabled_world_surface_impact_count := 0
 var rejected_counts: Dictionary = {}
@@ -255,6 +257,8 @@ func _emit_attack_audio(event: Dictionary, phase: String) -> bool:
 	if world_surface_disabled:
 		disabled_world_surface_impact_count += 1
 	var started := false if world_surface_disabled else (_play_lantern_attack_voice(phase, semantic) if weapon_id == "warden_lantern" else play_semantic(semantic))
+	if phase == "onset" and weapon_id == "warden_lantern":
+		player_report_count += 1
 	var source_paths: Array[String] = []
 	for stream in _lantern_streams_for_phase(phase) if weapon_id == "warden_lantern" else _streams_for(semantic):
 		if stream is AudioStream:
@@ -266,6 +270,7 @@ func _emit_attack_audio(event: Dictionary, phase: String) -> bool:
 		"attack_id": attack_id,
 		"generation": generation,
 		"phase": phase,
+		"report_kind": "player_firearm" if phase == "onset" and weapon_id == "warden_lantern" else ("impact_feedback" if phase == "impact" else phase),
 		"impact_stem": semantic.trim_prefix("weapon_warden_lantern_") if phase == "impact" and weapon_id == "warden_lantern" else (semantic if phase == "impact" else "native_report"),
 		"hit_material": String(event.get("hit_material", event.get("surface_material", "character" if phase == "impact" else "none"))),
 		"weapon_id": weapon_id,
@@ -285,6 +290,8 @@ func _emit_attack_audio(event: Dictionary, phase: String) -> bool:
 	while attack_audio_events.size() > 24:
 		attack_audio_events.pop_front()
 	last_attack_audio_receipt = receipt.duplicate(true)
+	if receipt.get("report_kind", "") == "player_firearm":
+		last_player_report_receipt = receipt.duplicate(true)
 	return started
 
 func _lantern_impact_semantic(event: Dictionary) -> String:
@@ -784,6 +791,8 @@ func reset_for_run() -> void:
 		_release_voice(index)
 	semantic_counts.clear()
 	_attack_audio_seen.clear()
+	player_report_count = 0
+	last_player_report_receipt.clear()
 	attack_audio_events.clear()
 	last_attack_audio_receipt.clear()
 	rejected_counts.clear()
@@ -827,6 +836,8 @@ func reset_attack_audio_lifecycle(reason: String = "lifecycle_reset") -> Diction
 	lantern_onset_window_remaining = 0.0
 	lantern_impact_window_remaining = 0.0
 	_attack_audio_seen.clear()
+	player_report_count = 0
+	last_player_report_receipt.clear()
 	return {"reason":reason,"stopped_voices":stopped,"dedupe_cleared":true,"process_frame":Engine.get_process_frames()}
 
 func retire_run_ownership(route: String, generation: int) -> Dictionary:
@@ -843,6 +854,8 @@ func retire_run_ownership(route: String, generation: int) -> Dictionary:
 	lantern_impact_window_remaining = 0.0
 	stopped_effects += lantern_before
 	_attack_audio_seen.clear()
+	player_report_count = 0
+	last_player_report_receipt.clear()
 	if movement_before > 0:
 		owners_before.append("movement")
 		stopped_effects += _retire_movement_owner("route_%s" % route)
@@ -930,6 +943,8 @@ func _mcp_state() -> Dictionary:
 		"pickup_semantic_count":int(semantic_counts.get("pickup", 0)),
 		"pickup_audio_event_count":pickup_audio_event_count,
 		"attack_audio_event_count":attack_audio_events.size(),
+		"player_report_count":player_report_count,
+		"last_player_report_receipt":last_player_report_receipt.duplicate(true),
 		"disabled_world_surface_impact_count":disabled_world_surface_impact_count,
 		"attack_audio_events":attack_audio_events.duplicate(true),
 		"last_attack_audio_receipt":last_attack_audio_receipt.duplicate(true),
