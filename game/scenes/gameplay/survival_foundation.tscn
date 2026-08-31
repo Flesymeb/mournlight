@@ -126,7 +126,11 @@ coverage_max_correction = 3.5
 coverage_threat_weight = 0.18
 coverage_radius = 16.0
 obstruction_height_boost = 1.2
-obstruction_lateral_bypass = 8.0
+# Sightline bypass is reserved for explicitly registered tall landmarks.  A
+# lateral camera nudge here would make ordinary perimeter/gameplay bodies look
+# like occluders again, so keep the serialized scene aligned with the runtime
+# visibility contract.
+obstruction_lateral_bypass = 0.0
 dense_compositor_resolution_scale = 0.5
 dense_compositor_refresh_seconds = 0.12
 presentation_body = NodePath("../Warden/PresentationRoot/ModelPivot/AssetTransform/AuthoredWardenMage")

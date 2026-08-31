@@ -87,6 +87,11 @@ func _start_wave(index: int, ordinary_progression: bool) -> void:
 	if terminated:
 		return
 	var bounded_index := clampi(index, 0, maxi(0, _wave_count() - 1))
+	# Ordinary eligibility is earned only by the contiguous authored sequence.
+	# Treat any out-of-order request as diagnostic, even if a stale caller marks
+	# it ordinary; this keeps fixture jumps from silently qualifying a run.
+	if ordinary_progression and wave_index >= 0 and bounded_index != wave_index + 1:
+		ordinary_progression = false
 	# Duplicate callbacks during reload/teardown must not reset an active wave or
 	# append a second copy of its stable route id.
 	if phase == "active" and wave_index == bounded_index:

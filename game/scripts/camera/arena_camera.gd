@@ -844,10 +844,17 @@ func _update_visibility_isolation(delta: float) -> void:
 		query.collide_with_areas = false
 		var hit := space_state.intersect_ray(query)
 		if not hit.is_empty():
-			_detection_source = "fallback_physics_ray"
+			# Physics masks are intentionally a coarse fallback.  A third-party or
+			# gameplay-only body can still share the mask, so it must never activate
+			# the compositor unless it is one of the explicitly bound tall landmark
+			# colliders.  Registered sight volumes remain the authoritative path.
+			var collider := hit.get("collider") as Node
+			if not _is_registered_occluder_collider(collider):
+				continue
+			_detection_source = "fallback_physics_ray_registered_occluder"
 			_visibility_samples_blocked += 1
-			if _last_occluder.is_empty() and is_instance_valid(hit.get("collider")):
-				_last_occluder = String((hit.collider as Node).get_path())
+			if _last_occluder.is_empty() and is_instance_valid(collider):
+				_last_occluder = String(collider.get_path())
 	if _visibility_samples_blocked > 0:
 		_blocked_seconds += delta
 		_clear_seconds = 0.0
@@ -862,6 +869,23 @@ func _update_visibility_isolation(delta: float) -> void:
 	if next_active != occlusion_guard_active:
 		occlusion_guard_active = next_active
 		_apply_visibility_overlay(occlusion_guard_active)
+
+func _is_registered_occluder_collider(collider: Node) -> bool:
+	if not is_instance_valid(collider):
+		return false
+	var collider_path := String(collider.get_path())
+	for binding in _tall_occluder_bindings:
+		if not bool(binding.get("bound", false)):
+			continue
+		var resolved := String(binding.get("resolved_path", ""))
+		if resolved.is_empty():
+			continue
+		# A ray may hit a child shape/owner beneath the registered body.  Accept
+		# only that bound subtree; unrelated layer-2 bodies stay invisible to the
+		# camera visibility contract.
+		if collider_path == resolved or collider_path.begins_with(resolved + "/"):
+			return true
+	return false
 
 func _find_registered_sight_occluder() -> String:
 	if not is_instance_valid(target):
