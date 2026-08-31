@@ -20,6 +20,9 @@ var terminated := false
 var terminal_transition_count := 0
 var ordinary_route_wave_ids: Array[String] = []
 var diagnostic_jump_count := 0
+var transition_serial := 0
+var transition_history: Array[Dictionary] = []
+var last_transition_receipt: Dictionary = {}
 
 func reset() -> void:
 	phase = "idle"
@@ -32,6 +35,9 @@ func reset() -> void:
 	terminal_transition_count = 0
 	ordinary_route_wave_ids.clear()
 	diagnostic_jump_count = 0
+	transition_serial = 0
+	transition_history.clear()
+	last_transition_receipt.clear()
 	set_process(false)
 
 func begin() -> void:
@@ -66,20 +72,41 @@ func _process(delta: float) -> void:
 	wave_elapsed += delta
 	if wave_index == _boss_wave_index() and not boss_spawned:
 		boss_spawned = true
+		last_transition_receipt["boss_trigger"] = "final_wave_elapsed"
+		if not transition_history.is_empty():
+			transition_history[transition_history.size() - 1] = last_transition_receipt.duplicate(true)
 		boss_requested.emit()
 	if wave_elapsed >= float(_definition(wave_index).duration) and wave_index < _wave_count() - 1:
 		_start_wave(wave_index + 1, true)
 
 func _start_wave(index: int, ordinary_progression: bool) -> void:
-	wave_index = index
+	if terminated:
+		return
+	var bounded_index := clampi(index, 0, maxi(0, _wave_count() - 1))
+	# Duplicate callbacks during reload/teardown must not reset an active wave or
+	# append a second copy of its stable route id.
+	if phase == "active" and wave_index == bounded_index:
+		return
+	wave_index = bounded_index
 	wave_elapsed = 0.0
 	phase = "active"
+	transition_serial += 1
+	var wave_id := String(_definition(wave_index).get("id", ""))
+	last_transition_receipt = {
+		"serial":transition_serial, "wave_index":wave_index, "wave":wave_index + 1,
+		"wave_id":wave_id, "ordinary_progression":ordinary_progression,
+		"diagnostic_jump_count":diagnostic_jump_count, "elapsed_before":total_elapsed,
+	}
+	transition_history.append(last_transition_receipt.duplicate(true))
+	while transition_history.size() > 8:
+		transition_history.pop_front()
 	if ordinary_progression:
-		var wave_id := String(_definition(index).get("id", ""))
 		if ordinary_route_wave_ids.is_empty() or ordinary_route_wave_ids[-1] != wave_id:
 			ordinary_route_wave_ids.append(wave_id)
 	else:
 		diagnostic_jump_count += 1
+		last_transition_receipt["diagnostic_jump_count"] = diagnostic_jump_count
+		transition_history[transition_history.size() - 1] = last_transition_receipt.duplicate(true)
 	_emit()
 
 func _emit() -> void:
@@ -103,6 +130,9 @@ func get_snapshot() -> Dictionary:
 		"ordinary_route_complete":route_complete,
 		"ordinary_route_eligible":route_complete and diagnostic_jump_count == 0,
 		"diagnostic_jump_count":diagnostic_jump_count,
+		"transition_serial":transition_serial,
+		"transition_history":transition_history.duplicate(true),
+		"last_transition":last_transition_receipt.duplicate(true),
 		"terminal_transition_count":terminal_transition_count,
 		"sequence_resource":"res://resources/waves/mournlight_wave_sequence.tres"}
 

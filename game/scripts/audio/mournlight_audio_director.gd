@@ -233,7 +233,19 @@ func _on_attack_hit(event: Dictionary) -> void:
 	# Lantern impact is a distinct, short recovery cue.  It is keyed by the
 	# authoritative attack id and phase, so one shot can never replay its impact
 	# even if presentation and combat both report the same hit.
-	_emit_attack_audio(event, "impact")
+	var resolved := event.duplicate(true)
+	# Keep compatibility with lightweight/custom health components that return a
+	# reduced hit dictionary. AttackRuntime normally supplies this field; the
+	# fallback still binds the impact to its latest authoritative transaction and
+	# never invents an id from wall-clock timing.
+	if String(resolved.get("attack_id", "")).is_empty():
+		var controller := get_parent()
+		var attack_runtime := controller.get_node_or_null("World/Warden/Weapons/AttackRuntime") if controller else null
+		if attack_runtime:
+			var latest: Dictionary = attack_runtime.last_event
+			if not String(latest.get("attack_id", "")).is_empty():
+				resolved["attack_id"] = latest.get("attack_id")
+	_emit_attack_audio(resolved, "impact")
 
 func _on_attack_rejected(event: Dictionary) -> void:
 	if not event.has("attack_id"):

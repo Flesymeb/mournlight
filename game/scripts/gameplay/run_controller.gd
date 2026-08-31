@@ -1818,7 +1818,8 @@ func _try_begin_passive_ordinary_profile() -> void:
 	if run_route_kind != "ordinary" or int(wave_snapshot.get("wave", 0)) != 5 or int(wave_snapshot.get("diagnostic_jump_count", 0)) != 0:
 		_profile_armed = false
 		return
-	var live_density := int(spawner.get_profile_counters().get("live", 0))
+	var encounter_snapshot := spawner.get_snapshot()
+	var live_density := int(encounter_snapshot.get("live", 0))
 	_profile_gate_counter_reads += 1
 	_profile_arm_receipt["observed_density"] = live_density
 	if live_density < PROFILE_DENSITY_MIN or live_density > PROFILE_DENSITY_MAX:
@@ -1876,7 +1877,8 @@ func _advance_profile_sample(delta: float) -> void:
 		return
 	_profile_sample_accumulator = 0.0
 	_profile_sample_counter_reads += 1
-	var live_density := int(spawner.get_profile_counters().get("live", 0))
+	var encounter_snapshot := spawner.get_snapshot()
+	var live_density := int(encounter_snapshot.get("live", 0))
 	_accumulate_profile_coverage(_profile_cached_system_observation(live_density))
 	if _profile_samples_ms.is_empty():
 		_profile_minimum_enemy_workload = live_density
@@ -1896,7 +1898,7 @@ func _advance_profile_sample(delta: float) -> void:
 	var allocation_bytes := int(Performance.get_monitor(Performance.MEMORY_STATIC))
 	var orphan_nodes := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	var metric_counts := _profile_counts()
-	var workload_sample := _profile_workload_receipt(spawner.get_snapshot())
+	var workload_sample := _profile_workload_receipt(encounter_snapshot)
 	if _profile_metric_samples.size() < PROFILE_MAX_SAMPLES:
 		var cycle_provenance: Dictionary = validation_profile_sample.get("cycle_provenance", {})
 		var sample_index := _profile_metric_samples.size()
@@ -1924,8 +1926,8 @@ func _advance_profile_sample(delta: float) -> void:
 			"active_audio_voices":int(metric_counts.get("audio_voices", 0)),
 			"pooled_enemies":int(metric_counts.get("pooled_enemies", 0)),
 			"pooled_pickups":int(metric_counts.get("pooled_pickups", 0)),
-			"spawned_total":int(spawner.get_snapshot().get("spawned", 0)),
-			"despawned_total":int(spawner.get_snapshot().get("retired", 0)),
+			"spawned_total":int(encounter_snapshot.get("spawned", 0)),
+			"despawned_total":int(encounter_snapshot.get("retired", 0)),
 			"runtime_error_count":0,
 			"subsystems": {
 				"targeting":(workload_sample.get("targeting", {}) as Dictionary).duplicate(true),
@@ -2938,7 +2940,13 @@ func _profile_renderer_receipt() -> Dictionary:
 	# platform (notably some desktop GL stacks). Treat a complete adapter/vendor
 	# pair plus either API or driver details as an identified renderer; software
 	# markers still force an explicit rejection below.
-	var identity_complete := not adapter_name.strip_edges().is_empty() and not adapter_vendor.strip_edges().is_empty() and (not adapter_api_version.strip_edges().is_empty() or not str(driver_info).strip_edges().is_empty())
+	# Some native desktop drivers expose neither a driver-info string nor an API
+	# version through Godot's adapter query, even though adapter name/vendor and
+	# the active rendering driver are fully identified.  Requiring those optional
+	# fields incorrectly classified such runs as unknown and made the dense
+	# qualification permanently pending.  Name + vendor + driver is the stable
+	# minimum identity; explicit software markers above still take precedence.
+	var identity_complete := not adapter_name.strip_edges().is_empty() and not adapter_vendor.strip_edges().is_empty() and not rendering_driver.strip_edges().is_empty()
 	var classification := "software" if software_renderer else ("hardware" if identity_complete else "unknown")
 	var classification_reason := "software_marker_detected" if software_renderer else ("complete_native_identity" if identity_complete else "renderer_identity_incomplete")
 	return {

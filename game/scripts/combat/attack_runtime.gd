@@ -88,6 +88,14 @@ func resolve_hit(attack_event: Dictionary, target: Node3D) -> Dictionary:
 	resolved_event["hit_material"] = "metal" if role_id == "grave_brute" else "character"
 	var result: Dictionary = health.apply_damage(resolved_event)
 	if result.get("accepted", false):
+		# HealthComponent returns the resolved damage payload, but older/custom
+		# health implementations may omit the attack identity when they build a
+		# compact result.  Re-attach the authoritative transaction fields at this
+		# boundary so every downstream observer (audio, HUD, telemetry) can bind
+		# the hit to the exact emitted attack rather than guessing from timing.
+		for key in ["attack_id", "weapon_id", "actor_id", "audio_owner", "damage_channel", "target_id", "generation"]:
+			if not result.has(key) and resolved_event.has(key):
+				result[key] = resolved_event[key]
 		hit_count += 1
 		result.phase = "impact"
 		last_event = result.duplicate(true)

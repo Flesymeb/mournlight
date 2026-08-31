@@ -1,0 +1,3 @@
+# These audition packages are retained for provenance review but are not
+# referenced by the shipped scene graph. Excluding the non-runtime directory
+# keeps clean headless imports bounded without changing gameplay bindings.
