@@ -26,7 +26,7 @@ radial_segments = 48
 [node name="Bellkeeper" type="CharacterBody3D" groups=["mcp_watch"]]
 script = ExtResource("1")
 collision_layer = 1
-collision_mask = 1
+collision_mask = 7
 
 [node name="Collider" type="CollisionShape3D" parent="."]
 position = Vector3(0, 1.5, 0)

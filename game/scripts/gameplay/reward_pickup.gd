@@ -27,6 +27,9 @@ var _collection_fx_remaining := 0.0
 var _constituent_drop_ids: Array[String] = []
 var merge_count := 0
 var last_merge_position := Vector3.ZERO
+var configure_generation := 0
+var configured_from_pool := false
+var last_retirement_reason := "never_retired"
 
 const SETTLE_DURATION := 0.42
 const COLLECTION_CORE_RADIUS := 0.42
@@ -35,9 +38,31 @@ const ATTRACTION_MAX_SPEED := 14.0
 const COLLECTION_FX_SECONDS := 0.24
 
 func configure(next_target: Node3D, event: Dictionary) -> void:
+	# Retirement deliberately hides and disables the pooled root. Reconfiguration
+	# is the single authoritative inverse operation: restore every presentation
+	# field that settle, attraction, collection FX, or retirement can mutate before
+	# assigning the next exactly-once reward identity.
+	configured_from_pool = _retired or state == "pooled" or configure_generation > 0
+	configure_generation += 1
 	if not is_in_group(&"reward_pickup"):
 		add_to_group(&"reward_pickup")
 	_retired = false
+	visible = true
+	presentation.visible = true
+	presentation.position = Vector3.ZERO
+	presentation.rotation = Vector3.ZERO
+	glow.visible = true
+	glow.light_energy = 0.88
+	pickup_ring.visible = true
+	pickup_ring.position = Vector3.ZERO
+	pickup_ring.rotation = Vector3.ZERO
+	pickup_ring.scale = Vector3.ONE
+	motion_tail.visible = false
+	motion_tail.position = Vector3.ZERO
+	motion_tail.rotation = Vector3.ZERO
+	motion_tail.scale = Vector3.ONE
+	process_mode = Node.PROCESS_MODE_INHERIT
+	set_process(true)
 	target = next_target
 	pickup_event = event.duplicate(true)
 	pickup_event["reward_value"] = maxi(1, int(pickup_event.get("reward_value", 1)))
@@ -66,7 +91,6 @@ func configure(next_target: Node3D, event: Dictionary) -> void:
 	presentation.scale = Vector3.ONE * (0.125 if int(pickup_event.reward_value) >= 3 else 0.09)
 	pickup_ring.scale = Vector3.ONE
 	motion_tail.visible = false
-	set_process(true)
 
 func can_accept_merge(drop_id: String) -> bool:
 	return not drop_id.is_empty() and not _constituent_drop_ids.has(drop_id) and not _collection_committed and state != "collection_fx"
@@ -173,6 +197,7 @@ func _retire(reason: String) -> void:
 	if _retired:
 		return
 	_retired = true
+	last_retirement_reason = reason
 	visible = false
 	set_process(false)
 	state = "pooled"
@@ -203,6 +228,15 @@ func _mcp_state() -> Dictionary:
 		"base_collection_radius":collection_radius,
 		"collection_radius":maxf(collection_radius, warden.pickup_collection_radius) if warden else collection_radius,
 		"target_valid":is_instance_valid(target),
+		"configure_generation":configure_generation,
+		"configured_from_pool":configured_from_pool,
+		"root_visible":visible,
+		"presentation_visible":presentation.visible,
+		"glow_visible":glow.visible,
+		"ring_visible":pickup_ring.visible,
+		"tail_visible":motion_tail.visible,
+		"processing":is_processing(),
+		"last_retirement_reason":last_retirement_reason,
 		"production_presentation":"authored_warden_lantern",
 		"presentation_variant":"high_value" if int(pickup_event.get("reward_value", 1)) >= 3 else "standard",
 	}

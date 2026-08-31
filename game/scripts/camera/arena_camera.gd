@@ -740,7 +740,19 @@ func _coverage_occluders_restored() -> bool:
 			return false
 	return true
 
+func _active_isolated_visual_count() -> int:
+	var active_count := 0
+	for visual in _coverage_occluder_visual_bindings:
+		if not is_instance_valid(visual):
+			continue
+		for occluder_path in _coverage_obstructing_paths:
+			if visual in (_coverage_visuals_by_occluder.get(occluder_path, []) as Array):
+				active_count += 1
+				break
+	return active_count
+
 func _mcp_state() -> Dictionary:
+	var isolated_visual_count := _active_isolated_visual_count()
 	return {
 		"binding_member_count":0,
 		"compositor_updates":false,
@@ -776,7 +788,7 @@ func _mcp_state() -> Dictionary:
 		"coverage_restoration_result":_coverage_occluders_restored(),
 		"effective_follow_height":follow_height + obstruction_height_boost * _obstruction_response_strength,
 		"effective_follow_distance":follow_distance - obstruction_distance_reduction * _obstruction_response_strength,
-		"isolated_visual_count":0,
+		"isolated_visual_count":isolated_visual_count,
 		"movement_velocity": movement_velocity,
 		"follow_height": follow_height,
 		"follow_distance": follow_distance,
@@ -812,11 +824,17 @@ func _mcp_state() -> Dictionary:
 			"detection_source":"registered_subject_sight_volume" if not _coverage_obstructing_paths.is_empty() else "clear",
 		},
 		"visibility_isolation": {
-			"active":false,
-			"strategy":"not_present_primary_camera_only",
+			"active":isolated_visual_count > 0,
+			"strategy":"primary_camera_segment_to_subject_selective_visual_fade",
 			"secondary_render_pass":false,
 			"secondary_camera_count":0,
-			"isolated_visual_count":0,
+			"isolated_visual_count":isolated_visual_count,
+			"bound_visual_count":_coverage_occluder_visual_bindings.size(),
+			"active_occluder_paths":_coverage_obstructing_paths.duplicate(),
+			"continuous_response":true,
+			"minimum_retained_opacity":1.0 - coverage_occluder_transparency,
+			"collision_unchanged":true,
+			"restored":_coverage_occluders_restored(),
 			"compositor_visible":false,
 			"compositor_updates":false,
 		},

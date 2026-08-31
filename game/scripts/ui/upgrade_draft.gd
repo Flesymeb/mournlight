@@ -216,6 +216,11 @@ func _decision_changes(source_changes: Variant) -> Array[Dictionary]:
 		# stale catalog row can never leak NEW/LOCKED into CURRENT or NEW.
 		if next == null:
 			continue
+		# A null-to-zero row is an old unlock placeholder, not a decision-relevant
+		# current-to-new value. Real authored unlock tradeoffs are positive defining
+		# stats; keep the silhouette/header and omit this inert numeric row.
+		if current == null and (next is int or next is float) and is_zero_approx(float(next)):
+			continue
 		if _display_values_equal(current, next):
 			continue
 		var normalized := change.duplicate(true)

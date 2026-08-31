@@ -1750,6 +1750,11 @@ func _advance_final_profile() -> void:
 		"preflight":DenseWaveProfileClass.preflight(_profile_renderer_receipt(), _profile_viewport_receipt(), _profile_process_frame_start, _profile_process_frame_start, 0, 0, "advance_start", {"branch_id":validation_profile_receipt.get("branch_id", ""), "run_serial":run_serial, "setup_generation":validation_profile_receipt.get("setup_generation", 0), "advance_generation":_profile_advance_generation}, {"required":true,"pending":true}),
 	}
 	get_tree().paused = false
+	# Advance only arms the candidate-owned window. Persist the start edge before
+	# returning to the input caller; completion is driven by _process and recorded
+	# independently after four seconds even when no collector call remains open.
+	_record_profile_cycle("advance_start", validation_profile_sample)
+	_emit_snapshot()
 
 func _arm_passive_ordinary_profile(wave_snapshot: Dictionary) -> void:
 	if run_route_kind != "ordinary" or _profile_active or _profile_armed:
@@ -2088,9 +2093,15 @@ func _advance_profile_sample(delta: float) -> void:
 	# Unknown identity is pending native evidence even if synthetic predicates
 	# happen to pass; software is an explicit rejection. Only an eligible native
 	# renderer may produce a qualified status.
-	validation_profile_sample["status"] = DenseWaveProfileClass.UNKNOWN_STATUS if renderer_gate_status == DenseWaveProfileClass.UNKNOWN_STATUS else (DenseWaveProfileClass.NATIVE_STATUS if qualification_passed and renderer_gate_status == DenseWaveProfileClass.NATIVE_STATUS else "rejected")
+	validation_profile_sample["status"] = (
+		DenseWaveProfileClass.UNKNOWN_STATUS if renderer_gate_status == DenseWaveProfileClass.UNKNOWN_STATUS
+		else (DenseWaveProfileClass.SOFTWARE_STATUS if renderer_gate_status == DenseWaveProfileClass.SOFTWARE_STATUS
+		else (DenseWaveProfileClass.NATIVE_STATUS if qualification_passed and renderer_gate_status == DenseWaveProfileClass.NATIVE_STATUS else "rejected_native_predicates"))
+	)
 	validation_profile_sample["renderer_gate_status"] = renderer_gate_status
-	validation_profile_sample["phase_sample_availability"] = {"advance_complete": {
+	validation_profile_sample["phase_sample_availability"] = {
+		"advance_start":{"frames_ran":false,"frame_sample_count":0,"physics_sample_count":0,"samples_available":false},
+		"advance_complete": {
 		"frames_ran": bool((validation_profile_sample.get("frame_execution", {}) as Dictionary).get("frames_ran", false)),
 		"frame_sample_count": validation_profile_sample.get("sample_count", 0),
 		"physics_sample_count": validation_profile_sample.get("physics_sample_count", 0),
@@ -2099,7 +2110,11 @@ func _advance_profile_sample(delta: float) -> void:
 	validation_profile_sample["requested_resolved_receipt"] = {"requested": validation_profile_sample.get("requested_enemy_workload", 0), "resolved": validation_profile_sample.get("end_enemy_workload", 0), "reset_isolation": false}
 	validation_profile_sample["rejection_reasons"] = (validation_profile_sample["qualification"] as Dictionary).get("reasons", []).duplicate()
 	_record_profile_matrix_sample(validation_profile_sample)
-	_record_profile_cycle("advance", validation_profile_sample)
+	_record_profile_cycle("advance_complete", validation_profile_sample)
+	# The completed window is a persisted product receipt, not an ephemeral
+	# collector return value. Reset remains a separate edge and archives this
+	# sample before replacing the live receipt with ordinary-run isolation state.
+	validation_profile_receipt = validation_profile_sample.duplicate(true)
 	if _profile_origin == "ordinary_final_wave_passive":
 		_record_ordinary_profile_sample(validation_profile_sample)
 	if _profile_origin.begins_with("diagnostic_"):
@@ -2482,7 +2497,7 @@ func _diagnostic_profile_cycle_comparison() -> Dictionary:
 					"resolved_density":entry.get("resolved_density", -1),
 					"lifecycle":(entry.get("lifecycle", {}) as Dictionary).duplicate(true),
 			}
-		elif phase == "advance" and not current.is_empty():
+		elif phase in ["advance", "advance_complete"] and not current.is_empty():
 			current["sample"] = {
 				"sample_count":entry.get("sample_count", 0),
 				"window_seconds":entry.get("window_seconds", 0.0),
@@ -2558,7 +2573,7 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 				"renderer":(entry.get("renderer", {}) as Dictionary).duplicate(true),
 				"prepare":entry.duplicate(true),
 			}
-		elif phase == "advance" and not current.is_empty() and String(entry.get("cycle_id", "")) == String(current.get("cycle_id", "")):
+		elif phase in ["advance", "advance_complete"] and not current.is_empty() and String(entry.get("cycle_id", "")) == String(current.get("cycle_id", "")):
 			current["advance"] = entry.duplicate(true)
 			current["sample"] = {
 				"status":entry.get("status", ""),

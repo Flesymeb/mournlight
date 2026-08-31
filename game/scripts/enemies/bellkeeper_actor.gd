@@ -61,7 +61,9 @@ func configure(next_target: WardenController, registry: EnemyNeighborRegistry = 
 	visible = true
 	collider.disabled = false
 	collision_layer = 1
-	collision_mask = 1
+	# Share the Warden/ordinary-enemy world mask so the representative boss is
+	# blocked by the same rendered-footprint landmark and perimeter datum.
+	collision_mask = 7
 	process_mode = Node.PROCESS_MODE_INHERIT
 	telegraph_kind = "bell_wave"
 	vulnerable = false
