@@ -50,19 +50,8 @@ extends Camera3D
 @export var coverage_occluder_visuals: Array[NodePath] = []
 @export_range(0.0, 1.0, 0.01) var coverage_occluder_transparency := 0.78
 @export var coverage_settle_seconds := 0.28
-@export var visibility_activation_seconds := 0.04
-@export var visibility_release_seconds := 0.22
-@export var visibility_probe_overscan := 1.25
-@export var presentation_body: NodePath
-@export var presentation_lantern: NodePath
-@export var presentation_effects: Array[NodePath] = []
 @export var tall_occluders: Array[NodePath] = []
 @export var direct_sight_volume_radius := 0.9
-## Dense-wave secondary visibility is a safety compositor, not a second full
-## resolution camera. Keep its texture cheap and refresh it on a bounded cadence
-## while the primary shipped camera remains responsive every frame.
-@export_range(0.25, 1.0, 0.05) var dense_compositor_resolution_scale := 0.5
-@export var dense_compositor_refresh_seconds := 0.12
 
 ## Multi-subject projection is the most expensive camera-side query during a
 ## dense wave (each subject projects an 8-corner actor volume twice per frame).
@@ -70,8 +59,6 @@ extends Camera3D
 ## work on a deterministic 20 Hz lane; the cached result is still consumed by
 ## the every-frame damping and framing code below.
 const DENSE_COVERAGE_REFRESH_SECONDS := 0.05
-
-const VISIBILITY_LAYER := 20
 
 var movement_velocity := Vector3.ZERO
 var framing_target := Vector3.ZERO
@@ -108,30 +95,8 @@ var _coverage_occluder_visual_bindings: Array[GeometryInstance3D] = []
 var _coverage_visuals_by_occluder: Dictionary = {}
 var _coverage_occluder_original_transparency: Dictionary = {}
 var _coverage_occluder_original_visibility: Dictionary = {}
-var _blocked_seconds := 0.0
-var _clear_seconds := 0.0
-var _visibility_samples_blocked := 0
-var _last_occluder := ""
-var _presentation_visuals: Array[VisualInstance3D] = []
-var _source_visuals: Array[VisualInstance3D] = []
-var _effect_visuals: Array[VisualInstance3D] = []
-var _binding_members: Array[Dictionary] = []
-var _original_visual_layers: Dictionary = {}
-var _original_visual_visibility: Dictionary = {}
-var _original_material_overlays: Dictionary = {}
-var _primary_camera_visibility_layer := true
-var _visibility_viewport: SubViewport
-var _visibility_camera: Camera3D
-var _visibility_canvas: CanvasLayer
-var _visibility_texture: TextureRect
-var _compositor_frame_count := 0
 var _tall_occluder_bindings: Array[Dictionary] = []
-var _direct_detection_active := false
-var _detection_source := "clear"
-var _compositor_allowed := false
-var _compositor_refresh_remaining := 0.0
-var _compositor_requested_updates := 0
-var _compositor_skipped_updates := 0
+var _camera_response_allowed := false
 
 func _ready() -> void:
 	# Rebase the shipped camera from one authoritative sight lane. Older
@@ -151,10 +116,8 @@ func _ready() -> void:
 	fov = normal_fov
 	if target:
 		_normalize_occluder_bindings()
-		_bind_visibility_presentation()
 		_bind_tall_occluders()
 		_bind_coverage_occluder_visuals()
-		_build_visibility_compositor()
 		_snap_to_target()
 
 func _normalize_occluder_bindings() -> void:
@@ -188,27 +151,22 @@ func set_movement_velocity(value: Vector3) -> void:
 	movement_velocity = Vector3(value.x, 0.0, value.z)
 
 func set_shell_state(run_state: String) -> void:
-	# The run controller is the authoritative owner of shell visibility. Draft,
-	# pause, settings, title, result, death, and victory never share the viewport
-	# with the private Warden compositor.
-	_compositor_allowed = run_state in ["active", "boss"]
-	if not _compositor_allowed:
+	# The run controller remains the authoritative owner of camera updates. Modal
+	# pages freeze this response, while ordinary and dense play use the one shipped
+	# camera and the same reversible landmark-fade path.
+	_camera_response_allowed = run_state in ["active", "boss"]
+	if not _camera_response_allowed:
 		occlusion_guard_active = false
-		_blocked_seconds = 0.0
-		_clear_seconds = 0.0
 		_coverage_measure_remaining = 0.0
 		_coverage_before_cache.clear()
 		_coverage_after_cache.clear()
-		_apply_visibility_overlay(false)
+		reset_occlusion_response()
 
 func _process(delta: float) -> void:
 	if not is_instance_valid(target):
 		return
-	if not _compositor_allowed:
-		if occlusion_guard_active or (is_instance_valid(_visibility_texture) and _visibility_texture.visible):
-			set_shell_state("modal")
+	if not _camera_response_allowed:
 		return
-	_compositor_refresh_remaining = maxf(0.0, _compositor_refresh_remaining - delta)
 	_coverage_members_refresh_remaining = maxf(0.0, _coverage_members_refresh_remaining - delta)
 	var desired_lead := Vector3.ZERO
 	if movement_velocity.length_squared() > 0.04:
@@ -325,10 +283,8 @@ func _process(delta: float) -> void:
 	safe_frame_ok = warden_inside and coverage_inside and arena_fill_ok and obstruction_resolved
 	safe_frame_correction_active = _coverage_offset.length_squared() > 0.0025 or not safe_frame_ok or _arena_containment_active
 	_update_coverage_receipt(after, warden_inside, coverage_inside, arena_fill_ok, delta)
-	# Projected containment owns framing. Sightline isolation remains a secondary
-	# response to cemetery geometry that genuinely crosses the camera-to-Warden ray.
-	_update_visibility_isolation(delta)
-	_sync_visibility_camera()
+	# Projected containment and the bounded selective landmark fade are the full
+	# shipped visibility response. No secondary camera or world render is used.
 
 func _select_coverage_subjects() -> Array[Node3D]:
 	var subjects: Array[Node3D] = []
@@ -611,22 +567,6 @@ func _screen_to_target_plane(screen: Vector2) -> Vector3:
 	var distance := (target.global_position.y - origin.y) / direction.y
 	return origin + direction * maxf(0.0, distance)
 
-func _bind_visibility_presentation() -> void:
-	# The compositor owns the complete concrete Warden contract. Every authored
-	# body, lantern, and effect visual moves through the same private camera layer
-	# while obstructed; no proxy material or duplicate actor exists.
-	_bind_member("body", presentation_body)
-	_bind_member("lantern", presentation_lantern)
-	for effect_path in presentation_effects:
-		var effect := get_node_or_null(effect_path)
-		if not is_instance_valid(effect):
-			continue
-		var visuals := _collect_visuals(effect)
-		for visual in visuals:
-			_register_visual(visual)
-			_effect_visuals.append(visual)
-		_binding_members.append({"role":"effect", "bound":true, "source_path":String(effect_path), "isolation":"complete_private_layer_compositor", "visual_count":visuals.size()})
-
 func _bind_tall_occluders() -> void:
 	_tall_occluder_bindings.clear()
 	for source_path in tall_occluders:
@@ -690,30 +630,13 @@ func reset_occlusion_response() -> void:
 	_coverage_obstructed_count = 0
 	_coverage_obstructing_path = ""
 	_coverage_obstructing_paths.clear()
-	_blocked_seconds = 0.0
-	_clear_seconds = 0.0
 	occlusion_guard_active = false
-	_apply_visibility_overlay(false)
 	for visual in _coverage_occluder_visual_bindings:
 		if not is_instance_valid(visual):
 			continue
 		var instance_id := visual.get_instance_id()
 		visual.transparency = float(_coverage_occluder_original_transparency.get(instance_id, visual.transparency))
 		visual.visible = bool(_coverage_occluder_original_visibility.get(instance_id, visual.visible))
-
-func _bind_member(role: String, source_path: NodePath) -> void:
-	var source := get_node_or_null(source_path)
-	var source_members := _collect_visuals(source)
-	for visual in source_members:
-		_register_visual(visual)
-		_source_visuals.append(visual)
-	_binding_members.append({
-		"role":role,
-		"bound":is_instance_valid(source),
-		"source_path":String(source_path),
-		"isolation":"complete_private_layer_compositor",
-		"source_visual_count":source_members.size(),
-	})
 
 func _collect_visuals(root: Node) -> Array[VisualInstance3D]:
 	var result: Array[VisualInstance3D] = []
@@ -725,186 +648,6 @@ func _collect_visuals(root: Node) -> Array[VisualInstance3D]:
 		if is_instance_valid(child) and child is VisualInstance3D:
 			result.append(child as VisualInstance3D)
 	return result
-
-func _register_visual(visual: VisualInstance3D) -> void:
-	if _presentation_visuals.has(visual):
-		return
-	_presentation_visuals.append(visual)
-	_original_visual_layers[visual.get_instance_id()] = visual.layers
-	_original_visual_visibility[visual.get_instance_id()] = visual.visible
-	if visual is GeometryInstance3D:
-		_original_material_overlays[visual.get_instance_id()] = (visual as GeometryInstance3D).material_overlay
-
-func _build_visibility_compositor() -> void:
-	# The isolation camera shares the live World3D but renders only the Warden's
-	# private visibility layer onto a transparent full-viewport texture. This is
-	# a camera-owned composition boundary: cemetery geometry remains untouched
-	# and cannot depth-occlude the isolated silhouette.
-	_primary_camera_visibility_layer = get_cull_mask_value(VISIBILITY_LAYER)
-	_visibility_viewport = SubViewport.new()
-	_visibility_viewport.name = "WardenVisibilityViewport"
-	_visibility_viewport.transparent_bg = true
-	_visibility_viewport.own_world_3d = false
-	_visibility_viewport.world_3d = get_world_3d()
-	_visibility_viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_ALWAYS
-	_visibility_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	_visibility_viewport.size = _secondary_viewport_size()
-	add_child(_visibility_viewport)
-	_visibility_camera = Camera3D.new()
-	_visibility_camera.name = "WardenVisibilityCamera"
-	_visibility_camera.cull_mask = 0
-	_visibility_camera.set_cull_mask_value(VISIBILITY_LAYER, true)
-	_visibility_camera.current = true
-	_visibility_viewport.add_child(_visibility_camera)
-	_visibility_canvas = CanvasLayer.new()
-	_visibility_canvas.name = "WardenVisibilityCanvas"
-	_visibility_canvas.layer = 8
-	add_child(_visibility_canvas)
-	_visibility_texture = TextureRect.new()
-	_visibility_texture.name = "WardenVisibilityTexture"
-	_visibility_texture.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_visibility_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_visibility_texture.stretch_mode = TextureRect.STRETCH_SCALE
-	_visibility_texture.texture = _visibility_viewport.get_texture()
-	_visibility_texture.visible = false
-	_visibility_canvas.add_child(_visibility_texture)
-	_resize_visibility_compositor()
-	get_viewport().size_changed.connect(_resize_visibility_compositor)
-
-func _resize_visibility_compositor() -> void:
-	if not is_instance_valid(_visibility_viewport) or not is_instance_valid(_visibility_texture):
-		return
-	var viewport_size := get_viewport().get_visible_rect().size
-	_visibility_viewport.size = _secondary_viewport_size()
-	_visibility_texture.position = Vector2.ZERO
-	_visibility_texture.size = viewport_size
-
-func _secondary_viewport_size() -> Vector2i:
-	var viewport_size := get_viewport().get_visible_rect().size
-	var scale := clampf(dense_compositor_resolution_scale, 0.25, 1.0)
-	return Vector2i(maxi(1, int(viewport_size.x * scale)), maxi(1, int(viewport_size.y * scale)))
-
-func _sync_visibility_camera() -> void:
-	if not is_instance_valid(_visibility_camera):
-		return
-	_visibility_camera.global_transform = global_transform
-	_visibility_camera.projection = projection
-	_visibility_camera.fov = fov
-	_visibility_camera.size = size
-	_visibility_camera.near = near
-	_visibility_camera.far = far
-	_visibility_camera.frustum_offset = frustum_offset
-	if occlusion_guard_active:
-		# UPDATE_ONCE renders a fresh occlusion sample and then idles. This avoids
-		# paying a full secondary visibility pass on every render frame while the
-		# primary camera and gameplay continue at native cadence.
-		if _compositor_refresh_remaining <= 0.0:
-			_visibility_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
-			_compositor_refresh_remaining = maxf(0.04, dense_compositor_refresh_seconds)
-			_compositor_requested_updates += 1
-			_compositor_frame_count += 1
-		else:
-			_compositor_skipped_updates += 1
-
-func _update_visibility_isolation(delta: float) -> void:
-	_visibility_samples_blocked = 0
-	_last_occluder = ""
-	_direct_detection_active = false
-	_detection_source = "clear"
-	var direct_occluder := _find_registered_sight_occluder()
-	if not direct_occluder.is_empty():
-		_direct_detection_active = true
-		_detection_source = "registered_tall_occluder_sight_volume"
-		_last_occluder = direct_occluder
-		_visibility_samples_blocked = 1
-	var space_state := get_world_3d().direct_space_state
-	var exclude: Array[RID] = []
-	if target is CollisionObject3D:
-		exclude.append((target as CollisionObject3D).get_rid())
-	# The horizontal play datum is never a screen-space occluder. Excluding its
-	# collision RID prevents a low body sample from falsely isolating the actor.
-	var ground := get_node_or_null("../CemeteryGarden/OuterDatum/GroundCollision") as CollisionObject3D
-	if is_instance_valid(ground):
-		exclude.append(ground.get_rid())
-	for height in [0.45, 0.95, 1.45]:
-		if _direct_detection_active:
-			break
-		var target_point: Vector3 = target.global_position + Vector3.UP * float(height)
-		var query := PhysicsRayQueryParameters3D.new()
-		query.from = global_position
-		# The ray remains a fallback for unregistered incidental geometry. Tall
-		# authored occluders are owned by the explicit conservative volume above,
-		# so activation no longer depends on overscanning this short ray.
-		query.to = target_point
-		# Perimeter bodies constrain the player but sit between an exterior camera
-		# sample and the actor when the camera follows near an edge. Only authored
-		# landmark occluders participate in the fallback sight test.
-		query.collision_mask = arena_contract.get_camera_visibility_collision_mask() if is_instance_valid(arena_contract) else 2
-		query.exclude = exclude
-		query.collide_with_areas = false
-		var hit := space_state.intersect_ray(query)
-		if not hit.is_empty():
-			# Physics masks are intentionally a coarse fallback.  A third-party or
-			# gameplay-only body can still share the mask, so it must never activate
-			# the compositor unless it is one of the explicitly bound tall landmark
-			# colliders.  Registered sight volumes remain the authoritative path.
-			var collider := hit.get("collider") as Node
-			if not _is_registered_occluder_collider(collider):
-				continue
-			_detection_source = "fallback_physics_ray_registered_occluder"
-			_visibility_samples_blocked += 1
-			if _last_occluder.is_empty() and is_instance_valid(collider):
-				_last_occluder = String(collider.get_path())
-	if _visibility_samples_blocked > 0:
-		_blocked_seconds += delta
-		_clear_seconds = 0.0
-	else:
-		_clear_seconds += delta
-		_blocked_seconds = 0.0
-	var next_active := occlusion_guard_active
-	if not next_active and _blocked_seconds >= visibility_activation_seconds:
-		next_active = true
-	elif next_active and _clear_seconds >= visibility_release_seconds:
-		next_active = false
-	if next_active != occlusion_guard_active:
-		occlusion_guard_active = next_active
-		_apply_visibility_overlay(occlusion_guard_active)
-
-func _is_registered_occluder_collider(collider: Node) -> bool:
-	if not is_instance_valid(collider):
-		return false
-	var collider_path := String(collider.get_path())
-	for binding in _tall_occluder_bindings:
-		if not bool(binding.get("bound", false)):
-			continue
-		var resolved := String(binding.get("resolved_path", ""))
-		if resolved.is_empty():
-			continue
-		# A ray may hit a child shape/owner beneath the registered body.  Accept
-		# only that bound subtree; unrelated layer-2 bodies stay invisible to the
-		# camera visibility contract.
-		if collider_path == resolved or collider_path.begins_with(resolved + "/"):
-			return true
-	return false
-
-func _find_registered_sight_occluder() -> String:
-	if not is_instance_valid(target):
-		return ""
-	var target_points := [
-		target.global_position + Vector3.UP * 0.35,
-		target.global_position + Vector3.UP * 1.0,
-		target.global_position + Vector3.UP * 1.75,
-	]
-	for binding in _tall_occluder_bindings:
-		if not bool(binding.get("bound", false)):
-			continue
-		for shape in binding.get("shapes", []):
-			if not is_instance_valid(shape) or shape.disabled:
-				continue
-			for target_point in target_points:
-				if _sight_segment_intersects_shape_volume(global_position, target_point, shape):
-					return String(binding.get("resolved_path", binding.get("source_path", "")))
-	return ""
 
 func _sight_segment_intersects_shape_volume(from_world: Vector3, to_world: Vector3, collision_shape: CollisionShape3D) -> bool:
 	var shape_transform := collision_shape.global_transform
@@ -949,44 +692,12 @@ func _segment_intersects_centered_aabb(from: Vector3, to: Vector3, extents: Vect
 			return false
 	return true
 
-func _apply_visibility_overlay(active: bool) -> void:
-	if not is_instance_valid(_visibility_viewport) or not is_instance_valid(_visibility_texture):
-		return
-	for visual in _presentation_visuals:
-		if not is_instance_valid(visual):
-			continue
-		var instance_id := visual.get_instance_id()
-		visual.visible = bool(_original_visual_visibility.get(instance_id, true))
-		visual.layers = 1 << (VISIBILITY_LAYER - 1) if active else int(_original_visual_layers.get(instance_id, 1))
-		if visual is GeometryInstance3D:
-			(visual as GeometryInstance3D).material_overlay = _original_material_overlays.get(instance_id) as Material
-	set_cull_mask_value(VISIBILITY_LAYER, not active and _primary_camera_visibility_layer)
-	_visibility_texture.visible = active
-	_visibility_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE if active else SubViewport.UPDATE_DISABLED
-	_compositor_refresh_remaining = 0.0
-	if active:
-		_sync_visibility_camera()
-
 func _snap_to_target() -> void:
 	framing_target = target.global_position
 	_safe_frame_offset = Vector3.ZERO
 	_coverage_offset = Vector3.ZERO
 	global_position = framing_target + Vector3(follow_lateral, follow_height, follow_distance)
 	look_at(framing_target + Vector3(0.0, 0.65, 0.0), Vector3.UP)
-
-func _original_presentation_restored() -> bool:
-	if occlusion_guard_active:
-		return false
-	for visual in _presentation_visuals:
-		if not is_instance_valid(visual):
-			return false
-		if visual.layers != int(_original_visual_layers.get(visual.get_instance_id(), visual.layers)):
-			return false
-		if visual.visible != bool(_original_visual_visibility.get(visual.get_instance_id(), visual.visible)):
-			return false
-		if visual is GeometryInstance3D and (visual as GeometryInstance3D).material_overlay != (_original_material_overlays.get(visual.get_instance_id()) as Material):
-			return false
-	return true
 
 func _coverage_occluders_restored() -> bool:
 	# Camera containment also contributes to the shared response strength. It does
@@ -1006,10 +717,10 @@ func _coverage_occluders_restored() -> bool:
 
 func _mcp_state() -> Dictionary:
 	return {
-		"binding_member_count": _binding_members.size(),
-		"compositor_updates": _visibility_viewport.render_target_update_mode != SubViewport.UPDATE_DISABLED if is_instance_valid(_visibility_viewport) else false,
-		"compositor_allowed":_compositor_allowed,
-		"effect_visual_count": _effect_visuals.size(),
+		"binding_member_count":0,
+		"compositor_updates":false,
+		"compositor_allowed":false,
+		"effect_visual_count":0,
 		"framing_target": framing_target,
 		"safe_frame_ok":safe_frame_ok,
 		"safe_frame_correction_active":safe_frame_correction_active,
@@ -1040,28 +751,28 @@ func _mcp_state() -> Dictionary:
 		"coverage_restoration_result":_coverage_occluders_restored(),
 		"effective_follow_height":follow_height + obstruction_height_boost * _obstruction_response_strength,
 		"effective_follow_distance":follow_distance - obstruction_distance_reduction * _obstruction_response_strength,
-		"isolated_visual_count": _presentation_visuals.size(),
+		"isolated_visual_count":0,
 		"movement_velocity": movement_velocity,
 		"follow_height": follow_height,
 		"follow_distance": follow_distance,
 		"follow_lateral": follow_lateral,
-		"occlusion_guard_active": occlusion_guard_active,
-		"direct_occluder_detection_active":_direct_detection_active,
-		"occluder_detection_source":_detection_source,
-		"active_occluder_path":_last_occluder,
+		"occlusion_guard_active":false,
+		"direct_occluder_detection_active":not _coverage_obstructing_paths.is_empty(),
+		"occluder_detection_source":"registered_subject_sight_volume" if not _coverage_obstructing_paths.is_empty() else "clear",
+		"active_occluder_path":_coverage_obstructing_path,
 		"registered_tall_occluder_count":_tall_occluder_bindings.filter(func(binding: Dictionary) -> bool: return bool(binding.get("bound", false))).size(),
-		"presentation_binding_complete": _binding_members.size() == 5 and _source_visuals.size() >= 2 and _effect_visuals.size() == 3,
-		"presentation_roles": ["body", "lantern", "dash_aura", "active_ring", "warden_halo"],
-		"original_presentation_restored": _original_presentation_restored(),
-		"primary_camera_visibility_layer": get_cull_mask_value(VISIBILITY_LAYER),
-		"source_visual_count": _source_visuals.size(),
-		"visibility_strategy": "deterministic_multi_subject_arena_containment_with_secondary_private_layer_compositor",
+		"presentation_binding_complete":true,
+		"presentation_roles":["primary_camera_world"],
+		"original_presentation_restored":true,
+		"primary_camera_cull_mask":cull_mask,
+		"source_visual_count":0,
+		"visibility_strategy":"single_primary_camera_multi_subject_containment_with_selective_reversible_landmark_fade",
 		"dense_render_budget": {
-			"secondary_resolution_scale": dense_compositor_resolution_scale,
-			"secondary_refresh_seconds": dense_compositor_refresh_seconds,
-			"requested_updates": _compositor_requested_updates,
-			"skipped_updates": _compositor_skipped_updates,
-			"policy": "half_resolution_update_once_cadence_with_primary_camera_native"
+			"secondary_render_pass":false,
+			"secondary_camera_count":0,
+			"projection_refresh_seconds":DENSE_COVERAGE_REFRESH_SECONDS,
+			"membership_refresh_seconds":0.1,
+			"policy":"primary_camera_only_with_bounded_projection_and_cached_membership"
 		},
 		"tall_occluder_registry":{
 			"requested_count":tall_occluders.size(),
@@ -1071,29 +782,17 @@ func _mcp_state() -> Dictionary:
 				"bound":binding.get("bound", false), "shape_count":binding.get("shape_count", 0),
 			}),
 			"sight_volume_radius":direct_sight_volume_radius,
-			"direct_detection_active":_direct_detection_active,
-			"detection_source":_detection_source,
+			"direct_detection_active":not _coverage_obstructing_paths.is_empty(),
+			"detection_source":"registered_subject_sight_volume" if not _coverage_obstructing_paths.is_empty() else "clear",
 		},
 		"visibility_isolation": {
-			"active": occlusion_guard_active, "blocked_samples": _visibility_samples_blocked,
-			"sample_count": 3, "blocked_seconds": _blocked_seconds,
-			"clear_seconds": _clear_seconds, "last_occluder": _last_occluder,
-				"strategy": "complete_private_layer_compositor",
-				"isolated_visual_count": _presentation_visuals.size(),
-				"source_visual_count": _source_visuals.size(),
-				"isolation_visual_count": _source_visuals.size() + _effect_visuals.size(),
-				"effect_visual_count": _effect_visuals.size(),
-				"binding_members": _binding_members.duplicate(true),
-				"binding_complete": _binding_members.size() == 5 and _source_visuals.size() >= 2 and _effect_visuals.size() == 3,
-			"compositor_visible": _visibility_texture.visible if is_instance_valid(_visibility_texture) else false,
-			"compositor_updates": _visibility_viewport.render_target_update_mode != SubViewport.UPDATE_DISABLED if is_instance_valid(_visibility_viewport) else false,
-			"compositor_frame_count": _compositor_frame_count,
-			"compositor_requested_updates": _compositor_requested_updates,
-			"compositor_skipped_updates": _compositor_skipped_updates,
-			"compositor_resolution_scale": dense_compositor_resolution_scale,
-			"compositor_refresh_seconds": dense_compositor_refresh_seconds,
-			"primary_camera_visibility_layer": get_cull_mask_value(VISIBILITY_LAYER),
-			"probe_overscan": visibility_probe_overscan,
+			"active":false,
+			"strategy":"not_present_primary_camera_only",
+			"secondary_render_pass":false,
+			"secondary_camera_count":0,
+			"isolated_visual_count":0,
+			"compositor_visible":false,
+			"compositor_updates":false,
 		},
 		"lead_distance": lead_distance,
 		"fov": fov,

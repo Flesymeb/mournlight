@@ -172,11 +172,16 @@ func _choose(index: int) -> void:
 	for card_index in buttons.size():
 		buttons[card_index].disabled = card_index != index
 		_refresh_card_state(card_index)
-	# Button.pressed is emitted on the debounced release edge. Commit directly
-	# instead of waiting on a scaled SceneTree timer: draft owns the pause, so a
-	# frozen/tester clock can otherwise hold the transaction forever and leave
-	# the world paused after a valid keyboard or gamepad choice.
-	if commit_serial != _presentation_serial or not visible:
+	# Keep SELECTED visible for a short authored confirmation beat while the draft
+	# continues to own pause. This unscaled, process-always timer also completes
+	# under a paused SceneTree. The latch is set before awaiting, guaranteeing a
+	# held confirm can schedule exactly one authoritative application before
+	# gameplay resumes.
+	_commit_choice_after_selected_frame(index, commit_serial)
+
+func _commit_choice_after_selected_frame(index: int, commit_serial: int) -> void:
+	await get_tree().create_timer(0.42, true, false, true).timeout
+	if commit_serial != _presentation_serial or not visible or not latched or selected_index != index:
 		return
 	choice_requested.emit(index)
 
@@ -407,9 +412,10 @@ func _refresh_card_state(index: int) -> void:
 	if selected_index == index: state = "SELECTED  •  APPLYING"
 	elif not available: state = "UNAVAILABLE"
 	elif latched: state = "CHOICE LOCKED"
-	elif _pressed[index]: state = "PRESS  •  RELEASE TO CHOOSE"
-	elif buttons[index].has_focus(): state = ("GAMEPAD FOCUS" if input_device == "gamepad" else "KEYBOARD FOCUS") + "  •  CONFIRM TO CHOOSE"
-	elif _hovered[index]: state = "MOUSE FOCUS  •  CLICK TO CHOOSE"
+	elif _pressed[index]: state = "PRESSED  •  RELEASE TO CHOOSE"
+	elif input_device == "mouse" and _hovered[index]: state = "MOUSE HOVER  •  CLICK TO CHOOSE"
+	elif buttons[index].has_focus() and input_device in ["keyboard", "gamepad"]: state = ("GAMEPAD FOCUS" if input_device == "gamepad" else "KEYBOARD FOCUS") + "  •  CONFIRM TO CHOOSE"
+	elif _hovered[index]: state = "MOUSE HOVER  •  CLICK TO CHOOSE"
 	elif newly_unlocked: state = "NEW WEAPON"
 	_state_nodes[index].text = state
 	buttons[index].add_theme_stylebox_override("normal", _card_style(state, false))
@@ -427,7 +433,7 @@ func _card_style(state: String, emphasized: bool) -> StyleBoxFlat:
 	style.border_color = Color(0.42, 0.31, 0.18, 0.85)
 	if state.begins_with("SELECTED"):
 		style.border_color = Color(1.0, 0.76, 0.31, 1.0); style.bg_color = Color(0.105, 0.072, 0.035, 0.97)
-	elif "FOCUS" in state or state.begins_with("HOVER") or emphasized:
+	elif "FOCUS" in state or "HOVER" in state or state.begins_with("PRESSED") or emphasized:
 		style.border_color = Color(0.43, 0.96, 0.86, 1.0); style.bg_color = Color(0.035, 0.065, 0.072, 0.97)
 	elif state == "NEW WEAPON": style.border_color = Color(0.72, 0.57, 0.95, 0.95)
 	elif state in ["UNAVAILABLE", "CHOICE LOCKED"]: style.border_color = Color(0.32, 0.34, 0.4, 0.7)
@@ -439,4 +445,4 @@ func _mcp_state() -> Dictionary:
 		var card: Dictionary = cards[index]
 		var changes := _decision_changes(card.get("changes", []))
 		visible_cards.append({"id":str(card.get("id", "")), "title":str(card.get("title", "")), "icon_path":str(card.get("icon_path", FALLBACK_ICON_PATH)), "changes":changes, "decision_delta_count":changes.size(), "silhouette_first":not str(card.get("icon_path", "")).is_empty(), "consequence":str(card.get("consequence", "")), "interaction_state":_state_nodes[index].text})
-	return {"authored_cards":visible_cards, "visible":visible, "latched":latched, "selected_index":selected_index, "focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none", "input_device":input_device, "device_generation":device_generation, "focus_states":{"keyboard":"KEYBOARD FOCUS  •  CONFIRM TO CHOOSE","gamepad":"GAMEPAD FOCUS  •  CONFIRM TO CHOOSE","mouse":"MOUSE FOCUS  •  CLICK TO CHOOSE","hover":"MOUSE FOCUS  •  CLICK TO CHOOSE","unavailable":"UNAVAILABLE","selected":"SELECTED  •  APPLYING"}, "cancel_policy":"back_or_escape_closes_without_mutation", "cancel_action":"ui_cancel", "stable_card_dimensions":Vector2(328,522), "hierarchy":"dominant_icon + consequence + projected_change_rows"}
+	return {"authored_cards":visible_cards, "visible":visible, "latched":latched, "selected_index":selected_index, "focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none", "input_device":input_device, "device_generation":device_generation, "focus_states":{"keyboard":"KEYBOARD FOCUS  •  CONFIRM TO CHOOSE","gamepad":"GAMEPAD FOCUS  •  CONFIRM TO CHOOSE","mouse":"MOUSE HOVER  •  CLICK TO CHOOSE","hover":"MOUSE HOVER  •  CLICK TO CHOOSE","pressed":"PRESSED  •  RELEASE TO CHOOSE","unavailable":"UNAVAILABLE","newly_unlocked":"NEW WEAPON","selected":"SELECTED  •  APPLYING"}, "activation_policy":"release_edge + pre_await_latch + 0.42s unscaled selected beat + exactly_once_authoritative_apply_before_unpause", "cancel_policy":"back_or_escape_closes_without_mutation", "cancel_action":"ui_cancel", "stable_card_dimensions":Vector2(328,522), "hierarchy":"dominant_icon + consequence + projected_change_rows"}
