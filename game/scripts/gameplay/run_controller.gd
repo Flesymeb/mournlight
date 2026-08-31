@@ -448,6 +448,10 @@ func retry_run() -> void:
 	var victory_transaction := ordinary_victory_receipt.duplicate(true)
 	var victory_fixture := tester_victory_fixture_receipt.duplicate(true)
 	_next_baseline_reason = "retry"
+	# Retire the short-lived attack voices before tearing down entities.  This is
+	# intentionally idempotent with _retire_transient_ownership and closes the
+	# gap where a held Retry activation could carry a report into the fresh run.
+	audio_director.reset_attack_audio_lifecycle("retry_preflight")
 	complete_run_ledger.record_exit(run_serial, "retry", run_elapsed)
 	_update_ordinary_profile_cycle(source_run_serial, "retry", {
 		"player_caused":true,

@@ -32,12 +32,14 @@ bus = &"Effects"
 max_polyphony = 1
 
 [node name="LanternOnsetVoice" type="AudioStreamPlayer" parent="."]
+	process_mode = 3
 stream = ExtResource("5_lantern_onset")
 volume_db = -11.0
 bus = &"Effects"
 max_polyphony = 1
 
 [node name="LanternImpactVoice" type="AudioStreamPlayer" parent="."]
+	process_mode = 3
 stream = ExtResource("6_lantern_impact")
 volume_db = -12.0
 bus = &"Effects"

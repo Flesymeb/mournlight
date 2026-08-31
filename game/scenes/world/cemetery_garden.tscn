@@ -126,7 +126,7 @@ collision_layer = 2
 shape = SubResource("TreeShape")
 
 [node name="PlayerSpawn" type="Marker3D" parent="OuterDatum" unique_id=108365110 groups=["spawn_anchor"]]
-position = Vector3(0, 0.05, 6.2)
+position = Vector3(-8.0, 0.05, 8.0)
 
 [node name="SpawnLanes" type="Node3D" parent="OuterDatum" unique_id=1734080278]
 

@@ -3,12 +3,12 @@ extends Camera3D
 
 @export var target: Node3D
 @export var arena_contract: CemeterySpatialContract
-@export var follow_height := 23.0
-@export var follow_distance := 14.0
+@export var follow_height := 33.0
+@export var follow_distance := 23.0
 ## Fixed three-quarter azimuth keeps the Warden out of the mausoleum's stair
 ## silhouette while retaining a high-angle escape-lane read.  The rig still
 ## follows the player; this is only the authored lateral offset of that rig.
-@export var follow_lateral := 10.0
+@export var follow_lateral := 15.0
 @export var follow_damping := 8.5
 @export var lead_distance := 2.4
 @export var lead_damping := 5.0
@@ -18,9 +18,9 @@ extends Camera3D
 # Aim slightly into the south escape lane so the mausoleum/bell stay in the
 # upper third while the Warden and nearby threats occupy the readable lower
 # safe lane. This is an authored target datum, not a landmark hide/fade.
-@export var framing_bias: Vector3 = Vector3(0.0, 0.0, -7.0)
+@export var framing_bias: Vector3 = Vector3(0.0, 0.0, 2.0)
 @export var arena_limit := Vector2(34.0, 32.0)
-@export var normal_fov := 58.0
+@export var normal_fov := 68.0
 @export var safe_frame_fraction := Vector2(0.08, 0.10)
 @export var safe_frame_activation_buffer := 0.04
 @export var safe_frame_correction_damping := 11.0

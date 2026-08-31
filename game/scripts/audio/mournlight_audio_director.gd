@@ -92,6 +92,11 @@ func _ready() -> void:
 	for index in 12:
 		var voice := AudioStreamPlayer.new()
 		voice.name = "SemanticVoice%02d" % index
+		# Semantic cues are lifecycle-owned by this director and must continue to
+		# render while the run controller freezes or pauses the gameplay tree.  An
+		# inherited pausable mode can otherwise leave a valid Effects source silent
+		# during deterministic capture and on the first frame after Retry.
+		voice.process_mode = Node.PROCESS_MODE_ALWAYS
 		voice.bus = &"Effects"
 		voice.max_polyphony = 1
 		add_child(voice)
