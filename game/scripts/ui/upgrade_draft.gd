@@ -115,6 +115,19 @@ func _normalize_card(value: Variant) -> Dictionary:
 	normalized["consequence"] = str(normalized.get("consequence", "Shape the next exchange."))
 	normalized["available"] = bool(normalized.get("available", true)) and normalized["id"] != "invalid_offer"
 	normalized["changes"] = normalized.get("changes", []) if normalized.get("changes", []) is Array else []
+	# Keep the serialized presenter payload truthful as well as the rendered rows.
+	# Older catalog entries carried UNOWNED/NEW tokens in concrete_change and
+	# effect_lines for new weapons; those are eligibility metadata, not values a
+	# player can compare. Rebuild both summaries from the normalized deltas.
+	var decision_changes := _decision_changes(normalized["changes"])
+	var summary_lines: Array[String] = []
+	for change in decision_changes:
+		var field_label := str(change.get("label", str(change.get("field", "STAT")).to_upper()))
+		var result_text := _format_value(change.get("result"), str(change.get("field", "")))
+		var current_text := _format_value(change.get("current"), str(change.get("field", "")))
+		summary_lines.append("%s  %s  →  %s" % [field_label, current_text, result_text] if not current_text.is_empty() else "%s  →  %s" % [field_label, result_text])
+	normalized["effect_lines"] = summary_lines
+	normalized["concrete_change"] = " | ".join(summary_lines)
 	return normalized
 
 func set_input_device(next_device: String, generation: int) -> void:
@@ -340,9 +353,10 @@ func _build_stat_row(change: Dictionary) -> Control:
 	# in a faux current-value cell.
 	var is_new := change.current == null
 	if is_new:
-		# A newly unlocked weapon has no prior numeric value.  Show the
-		# authoritative ownership state instead of an em-dash placeholder.
-		var empty_current := _value_label("UNOWNED", false)
+		# A newly unlocked weapon has no prior numeric value. Keep CURRENT empty
+		# rather than leaking an ownership/placeholder token into a decision row;
+		# the NEW WEAPON state label and silhouette already establish eligibility.
+		var empty_current := _value_label("", false)
 		empty_current.custom_minimum_size = Vector2(62, 0)
 		row.add_child(empty_current)
 	else:
@@ -369,7 +383,7 @@ func _value_label(value: String, result_value: bool) -> Label:
 	return label
 
 func _format_value(value, field: String) -> String:
-	if value == null: return "UNOWNED"
+	if value == null: return ""
 	if value is String: return value
 	if field in ["count", "rank"]: return str(int(value))
 	if field in ["cooldown", "duration", "hit_interval", "dash_cooldown"]: return "%.2fs" % float(value)

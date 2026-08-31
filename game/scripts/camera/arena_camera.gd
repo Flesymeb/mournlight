@@ -293,7 +293,7 @@ func _process(delta: float) -> void:
 	# the lower safe band; no authored child transform is altered.
 	var look_height := 0.65
 	if is_instance_valid(get_node_or_null("../CemeteryGarden/OuterDatum/SmallMausoleumAnchor")):
-		look_height = 2.6
+		look_height = 1.8
 	look_at(framing_target + Vector3(0.0, look_height, 0.0), Vector3.UP)
 	var warden_after := _measure_projected_safe_frame()
 	var after: Dictionary
@@ -391,7 +391,7 @@ func _compose_arena_target(requested_target: Vector3, subjects: Array[Node3D]) -
 		landmark_target.y = composed.y
 		# Give the Warden priority in the shipped frame; the landmark remains in
 		# the upper composition without becoming a camera-target attractor.
-		composed = composed.lerp(landmark_target, 0.10)
+		composed = composed.lerp(landmark_target, 0.05)
 	_coverage_obstructed_count = 0
 	_coverage_obstructing_path = ""
 	_coverage_obstructing_paths.clear()

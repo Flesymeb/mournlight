@@ -32,7 +32,7 @@ background_energy_multiplier = 0.82
 sky = SubResource("Sky_mournlight")
 ambient_light_source = 2
 ambient_light_color = Color(0.32, 0.37, 0.56, 1)
-ambient_light_energy = 1.15
+ambient_light_energy = 0.82
 reflected_light_source = 2
 tonemap_mode = 2
 glow_enabled = true
@@ -74,7 +74,7 @@ shadow_enabled = false
 [node name="RouteWarmFill" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-52, -24, 0)
 light_color = Color(1, 0.68, 0.42, 1)
-light_energy = 0.24
+light_energy = 0.78
 light_specular = 0.0
 shadow_enabled = false
 
@@ -104,16 +104,18 @@ arena_contract = NodePath("../CemeteryGarden")
 near = 0.15
 far = 180.0
 arena_limit = Vector2(34.0, 32.0)
-normal_fov = 64.0
-follow_height = 24.0
-follow_distance = 19.0
-follow_lateral = 5.0
+# Release framing keeps the Warden in the lower-safe lane while exposing the
+# native cross-route, perimeter depth, and both landmark silhouettes.
+normal_fov = 72.0
+follow_height = 31.0
+follow_distance = 26.0
+follow_lateral = 9.0
 # Keep the player in the lower-safe lane while the authored mausoleum and bell
 # sit above the route instead of filling the camera's center sight lane.
-framing_bias = Vector3(0.0, 0, 1.5)
+framing_bias = Vector3(0.0, 0, 4.0)
 arena_fill_limit = Vector2(33.0, 30.5)
 coverage_max_correction = 3.5
-coverage_threat_weight = 0.30
+coverage_threat_weight = 0.18
 coverage_radius = 16.0
 obstruction_height_boost = 1.2
 obstruction_lateral_bypass = 8.0

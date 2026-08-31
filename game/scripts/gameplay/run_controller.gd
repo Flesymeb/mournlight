@@ -2863,7 +2863,11 @@ func _profile_renderer_receipt() -> Dictionary:
 	var software_renderer := false
 	for marker in ["llvmpipe", "softpipe", "swiftshader", "lavapipe", "software rasterizer"]:
 		software_renderer = software_renderer or identity_text.contains(marker)
-	var identity_complete := not adapter_name.strip_edges().is_empty() and not adapter_vendor.strip_edges().is_empty() and not adapter_api_version.strip_edges().is_empty()
+	# Native drivers are not required to expose an API-version string on every
+	# platform (notably some desktop GL stacks). Treat a complete adapter/vendor
+	# pair plus either API or driver details as an identified renderer; software
+	# markers still force an explicit rejection below.
+	var identity_complete := not adapter_name.strip_edges().is_empty() and not adapter_vendor.strip_edges().is_empty() and (not adapter_api_version.strip_edges().is_empty() or not str(driver_info).strip_edges().is_empty())
 	var classification := "software" if software_renderer else ("hardware" if identity_complete else "unknown")
 	var classification_reason := "software_marker_detected" if software_renderer else ("complete_native_identity" if identity_complete else "renderer_identity_incomplete")
 	return {
