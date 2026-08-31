@@ -31,15 +31,15 @@ background_color = Color(0.018, 0.028, 0.09, 1)
 background_energy_multiplier = 0.98
 sky = SubResource("Sky_mournlight")
 ambient_light_source = 2
-ambient_light_color = Color(0.40, 0.45, 0.66, 1)
-ambient_light_energy = 1.18
+ambient_light_color = Color(0.34, 0.39, 0.60, 1)
+ambient_light_energy = 1.06
 reflected_light_source = 2
 tonemap_mode = 2
-tonemap_exposure = 1.24
+tonemap_exposure = 1.08
 adjustment_enabled = true
-adjustment_brightness = 1.10
-adjustment_contrast = 1.06
-adjustment_saturation = 1.04
+adjustment_brightness = 1.04
+adjustment_contrast = 1.10
+adjustment_saturation = 0.92
 glow_enabled = true
 glow_intensity = 0.64
 bloom = 0.08
@@ -64,22 +64,22 @@ environment = SubResource("Environment_moonlit")
 
 [node name="MoonKey" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-54, -32, 0)
-light_color = Color(0.62, 0.72, 1, 1)
-light_energy = 1.62
+light_color = Color(0.50, 0.58, 0.88, 1)
+light_energy = 1.36
 shadow_enabled = true
 directional_shadow_max_distance = 42.0
 
 [node name="ShadowLift" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-38, 148, 0)
 light_color = Color(0.36, 0.39, 0.55, 1)
-light_energy = 0.94
+light_energy = 0.60
 light_specular = 0.0
 shadow_enabled = false
 
 [node name="RouteWarmFill" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-52, -24, 0)
 light_color = Color(1, 0.68, 0.42, 1)
-light_energy = 0.82
+light_energy = 0.68
 light_specular = 0.0
 shadow_enabled = false
 
@@ -112,8 +112,8 @@ arena_limit = Vector2(34.0, 32.0)
 # Release framing keeps the Warden in the lower-safe lane while exposing the
 # native cross-route, perimeter depth, and both landmark silhouettes.
 normal_fov = 72.0
-follow_height = 27.0
-follow_distance = 24.0
+follow_height = 22.0
+follow_distance = 19.0
 # Keep the camera near the south sight lane. The authored crypt occupies the
 # north route; a centered lateral rebase preserves the intact package while
 # keeping the player silhouette, keeper post, bell, and escape lanes readable.

@@ -71,6 +71,10 @@ var _victory_vfx_generation := -1
 var victory_vfx_event_count := 0
 var victory_vfx_receipt: Dictionary = {}
 const SHIPPED_CAMERA_HAT_NODE_NAME := "Mage_Hat"
+## Product presentation multiplier keeps the authored Warden silhouette legible
+## against the enlarged cemetery while leaving CharacterBody collision and
+## targeting dimensions authoritative.
+const RELEASE_PRESENTATION_SCALE := 1.8
 var _isolated_hat: MeshInstance3D
 var _isolated_hat_original_visibility := true
 var _hat_isolation_generation := 0
@@ -84,7 +88,8 @@ func _ready() -> void:
 	movement_plane_y = global_position.y
 	_base_model_position = model_pivot.position
 	_base_lantern_position = lantern.position
-	_base_presentation_scale = presentation_root.scale
+	_base_presentation_scale = presentation_root.scale * RELEASE_PRESENTATION_SCALE
+	presentation_root.scale = _base_presentation_scale
 	_authored_animation = _find_animation_player(authored_character)
 	_apply_authored_model_rebase()
 	_repair_visible_uv_bindings()

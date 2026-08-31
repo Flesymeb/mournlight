@@ -141,8 +141,8 @@ func _ready() -> void:
 	# Match the authored composition datum in CemeterySpatialContract.  This
 	# keeps the shipped player silhouette large enough to read while the native
 	# package, external depth, and escape lanes remain in frame.
-	follow_height = 27.0
-	follow_distance = 24.0
+	follow_height = 22.0
+	follow_distance = 19.0
 	follow_lateral = 5.0
 	framing_bias = Vector3(0.0, 0.0, 5.0)
 	obstruction_lateral_bypass = 0.0
@@ -278,8 +278,8 @@ func _process(delta: float) -> void:
 		# Preserve the landmark silhouette while keeping the Warden readable at
 		# ordinary traversal distance. External depth comes from the intact map,
 		# not from pushing the shipped lens into a thumbnail view.
-		effective_height += 1.5
-		effective_distance += 3.0
+		effective_height += 0.8
+		effective_distance += 1.2
 	var desired_position := framing_target + Vector3(follow_lateral, effective_height, effective_distance)
 	desired_position.x += _obstruction_bypass_sign * obstruction_lateral_bypass * _obstruction_response_strength
 	# Keep the shipped camera inside the intact authored world.  At the outer

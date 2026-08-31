@@ -181,7 +181,7 @@ shape = SubResource("KeeperPostShape")
 [node name="WarmLandmarkLight" type="OmniLight3D" parent="OuterDatum/KeeperLanternPostAnchor" unique_id=1551095271]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1, 0)
 light_color = Color(1, 0.53, 0.19, 1)
-light_energy = 4.2
+light_energy = 5.0
 shadow_enabled = true
 omni_range = 6.5
 

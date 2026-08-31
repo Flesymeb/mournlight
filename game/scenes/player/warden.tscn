@@ -97,7 +97,7 @@ cast_shadow = 0
 [node name="PresentationRoot" type="Node3D" parent="."]
 ## Keep the authored mage silhouette legible in the high-angle shipped camera;
 ## collision and targeting remain owned by the CharacterBody3D above.
-scale = Vector3(1.28, 1.28, 1.28)
+scale = Vector3(1.0, 1.0, 1.0)
 
 [node name="ModelPivot" type="Node3D" parent="PresentationRoot"]
 
@@ -118,7 +118,7 @@ scale = Vector3(0.18, 0.18, 0.18)
 [node name="WarmLight" type="OmniLight3D" parent="PresentationRoot/LanternPivot"]
 position = Vector3(0, 0.15, 0)
 light_color = Color(1, 0.52, 0.16, 1)
-light_energy = 2.4
+light_energy = 3.6
 omni_range = 5.2
 shadow_enabled = true
 

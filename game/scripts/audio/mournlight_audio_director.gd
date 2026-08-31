@@ -8,6 +8,7 @@ extends Node
 const LANTERN_ONSET_MIN_WALL_MSEC := 240
 const LANTERN_IMPACT_MIN_WALL_MSEC := 280
 const LANTERN_DECODER_STARTUP_GRACE_MSEC := 900
+const LANTERN_PITCH_VARIANTS: Array[float] = [0.94, 1.0, 1.06, 0.98]
 
 @export var library: Resource
 
@@ -330,10 +331,15 @@ func _play_lantern_attack_voice(phase: String, semantic_override: String = "") -
 		return false
 	var volumes: Dictionary = library.get_meta("volumes_db", {}) if library else {}
 	var windows: Dictionary = library.get_meta("playback_windows", {}) if library else {}
+	# Keep the dedicated voice as the sole player-report owner, but vary the
+	# authored stem subtly so repeated automatic fire does not sound like a
+	# machine-duplicated sample.  The cursor is reset with the run lifecycle.
+	var variation := int(_variation_cursor.get("warden_lantern_" + phase, 0))
+	_variation_cursor["warden_lantern_" + phase] = variation + 1
 	voice.stop()
 	voice.stream = streams[0] as AudioStream
 	voice.volume_db = float(volumes.get(semantic, -12.0))
-	voice.pitch_scale = 1.0
+	voice.pitch_scale = LANTERN_PITCH_VARIANTS[variation % LANTERN_PITCH_VARIANTS.size()]
 	voice.play(0.0)
 	if phase == "onset":
 		lantern_onset_started_msec = Time.get_ticks_msec()
@@ -571,6 +577,15 @@ func _stop_music() -> void:
 func play_semantic(id: String) -> bool:
 	if id == "footstep":
 		return _play_footstep_direct()
+	# Resource metadata is intentionally treated as optional at runtime: some
+	# importers discard custom keys from generic Resources.  Route direct attack
+	# probes through the same scene-bound authored voices used by the normal
+	# AttackRuntime signal path so a semantic invocation cannot report a false
+	# negative merely because metadata was stripped.
+	if id == "weapon_warden_lantern_onset":
+		return _play_lantern_attack_voice("onset", id)
+	if id in ["weapon_warden_lantern_impact", "weapon_warden_lantern_character_hit", "weapon_warden_lantern_metal_hit", "weapon_warden_lantern_miss"]:
+		return _play_lantern_attack_voice("impact", id)
 	if id == "victory":
 		return _acquire_terminal_audio("victory", "semantic_victory")
 	var streams := _streams_for(id)
