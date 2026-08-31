@@ -98,8 +98,8 @@ shape = SubResource("EastWestShape")
 [node name="MausoleumCollision" type="StaticBody3D" parent="OuterDatum" unique_id=631849061]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.53, 1.9, -2.52)
 # Gameplay still collides through the Warden/enemy mask (7), while the
-# camera-coverage query excludes this tall landmark from sightline rays.
-collision_layer = 2
+# camera-coverage query on landmark layer 2 excludes this body from sightline rays.
+collision_layer = 4
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/MausoleumCollision" unique_id=403615118]
 shape = SubResource("MausoleumShape")

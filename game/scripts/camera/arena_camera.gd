@@ -138,10 +138,10 @@ func _ready() -> void:
 	# instanced scene resources can retain serialized east-side values even after
 	# the product scene is edited; applying the release datum here keeps the live
 	# camera, player spawn, and authored landmark in the same transform contract.
-	follow_height = 29.0
-	follow_distance = 24.0
-	follow_lateral = -14.0
-	framing_bias = Vector3(-1.5, 0.0, 5.5)
+	follow_height = 31.0
+	follow_distance = 27.0
+	follow_lateral = -4.0
+	framing_bias = Vector3(0.0, 0.0, 4.0)
 	obstruction_lateral_bypass = 0.0
 	current = true
 	fov = normal_fov
@@ -389,18 +389,30 @@ func _compose_arena_target(requested_target: Vector3, subjects: Array[Node3D]) -
 		threat_center /= float(subjects.size() - 1)
 		threat_center.y = composed.y
 		composed = composed.lerp(threat_center, coverage_threat_weight)
-	# Keep the authored mausoleum landmark in the same readable band as the
-	# Warden during the critical route. The imported cemetery is intentionally
-	# one intact instance and its native Crypt bounds extend high above the
-	# street; a small datum-level focus bias avoids the old north-edge crop
-	# without tracking proxy geometry or moving any authored child mesh.
-	var landmark := get_node_or_null("../CemeteryGarden/OuterDatum/SmallMausoleumAnchor") as Node3D
-	if is_instance_valid(landmark):
-		var landmark_target := landmark.global_position
+	# Keep the authored landmark cluster in the same readable band as the Warden
+	# during the critical route and perimeter traversal. The imported cemetery is
+	# intentionally one intact instance; tracking the three native anchors keeps
+	# their silhouettes from cropping when the player reaches the south/east edge
+	# without moving any authored child mesh or introducing proxy geometry.
+	var landmark_sum := Vector3.ZERO
+	var landmark_count := 0
+	for landmark_path in [
+		"../CemeteryGarden/OuterDatum/KeeperLanternPostAnchor",
+		"../CemeteryGarden/OuterDatum/SmallMausoleumAnchor",
+		"../CemeteryGarden/OuterDatum/CrackedMoonBellAnchor",
+	]:
+		var landmark := get_node_or_null(landmark_path) as Node3D
+		if not is_instance_valid(landmark):
+			continue
+		landmark_sum += landmark.global_position
+		landmark_count += 1
+	if landmark_count > 0:
+		var landmark_target := landmark_sum / float(landmark_count)
 		landmark_target.y = composed.y
-		# Give the Warden priority in the shipped frame; the landmark remains in
-		# the upper composition without becoming a camera-target attractor.
-		composed = composed.lerp(landmark_target, 0.05)
+		# Keep player movement primary while reserving a stable 18% look-ahead for
+		# the authored landmark cluster. This retains the north route in-frame on
+		# cardinal views without pulling the camera off the street.
+		composed = composed.lerp(landmark_target, 0.18)
 	_coverage_obstructed_count = 0
 	_coverage_obstructing_path = ""
 	_coverage_obstructing_paths.clear()

@@ -32,7 +32,10 @@ func _ready() -> void:
 	for prop in find_children("*", "StaticBody3D", true, false):
 		var authored_prop := prop as StaticBody3D
 		if is_instance_valid(authored_prop):
-			authored_prop.collision_layer = 2
+			# Gameplay bodies use layer 4 so camera-coverage probes on the
+			# landmark/boundary layer 2 do not treat ordinary graves as opaque
+			# sightline blockers. Warden/enemy masks include both layers.
+			authored_prop.collision_layer = 4
 			authored_prop.collision_mask = 1
 	for body in [north_boundary, south_boundary, east_boundary, west_boundary]:
 		if is_instance_valid(body):
@@ -41,14 +44,15 @@ func _ready() -> void:
 	if is_instance_valid(ground_collision):
 		ground_collision.collision_layer = 4
 		ground_collision.collision_mask = 1
-	# Tall landmark bodies live on the authored environment layer 2. The Warden
-	# and enemy masks include layer 2 (mask 7), while camera-coverage probes use
-	# gameplay layer 1 by default. This keeps landmark collision authoritative for
-	# movement without reporting the same body as a camera sightline occluder.
+	# Tall landmark bodies live on the authored environment collision layer 4.
+	# The Warden and enemy masks include layer 4 (mask 7), while camera-coverage
+	# probes commonly use the landmark layer 2 to inspect boundary occlusion. This
+	# keeps landmark collision authoritative for movement without reporting the
+	# same body as a camera sightline blocker.
 	for path in ["OuterDatum/MausoleumCollision", "OuterDatum/NortheastTreeCollision", "OuterDatum/NorthwestTreeCollision", "OuterDatum/SoutheastTreeCollision", "OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision", "OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision"]:
 		var landmark := get_node_or_null(path) as StaticBody3D
 		if is_instance_valid(landmark):
-			landmark.collision_layer = 2
+			landmark.collision_layer = 4
 			landmark.collision_mask = 1
 	# The complete cemetery is authored with a native local datum.  Rebase the
 	# instance once at runtime so nested scene overrides cannot regress the
@@ -489,7 +493,7 @@ func get_snapshot() -> Dictionary:
 		# on layer 2 for boundary probes. Warden/enemy masks include both layers,
 		# while camera coverage mask 1 audits the sight lane without treating the
 		# central building as a physics occluder.
-		"collision_layers":{"ground":4,"perimeter":2,"landmarks":2,"mausoleum_gameplay":2,"camera_query_excluded":2,"navigation":0},
+		"collision_layers":{"ground":4,"perimeter":2,"landmarks":4,"mausoleum_gameplay":4,"camera_query_excluded":2,"navigation":0},
 		"navigation_region":{"path":"OuterDatum/NativeNavigationRegion","layers":1,"source":"native_authored_streets","enabled":is_instance_valid(get_node_or_null("OuterDatum/NativeNavigationRegion"))},
 		"playable_rect":playable,
 		"playable_area":playable.size.x * playable.size.y,
