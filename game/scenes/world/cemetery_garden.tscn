@@ -126,7 +126,7 @@ collision_layer = 2
 shape = SubResource("TreeShape")
 
 [node name="PlayerSpawn" type="Marker3D" parent="OuterDatum" unique_id=108365110 groups=["spawn_anchor"]]
-position = Vector3(-8.0, 0.05, 8.0)
+position = Vector3(0.0, 0.05, 7.8)
 
 [node name="SpawnLanes" type="Node3D" parent="OuterDatum" unique_id=1734080278]
 
@@ -181,7 +181,7 @@ shape = SubResource("KeeperPostShape")
 [node name="WarmLandmarkLight" type="OmniLight3D" parent="OuterDatum/KeeperLanternPostAnchor" unique_id=1551095271]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1, 0)
 light_color = Color(1, 0.53, 0.19, 1)
-light_energy = 5.5
+light_energy = 4.2
 shadow_enabled = true
 omni_range = 6.5
 
@@ -191,13 +191,13 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.53, 0, -2.52)
 [node name="MausoleumMoonLift" type="OmniLight3D" parent="OuterDatum/SmallMausoleumAnchor" unique_id=1562012714]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.4, 0)
 light_color = Color(0.27, 0.68, 0.9, 1)
-light_energy = 1.7
+light_energy = 1.15
 omni_range = 5.5
 
 [node name="RouteMoonFill" type="OmniLight3D" parent="OuterDatum" unique_id=1774219321]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.6, 6.8)
 light_color = Color(0.32, 0.48, 0.9, 1)
-light_energy = 1.8
+light_energy = 1.05
 light_specular = 0.2
 shadow_enabled = false
 omni_range = 10.0

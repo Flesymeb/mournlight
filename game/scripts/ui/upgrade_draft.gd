@@ -15,7 +15,7 @@ const STAT_ICON_PATHS := {
 	"experience_yield_multiplier":"res://assets/ui/upgrades/stats/experience.svg",
 }
 const VIOLET := Color("c27cff")
-const PLACEHOLDER_VALUES := ["NEW", "LOCKED", "UNAVAILABLE", "N/A", "NA"]
+const PLACEHOLDER_VALUES := ["NEW", "LOCKED", "UNAVAILABLE", "UNKNOWN", "N/A", "NA"]
 const FALLBACK_ICON_PATH := "res://assets/ui/upgrades/stats/weapon.svg"
 
 var cards: Array[Dictionary] = []
@@ -215,7 +215,7 @@ func _is_placeholder_value(value) -> bool:
 	# Catalogs from older builds occasionally decorated placeholders (for
 	# example, "LOCKED CURRENT" or "NEW WEAPON"). Treat those as unavailable
 	# display values too so they can never leak into a CURRENT/NEW comparison.
-	return normalized.contains("NEW") or normalized.contains("LOCKED") or normalized.contains("UNAVAILABLE")
+	return normalized.contains("NEW") or normalized.contains("LOCKED") or normalized.contains("UNAVAILABLE") or normalized.contains("UNKNOWN")
 
 func _display_values_equal(current, next) -> bool:
 	if current == null or next == null:
