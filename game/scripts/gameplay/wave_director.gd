@@ -29,6 +29,7 @@ var diagnostic_jump_count := 0
 var transition_serial := 0
 var transition_history: Array[Dictionary] = []
 var last_transition_receipt: Dictionary = {}
+var ordinary_transition_times: Array[float] = []
 
 func reset() -> void:
 	phase = "idle"
@@ -46,6 +47,7 @@ func reset() -> void:
 	transition_serial = 0
 	transition_history.clear()
 	last_transition_receipt.clear()
+	ordinary_transition_times.clear()
 	set_process(false)
 
 func begin() -> void:
@@ -81,7 +83,8 @@ func _process(delta: float) -> void:
 	if wave_index == _boss_wave_index() and not boss_spawned:
 		boss_entry_elapsed += delta
 		last_transition_receipt["boss_entry_elapsed"] = boss_entry_elapsed
-	if wave_index == _boss_wave_index() and not boss_spawned and boss_entry_elapsed >= BOSS_ENTRY_DELAY_SECONDS:
+	var boss_route_ready := diagnostic_jump_count > 0 or _ordinary_route_complete()
+	if wave_index == _boss_wave_index() and not boss_spawned and boss_entry_elapsed >= BOSS_ENTRY_DELAY_SECONDS and boss_route_ready:
 		boss_spawned = true
 		boss_request_count += 1
 		last_transition_receipt["boss_trigger"] = "final_wave_elapsed"
@@ -99,7 +102,8 @@ func _start_wave(index: int, ordinary_progression: bool) -> void:
 	# Ordinary eligibility is earned only by the contiguous authored sequence.
 	# Treat any out-of-order request as diagnostic, even if a stale caller marks
 	# it ordinary; this keeps fixture jumps from silently qualifying a run.
-	if ordinary_progression and wave_index >= 0 and bounded_index != wave_index + 1:
+	var expected_ordinary_index := 0 if wave_index < 0 else wave_index + 1
+	if ordinary_progression and (bounded_index != expected_ordinary_index or ordinary_route_wave_ids.size() != bounded_index):
 		ordinary_progression = false
 	# Duplicate callbacks during reload/teardown must not reset an active wave or
 	# append a second copy of its stable route id.
@@ -126,6 +130,7 @@ func _start_wave(index: int, ordinary_progression: bool) -> void:
 	if ordinary_progression:
 		if ordinary_route_wave_ids.is_empty() or ordinary_route_wave_ids[-1] != wave_id:
 			ordinary_route_wave_ids.append(wave_id)
+			ordinary_transition_times.append(total_elapsed)
 	else:
 		diagnostic_jump_count += 1
 		last_transition_receipt["diagnostic_jump_count"] = diagnostic_jump_count
@@ -144,6 +149,9 @@ func get_snapshot() -> Dictionary:
 	var definition := _definition(wave_index) if wave_index >= 0 else {}
 	var expected_ids: PackedStringArray = WAVE_SEQUENCE.get_meta("wave_ids", PackedStringArray())
 	var route_complete := _ordinary_route_complete()
+	var next_wave_id := ""
+	if ordinary_route_wave_ids.size() < expected_ids.size():
+		next_wave_id = String(expected_ids[ordinary_route_wave_ids.size()])
 	return {"phase":phase,"wave":wave_index + 1,"wave_count":_wave_count(),"wave_elapsed":wave_elapsed,
 		"wave_duration":float(definition.get("duration",0.0)),"title":String(definition.get("title","WARMUP")),
 		"warning":String(definition.get("warning","PREPARE")),"total_elapsed":total_elapsed,
@@ -152,6 +160,9 @@ func get_snapshot() -> Dictionary:
 		"terminated":terminated,"definition":definition,
 		"expected_route_wave_ids":Array(expected_ids),
 		"ordinary_route_wave_ids":ordinary_route_wave_ids.duplicate(),
+		"ordinary_transition_times":ordinary_transition_times.duplicate(),
+		"ordinary_route_next_wave_id":next_wave_id,
+		"ordinary_route_contiguous":diagnostic_jump_count == 0 and ordinary_route_wave_ids.size() == wave_index + 1 if wave_index >= 0 else ordinary_route_wave_ids.is_empty(),
 		"ordinary_route_complete":route_complete,
 		"ordinary_route_eligible":route_complete and diagnostic_jump_count == 0,
 		"diagnostic_jump_count":diagnostic_jump_count,

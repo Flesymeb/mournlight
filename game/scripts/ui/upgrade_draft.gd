@@ -30,15 +30,27 @@ var _title_nodes: Array[Label] = []
 var _consequence_nodes: Array[Label] = []
 var _state_nodes: Array[Label] = []
 var _stat_bodies: Array[VBoxContainer] = []
+var _card_styles: Array[StyleBoxFlat] = []
 var _presentation_serial := 0
 @onready var buttons: Array[Button] = [$Cards/CardA, $Cards/CardB, $Cards/CardC]
-@onready var cards_container: HBoxContainer = $Cards
+@onready var cards_container: Control = $Cards
+
+const CARD_SIZE := Vector2(328, 522)
+const CARD_OFFSETS := [0.0, 346.0, 692.0]
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	cards_container.pivot_offset = Vector2(510, 261)
 	for index in buttons.size():
 		_build_card_content(buttons[index])
+		var isolated_style := _card_style("AVAILABLE", false)
+		_card_styles.append(isolated_style)
+		# Bind one persistent style resource to every draw state of this card.
+		# Focus refreshes mutate this card-owned resource in place; they never
+		# replace a sibling's theme binding or trigger shared minimum recomputation.
+		for style_state in [&"normal", &"hover", &"pressed", &"disabled"]:
+			buttons[index].add_theme_stylebox_override(style_state, isolated_style)
+		buttons[index].add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 		buttons[index].focus_mode = Control.FOCUS_ALL
 		# Explicit lateral neighbors make the three-card draft deterministic on
 		# gamepad and keyboard regardless of container sizing or UI scale.  The
@@ -47,8 +59,8 @@ func _ready() -> void:
 		buttons[index].focus_neighbor_right = buttons[(index + 1) % buttons.size()].get_path()
 		buttons[index].mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		buttons[index].pressed.connect(_choose.bind(index))
-		buttons[index].focus_entered.connect(_refresh_card_state.bind(index))
-		buttons[index].focus_exited.connect(_refresh_card_state.bind(index))
+		buttons[index].focus_entered.connect(_on_card_focus_changed.bind(index))
+		buttons[index].focus_exited.connect(_on_card_focus_changed.bind(index))
 		buttons[index].mouse_entered.connect(_set_hovered.bind(index, true))
 		buttons[index].mouse_exited.connect(_set_hovered.bind(index, false))
 		buttons[index].button_down.connect(_set_pressed.bind(index, true))
@@ -72,6 +84,13 @@ func _layout_cards() -> void:
 	cards_container.position = size * 0.5 - cards_container.pivot_offset * fit
 	cards_container.size = Vector2(1020, 522)
 	cards_container.scale = Vector2.ONE * fit
+	# Each card owns one fixed render slot. A focused state label or style can
+	# change only pixels inside that slot; it can no longer renegotiate a shared
+	# container minimum and push, clip, or collapse either sibling.
+	for index in buttons.size():
+		buttons[index].position = Vector2(CARD_OFFSETS[index], 0.0)
+		buttons[index].size = CARD_SIZE
+		buttons[index].custom_minimum_size = CARD_SIZE
 
 func present(next_cards: Array[Dictionary]) -> void:
 	_presentation_serial += 1
@@ -409,6 +428,12 @@ func _set_pressed(index: int, pressed: bool) -> void:
 	_pressed[index] = pressed
 	_refresh_card_state(index)
 
+func _on_card_focus_changed(index: int) -> void:
+	# Only the card whose ownership changed may invalidate its presentation.
+	# Focus exit and enter each deliver an indexed signal, so both participants
+	# refresh without rebuilding the untouched sibling's canvas item.
+	_refresh_card_state(index)
+
 func _refresh_card_state(index: int) -> void:
 	if index < 0 or index >= buttons.size() or index >= _state_nodes.size(): return
 	var available := index < cards.size() and bool(cards[index].get("available", true))
@@ -423,12 +448,30 @@ func _refresh_card_state(index: int) -> void:
 	elif _hovered[index]: state = "MOUSE HOVER  •  CLICK TO CHOOSE"
 	elif newly_unlocked: state = "NEW WEAPON"
 	_state_nodes[index].text = state
-	buttons[index].add_theme_stylebox_override("normal", _card_style(state, false))
-	buttons[index].add_theme_stylebox_override("hover", _card_style(state, true))
-	buttons[index].add_theme_stylebox_override("pressed", _card_style(state, true))
-	buttons[index].add_theme_stylebox_override("disabled", _card_style(state, false))
-	buttons[index].add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	_apply_card_style(index, state)
 	buttons[index].modulate = Color(0.56, 0.58, 0.65) if not available else Color.WHITE
+	# Theme minimums are presentation data, never layout ownership. Reassert only
+	# this card's authored slot after replacing its per-state style resources.
+	buttons[index].position = Vector2(CARD_OFFSETS[index], 0.0)
+	buttons[index].size = CARD_SIZE
+	buttons[index].queue_redraw()
+
+func _apply_card_style(index: int, state: String) -> void:
+	if index < 0 or index >= _card_styles.size():
+		return
+	var style := _card_styles[index]
+	style.bg_color = Color(0.018, 0.022, 0.047, 0.94)
+	style.border_color = Color(0.42, 0.31, 0.18, 0.85)
+	if state.begins_with("SELECTED"):
+		style.border_color = Color(1.0, 0.76, 0.31, 1.0)
+		style.bg_color = Color(0.105, 0.072, 0.035, 0.97)
+	elif "FOCUS" in state or "HOVER" in state or state.begins_with("PRESSED"):
+		style.border_color = Color(0.43, 0.96, 0.86, 1.0)
+		style.bg_color = Color(0.035, 0.065, 0.072, 0.97)
+	elif state == "NEW WEAPON":
+		style.border_color = Color(0.72, 0.57, 0.95, 0.95)
+	elif state in ["UNAVAILABLE", "CHOICE LOCKED"]:
+		style.border_color = Color(0.32, 0.34, 0.4, 0.7)
 
 func _card_style(state: String, emphasized: bool) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -450,4 +493,7 @@ func _mcp_state() -> Dictionary:
 		var card: Dictionary = cards[index]
 		var changes := _decision_changes(card.get("changes", []))
 		visible_cards.append({"id":str(card.get("id", "")), "title":str(card.get("title", "")), "icon_path":str(card.get("icon_path", FALLBACK_ICON_PATH)), "changes":changes, "decision_delta_count":changes.size(), "silhouette_first":not str(card.get("icon_path", "")).is_empty(), "consequence":str(card.get("consequence", "")), "interaction_state":_state_nodes[index].text})
-	return {"authored_cards":visible_cards, "visible":visible, "latched":latched, "selected_index":selected_index, "focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none", "input_device":input_device, "device_generation":device_generation, "focus_states":{"keyboard":"KEYBOARD FOCUS  •  CONFIRM TO CHOOSE","gamepad":"GAMEPAD FOCUS  •  CONFIRM TO CHOOSE","mouse":"MOUSE HOVER  •  CLICK TO CHOOSE","hover":"MOUSE HOVER  •  CLICK TO CHOOSE","pressed":"PRESSED  •  RELEASE TO CHOOSE","unavailable":"UNAVAILABLE","newly_unlocked":"NEW WEAPON","selected":"SELECTED  •  APPLYING"}, "activation_policy":"release_edge + pre_await_latch + 0.42s unscaled selected beat + exactly_once_authoritative_apply_before_unpause", "cancel_policy":"back_or_escape_closes_without_mutation", "cancel_action":"ui_cancel", "stable_card_dimensions":Vector2(328,522), "hierarchy":"dominant_icon + consequence + projected_change_rows"}
+	var card_rects: Array[Dictionary] = []
+	for index in buttons.size():
+		card_rects.append({"index":index,"position":buttons[index].position,"size":buttons[index].size,"visible":buttons[index].visible,"slot_offset":CARD_OFFSETS[index]})
+	return {"authored_cards":visible_cards, "visible":visible, "latched":latched, "selected_index":selected_index, "focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none", "input_device":input_device, "device_generation":device_generation, "focus_states":{"keyboard":"KEYBOARD FOCUS  •  CONFIRM TO CHOOSE","gamepad":"GAMEPAD FOCUS  •  CONFIRM TO CHOOSE","mouse":"MOUSE HOVER  •  CLICK TO CHOOSE","hover":"MOUSE HOVER  •  CLICK TO CHOOSE","pressed":"PRESSED  •  RELEASE TO CHOOSE","unavailable":"UNAVAILABLE","newly_unlocked":"NEW WEAPON","selected":"SELECTED  •  APPLYING"}, "activation_policy":"release_edge + pre_await_latch + 0.42s unscaled selected beat + exactly_once_authoritative_apply_before_unpause", "cancel_policy":"back_or_escape_closes_without_mutation", "cancel_action":"ui_cancel", "stable_card_dimensions":CARD_SIZE, "card_rects":card_rects, "render_ownership":"three_fixed_control_slots_no_shared_container_minimum", "hierarchy":"dominant_icon + consequence + projected_change_rows"}

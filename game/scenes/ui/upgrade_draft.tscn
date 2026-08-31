@@ -43,7 +43,7 @@ offset_bottom = 164.0
 text = "THE NIGHT HOLDS ITS BREATH"
 horizontal_alignment = 1
 
-[node name="Cards" type="HBoxContainer" parent="."]
+[node name="Cards" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -56,21 +56,28 @@ offset_right = 510.0
 offset_bottom = 310.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 18
 
 [node name="CardA" type="Button" parent="Cards"]
 custom_minimum_size = Vector2(328,522)
-layout_mode = 2
+layout_mode = 0
+offset_right = 328.0
+offset_bottom = 522.0
 text = ""
 
 [node name="CardB" type="Button" parent="Cards"]
 custom_minimum_size = Vector2(328,522)
-layout_mode = 2
+layout_mode = 0
+offset_left = 346.0
+offset_right = 674.0
+offset_bottom = 522.0
 text = ""
 
 [node name="CardC" type="Button" parent="Cards"]
 custom_minimum_size = Vector2(328,522)
-layout_mode = 2
+layout_mode = 0
+offset_left = 692.0
+offset_right = 1020.0
+offset_bottom = 522.0
 text = ""
 
 [node name="Footer" type="Label" parent="."]

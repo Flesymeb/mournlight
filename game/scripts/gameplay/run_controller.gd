@@ -118,6 +118,7 @@ var _profile_physics_samples_ms: Array[float] = []
 var _profile_metric_samples: Array[Dictionary] = []
 var _profile_advance_generation := 0
 var _profile_process_frame_start := 0
+var _profile_physics_frame_start := 0
 var _profile_completion_grace_frames := 0
 var _dense_cycle_index := 0
 var validation_profile_matrix_samples: Array[Dictionary] = []
@@ -1708,8 +1709,10 @@ func _advance_final_profile() -> void:
 	_profile_sample_counter_reads = 0
 	_profile_active = true
 	_profile_origin = "diagnostic_prepared"
+	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
 	_profile_advance_generation += 1
 	_profile_process_frame_start = Engine.get_process_frames()
+	_profile_physics_frame_start = Engine.get_physics_frames()
 	_profile_completion_grace_frames = 0
 	_profile_start_counts = _profile_counts()
 	_profile_start_lifecycle = _lifecycle_counters()
@@ -1845,6 +1848,9 @@ func _try_begin_passive_ordinary_profile() -> void:
 	_profile_sample_accumulator = 0.0
 	_profile_sample_counter_reads = 0
 	_profile_active = true
+	_profile_process_frame_start = Engine.get_process_frames()
+	_profile_physics_frame_start = Engine.get_physics_frames()
+	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
 	_profile_origin = "ordinary_final_wave_passive"
 	_profile_completion_grace_frames = 0
 	_profile_start_counts = _profile_counts()
@@ -1881,12 +1887,21 @@ func _try_begin_passive_ordinary_profile() -> void:
 func _advance_profile_sample(delta: float) -> void:
 	if not _profile_active or get_tree().paused:
 		return
-	_profile_elapsed += delta
-	_profile_sample_accumulator += delta
+	var process_frame_delta := maxi(0, Engine.get_process_frames() - _profile_process_frame_start)
+	var physics_frame_delta := maxi(0, Engine.get_physics_frames() - _profile_physics_frame_start)
+	var nominal_hz := maxi(1, Engine.physics_ticks_per_second)
+	# Frame-stepped collectors can legitimately deliver zero delta while still
+	# executing process and physics frames. Observed engine counters therefore
+	# own the fallback sampling clock; renderer identity never participates.
+	var observed_frame_seconds := float(mini(process_frame_delta, physics_frame_delta)) / float(nominal_hz)
+	_profile_elapsed = maxf(_profile_elapsed + maxf(delta, 0.0), observed_frame_seconds)
+	_profile_sample_accumulator += maxf(delta, 0.0)
+	var sample_frame_interval := maxi(1, int(ceil(PROFILE_SAMPLE_INTERVAL_SECONDS * float(nominal_hz))))
+	var frame_cadence_ready := process_frame_delta >= (_profile_metric_samples.size() + 1) * sample_frame_interval and physics_frame_delta > 0
 	# Dynamic counters and audio/lifecycle observations are sampled at a
 	# bounded cadence. The gameplay window still advances every frame, while
 	# history growth and recursive owner reads stay capped for dense qualification.
-	if _profile_sample_accumulator < PROFILE_SAMPLE_INTERVAL_SECONDS and _profile_elapsed < _profile_duration:
+	if _profile_sample_accumulator < PROFILE_SAMPLE_INTERVAL_SECONDS and not frame_cadence_ready and _profile_elapsed < _profile_duration:
 		return
 	_profile_sample_accumulator = 0.0
 	_profile_sample_counter_reads += 1
@@ -1914,8 +1929,11 @@ func _advance_profile_sample(delta: float) -> void:
 	# authoritative and unchanged.
 	if measured_physics_ms <= 0.0 and Engine.physics_ticks_per_second > 0:
 		measured_physics_ms = 1000.0 / float(Engine.physics_ticks_per_second)
-	var measured_render_ms := maxf(0.0, frame_ms - measured_physics_ms)
 	var draw_calls := int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+	# This viewport-local CPU render metric is enabled only for the bounded dense
+	# window. It remains diagnostic on software renderers and never changes their
+	# eligibility; Godot's Performance.TIME_PROCESS remains the full-frame metric.
+	var measured_render_ms := maxf(0.0, RenderingServer.viewport_get_measured_render_time_cpu(get_viewport().get_viewport_rid()))
 	var allocation_bytes := int(Performance.get_monitor(Performance.MEMORY_STATIC))
 	var orphan_nodes := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	var metric_counts := _profile_counts()
@@ -1936,6 +1954,7 @@ func _advance_profile_sample(delta: float) -> void:
 			"frame_ms":frame_ms,
 			"physics_ms":measured_physics_ms,
 			"render_ms":measured_render_ms,
+			"render_time_source":"RenderingServer.viewport_get_measured_render_time_cpu",
 			"draw_calls":draw_calls,
 			"allocation_bytes":allocation_bytes,
 			"orphan_nodes":orphan_nodes,
@@ -1977,6 +1996,7 @@ func _advance_profile_sample(delta: float) -> void:
 		_profile_sample_accumulator = 0.0
 		return
 	_profile_active = false
+	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), false)
 	var sorted := _profile_samples_ms.duplicate()
 	sorted.sort()
 	var sorted_physics := _profile_physics_samples_ms.duplicate()
@@ -2036,6 +2056,9 @@ func _advance_profile_sample(delta: float) -> void:
 			"process_frame_end":Engine.get_process_frames(),
 			"process_frame_delta":maxi(0, Engine.get_process_frames() - int(sample_start.get("process_frame_start", _profile_process_frame_start))),
 			"frames_ran":Engine.get_process_frames() > int(sample_start.get("process_frame_start", _profile_process_frame_start)),
+			"physics_frame_start":_profile_physics_frame_start,
+			"physics_frame_end":Engine.get_physics_frames(),
+			"physics_frame_delta":maxi(0, Engine.get_physics_frames() - _profile_physics_frame_start),
 		},
 		"timestamp_msec":Time.get_ticks_msec(),
 		"fps":{"p50":60000.0 / maxf(0.001, _percentile(sorted,0.50)), "p95":60000.0 / maxf(0.001, _percentile(sorted,0.95)), "worst":1000.0 / maxf(0.001, sorted.back() if not sorted.is_empty() else 0.0)},
@@ -2143,6 +2166,7 @@ func _reset_final_profile() -> void:
 	_validation_setup_generation += 1
 	var setup_generation := _validation_setup_generation
 	_profile_active = false
+	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), false)
 	_profile_metric_samples.clear()
 	# Retire the public record immediately beside the active-owner flag. Any
 	# teardown callback or snapshot emitted below therefore sees one state.
