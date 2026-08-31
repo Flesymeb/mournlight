@@ -166,7 +166,9 @@ func _project_risk_reward(projection: Dictionary, inventory: WeaponInventory, he
 func _effect_lines(changes: Array) -> Array[String]:
 	var lines: Array[String] = []
 	for change in changes:
-		lines.append("%s  %s  →  %s" % [change.label, _format_value(change.current, String(change.field)), _format_value(change.result, String(change.field))])
+		var current_text := _format_value(change.current, String(change.field))
+		var result_text := _format_value(change.result, String(change.field))
+		lines.append("%s  %s  →  %s" % [change.label, current_text, result_text] if not current_text.is_empty() else "%s  →  %s" % [change.label, result_text])
 	return lines
 
 func _consequence_line(projection: Dictionary) -> String:
@@ -187,7 +189,11 @@ func _consequence_line(projection: Dictionary) -> String:
 
 func _format_value(value, field: String) -> String:
 	if value == null:
-		return "UNOWNED"
+		# A newly unlocked weapon has no prior numeric value. Keep the
+		# authoritative projection honest; the authored silhouette/state label
+		# communicates identity while the CURRENT column remains intentionally
+		# blank instead of leaking an ownership placeholder.
+		return ""
 	if value is String:
 		return value
 	if field in ["count", "rank"]:

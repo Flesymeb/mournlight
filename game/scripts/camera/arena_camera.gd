@@ -134,6 +134,15 @@ var _compositor_requested_updates := 0
 var _compositor_skipped_updates := 0
 
 func _ready() -> void:
+	# Rebase the shipped camera from one authoritative sight lane. Older
+	# instanced scene resources can retain serialized east-side values even after
+	# the product scene is edited; applying the release datum here keeps the live
+	# camera, player spawn, and authored landmark in the same transform contract.
+	follow_height = 29.0
+	follow_distance = 24.0
+	follow_lateral = -14.0
+	framing_bias = Vector3(-1.5, 0.0, 5.5)
+	obstruction_lateral_bypass = 0.0
 	current = true
 	fov = normal_fov
 	if target:
