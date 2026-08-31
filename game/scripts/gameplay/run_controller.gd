@@ -157,9 +157,29 @@ var _upgrade_commit_in_progress := false
 
 const PROFILE_SAMPLE_INTERVAL_SECONDS := 0.1
 const PROFILE_MAX_SAMPLES := 128
+const DEVELOPMENT_ONLY_ACTIONS := [
+	&"validation_prepare_build", &"validation_reset_build", &"validation_prepare_wisps",
+	&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_draft",
+	&"validation_prepare_result_failure", &"validation_prepare_result_victory",
+	&"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10",
+	&"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_advance_density",
+	&"validation_reset_density", &"validation_prepare_final_profile", &"validation_advance_final_profile",
+	&"validation_reset_final_profile", &"tester_victory_prepare", &"tester_victory_advance",
+	&"tester_victory_commit", &"tester_final_profile_prepare", &"tester_final_profile_advance",
+	&"tester_final_profile_reset", &"tester_dense_prepare", &"tester_dense_advance", &"tester_dense_reset",
+	&"qa_reset_first_run_guidance",
+]
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Development qualification controls are intentionally absent from release
+	# InputMap state.  They remain unbound in editor sessions for host-driven
+	# probes, but an exported build must not expose tester/validation actions even
+	# if a stale project.godot carried their names forward.
+	if not OS.has_feature("editor"):
+		for action in DEVELOPMENT_ONLY_ACTIONS:
+			if InputMap.has_action(action):
+				InputMap.erase_action(action)
 	complete_run_ledger = CompleteRunLedgerClass.new()
 	ordinary_profile_contract_checks = _ordinary_profile_contract_checks()
 	density_matrix_contract_checks = _density_matrix_contract_checks()
