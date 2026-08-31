@@ -16,6 +16,7 @@ var wave_elapsed := 0.0
 var warmup_remaining := 4.0
 var total_elapsed := 0.0
 var boss_spawned := false
+var boss_request_count := 0
 var terminated := false
 var terminal_transition_count := 0
 var ordinary_route_wave_ids: Array[String] = []
@@ -31,6 +32,7 @@ func reset() -> void:
 	warmup_remaining = 4.0
 	total_elapsed = 0.0
 	boss_spawned = false
+	boss_request_count = 0
 	terminated = false
 	terminal_transition_count = 0
 	ordinary_route_wave_ids.clear()
@@ -72,7 +74,9 @@ func _process(delta: float) -> void:
 	wave_elapsed += delta
 	if wave_index == _boss_wave_index() and not boss_spawned:
 		boss_spawned = true
+		boss_request_count += 1
 		last_transition_receipt["boss_trigger"] = "final_wave_elapsed"
+		last_transition_receipt["boss_request_count"] = boss_request_count
 		if not transition_history.is_empty():
 			transition_history[transition_history.size() - 1] = last_transition_receipt.duplicate(true)
 		boss_requested.emit()
@@ -124,7 +128,7 @@ func get_snapshot() -> Dictionary:
 	return {"phase":phase,"wave":wave_index + 1,"wave_count":_wave_count(),"wave_elapsed":wave_elapsed,
 		"wave_duration":float(definition.get("duration",0.0)),"title":String(definition.get("title","WARMUP")),
 		"warning":String(definition.get("warning","PREPARE")),"total_elapsed":total_elapsed,
-		"boss_spawned":boss_spawned,"terminated":terminated,"definition":definition,
+		"boss_spawned":boss_spawned,"boss_request_count":boss_request_count,"boss_requested_exactly_once":boss_request_count == 1 if boss_spawned else true,"terminated":terminated,"definition":definition,
 		"expected_route_wave_ids":Array(expected_ids),
 		"ordinary_route_wave_ids":ordinary_route_wave_ids.duplicate(),
 		"ordinary_route_complete":route_complete,

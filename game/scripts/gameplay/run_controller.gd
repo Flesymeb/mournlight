@@ -1148,6 +1148,14 @@ func _on_wave_phase_changed(snapshot: Dictionary) -> void:
 func _spawn_bellkeeper() -> void:
 	if is_instance_valid(boss) or result_committed:
 		return
+	# The director is authoritative for boss timing.  Ignore stale/deferred
+	# requests that arrive after teardown or from a non-final diagnostic wave.
+	var requested_wave := wave_director.get_snapshot()
+	var requested_definition: Dictionary = requested_wave.get("definition", {})
+	if not bool(requested_definition.get("boss_wave", false)):
+		return
+	if String(requested_wave.get("phase", "")) != "active":
+		return
 	boss = BELLKEEPER_SCENE.instantiate() as BellkeeperActor
 	world.get_node("BossAnchor").add_child(boss)
 	boss.position = Vector3.ZERO
