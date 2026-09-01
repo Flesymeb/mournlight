@@ -32,6 +32,7 @@ var terminal_transition_count := 0
 var ordinary_route_wave_ids: Array[String] = []
 var diagnostic_jump_count := 0
 var transition_serial := 0
+var stale_transition_rejection_count := 0
 var transition_history: Array[Dictionary] = []
 var last_transition_receipt: Dictionary = {}
 var ordinary_transition_times: Array[float] = []
@@ -54,6 +55,7 @@ func reset() -> void:
 	ordinary_route_wave_ids.clear()
 	diagnostic_jump_count = 0
 	transition_serial = 0
+	stale_transition_rejection_count = 0
 	transition_history.clear()
 	last_transition_receipt.clear()
 	ordinary_transition_times.clear()
@@ -116,16 +118,20 @@ func _start_wave(index: int, ordinary_progression: bool) -> void:
 	if terminated:
 		return
 	var bounded_index := clampi(index, 0, maxi(0, _wave_count() - 1))
+	# Wave ownership is monotonic for a live run.  Deferred callbacks can arrive
+	# after an intermission has already handed off to the next pressure band;
+	# accepting a stale lower index would rewind the authoritative route and make
+	# a fresh ordinary replay look permanently stuck in Wave 1.  Ignore those
+	# callbacks (and same-index duplicates) before mutating any state.
+	if phase in ["active", "intermission"] and bounded_index <= wave_index:
+		stale_transition_rejection_count += 1
+		return
 	# Ordinary eligibility is earned only by the contiguous authored sequence.
 	# Treat any out-of-order request as diagnostic, even if a stale caller marks
 	# it ordinary; this keeps fixture jumps from silently qualifying a run.
 	var expected_ordinary_index := 0 if wave_index < 0 else wave_index + 1
 	if ordinary_progression and (bounded_index != expected_ordinary_index or ordinary_route_wave_ids.size() != bounded_index):
 		ordinary_progression = false
-	# Duplicate callbacks during reload/teardown must not reset an active wave or
-	# append a second copy of its stable route id.
-	if phase == "active" and wave_index == bounded_index:
-		return
 	wave_index = bounded_index
 	wave_elapsed = 0.0
 	# A fresh fifth-wave entry always owns a new warning window, including
@@ -204,6 +210,7 @@ func get_snapshot() -> Dictionary:
 		"ordinary_route_complete":route_complete,
 		"ordinary_route_eligible":route_complete and diagnostic_jump_count == 0,
 		"diagnostic_jump_count":diagnostic_jump_count,
+		"stale_transition_rejection_count":stale_transition_rejection_count,
 		"transition_serial":transition_serial,
 		"transition_history":transition_history.duplicate(true),
 		"last_transition":last_transition_receipt.duplicate(true),
@@ -243,6 +250,7 @@ func get_route_contract_receipt() -> Dictionary:
 		"spawn_budget_remaining": int(snapshot.get("spawn_budget_remaining", 0)),
 		"boss_request_count": int(snapshot.get("boss_request_count", 0)),
 		"boss_requested_exactly_once": bool(snapshot.get("boss_requested_exactly_once", false)),
+		"stale_transition_rejection_count": int(snapshot.get("stale_transition_rejection_count", 0)),
 		"terminal": (snapshot.get("terminal_predicate", {}) as Dictionary).duplicate(true),
 	}
 
