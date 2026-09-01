@@ -128,13 +128,21 @@ func _ready() -> void:
 	# camera high-angle, but bring the lens back into the readable gameplay band
 	# so the Warden, telegraphs, and nearby pickups occupy the same visual scale
 	# as the PRD target instead of shrinking to thumbnail silhouettes.
-	follow_height = 28.0
-	follow_distance = 28.0
+	# Keep the native cemetery legible at the shipped 16:9 lens.  The authored
+	# map is now materially larger than the old combat pad, so the previous
+	# 28 m rig rendered the Warden as a thumbnail and weakened threat reads.
+	# A 22 m high-angle orbit still exposes the mausoleum, bell and an escape
+	# lane while giving the player silhouette enough pixels for ordinary play.
+	follow_height = 22.0
+	follow_distance = 22.0
 	follow_lateral = 0.0
-	framing_bias = Vector3(0.0, 0.0, -2.0)
+	# Aim a little farther up the authored north route so the mausoleum and bell
+	# remain fully framed from spawn; the closer 22 m rig keeps the Warden in the
+	# lower safe lane despite this landmark-forward bias.
+	framing_bias = Vector3(0.0, 0.0, -5.0)
 	obstruction_lateral_bypass = 0.0
 	current = true
-	normal_fov = 74.0
+	normal_fov = 78.0
 	fov = normal_fov
 	# Keep the shipped camera's visibility query bound to the same dedicated
 	# landmark layer as CemeterySpatialContract.  The scene resource historically
