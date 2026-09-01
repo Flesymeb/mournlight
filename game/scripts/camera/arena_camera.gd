@@ -328,6 +328,10 @@ func _select_coverage_subjects() -> Array[Node3D]:
 		_coverage_members_scan_count += 1
 	else:
 		_coverage_members_scan_skips += 1
+	# Keep the density/FOV lane truthful on both sides of the cache refresh. The
+	# first frame after a refresh used to leave this at its previous value (often
+	# zero), so a newly admitted dense wave could retain the narrow lens until
+	# the next membership tick.
 	_coverage_active_count = active_members.size()
 	for member in active_members:
 		if not is_instance_valid(member) or not member is Node3D or member == target:
@@ -808,10 +812,10 @@ func _active_isolated_visual_count() -> int:
 func _mcp_state() -> Dictionary:
 	var isolated_visual_count := _active_isolated_visual_count()
 	return {
-		"binding_member_count":0,
+		"binding_member_count":_coverage_occluder_visual_bindings.size(),
 		"compositor_updates":false,
 		"compositor_allowed":false,
-		"effect_visual_count":0,
+		"effect_visual_count":isolated_visual_count,
 		"framing_target": framing_target,
 		"safe_frame_ok":safe_frame_ok,
 		"safe_frame_correction_active":safe_frame_correction_active,
@@ -855,7 +859,7 @@ func _mcp_state() -> Dictionary:
 		"follow_height": follow_height,
 		"follow_distance": follow_distance,
 		"follow_lateral": follow_lateral,
-		"occlusion_guard_active":false,
+		"occlusion_guard_active":_coverage_obstructed_count > 0,
 		"direct_occluder_detection_active":not _coverage_obstructing_paths.is_empty(),
 		"occluder_detection_source":"registered_subject_sight_volume" if not _coverage_obstructing_paths.is_empty() else "clear",
 		"active_occluder_path":_coverage_obstructing_path,
@@ -864,7 +868,7 @@ func _mcp_state() -> Dictionary:
 		"presentation_roles":["primary_camera_world"],
 		"original_presentation_restored":true,
 		"primary_camera_cull_mask":cull_mask,
-		"source_visual_count":0,
+		"source_visual_count":_coverage_occluder_visual_bindings.size(),
 		"visibility_strategy":"single_primary_camera_package_bound_visual_aabb_with_selective_reversible_landmark_fade",
 		"dense_render_budget": {
 			"secondary_render_pass":false,
