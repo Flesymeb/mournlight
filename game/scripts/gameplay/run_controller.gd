@@ -231,6 +231,13 @@ func _ready() -> void:
 	_enter_title()
 
 func _process(delta: float) -> void:
+	# The development dense collector owns its sampling window. A timed MCP
+	# advance can leave the SceneTree paused after the input edge returns even
+	# though the game is not in its pause menu; release that stale pause latch so
+	# real frames continue to be measured. Ordinary gameplay and passive
+	# profiling never override the player's pause ownership.
+	if _profile_active and _profile_origin.begins_with("diagnostic_") and get_tree().paused and not _profile_paused:
+		get_tree().paused = false
 	_advance_context_handoff()
 	_advance_victory_transaction(delta)
 	_try_begin_passive_ordinary_profile()
@@ -1778,11 +1785,17 @@ func _prepare_final_profile() -> void:
 	var renderer_receipt := _profile_renderer_receipt()
 	var prepare_process_frame := Engine.get_process_frames()
 	var cycle_provenance := _dense_cycle_provenance("prepare", run_serial, _validation_setup_generation, 0)
+	var setup_valid := bool(preparation.get("accepted",false)) and is_instance_valid(boss)
 	validation_profile_receipt = {
 		"contract_id":DenseWaveProfileClass.CONTRACT_ID,
 		"contract_version":DenseWaveProfileClass.CONTRACT_VERSION,
 		"contract_signature":DenseWaveProfileClass.CONTRACT_SIGNATURE,
-		"accepted":bool(preparation.get("accepted",false)) and is_instance_valid(boss),
+		# Setup validity is independent from renderer qualification. A software
+		# renderer must still run the real four-second collector so frame/entity/
+		# lifecycle diagnostics remain useful; only the final qualification gate
+		# rejects it. Keep both fields explicit for host receipts.
+		"accepted":setup_valid,
+		"setup_valid":setup_valid,
 		"status":DenseWaveProfileClass.renderer_status(String(renderer_receipt.get("classification", "unknown")), bool(renderer_receipt.get("hardware_qualification_eligible", false))),
 		"branch_id":"final_wave_bellkeeper_profile",
 		"run_serial":run_serial,
@@ -1870,7 +1883,11 @@ func _advance_final_profile() -> void:
 		validation_profile_receipt["phase"] = "advance_pending"
 		validation_profile_receipt["timeout_safe"] = true
 		return
-	if not bool(validation_profile_receipt.get("accepted", false)):
+	# Do not suppress sampling merely because the preflight renderer was marked
+	# software/unknown. The collector must observe real entities and frame
+	# execution before applying the native qualification gate. Reject only an
+	# invalid setup (missing workload or Bellkeeper).
+	if not bool(validation_profile_receipt.get("setup_valid", validation_profile_receipt.get("accepted", false))):
 		_record_profile_control_rejection("tester_dense_advance", "accepted_prepare_required")
 		return
 	_profile_samples_ms.clear()

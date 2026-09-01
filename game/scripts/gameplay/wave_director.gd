@@ -36,6 +36,10 @@ var stale_transition_rejection_count := 0
 var transition_history: Array[Dictionary] = []
 var last_transition_receipt: Dictionary = {}
 var ordinary_transition_times: Array[float] = []
+## Immutable receipts for each completed pressure band.  Keeping completion
+## separate from the next-wave transition makes the ordinary five-wave route
+## auditable even when an intermission is paused by a draft transaction.
+var wave_completion_receipts: Array[Dictionary] = []
 ## Sibling encounter owner used only for read-only receipts. Wave timing remains
 ## authoritative here; the spawner owns entity lifetime and never drives phase.
 @onready var encounter_spawner: Node = get_parent().get_node_or_null("World/EncounterSpawner")
@@ -59,6 +63,7 @@ func reset() -> void:
 	transition_history.clear()
 	last_transition_receipt.clear()
 	ordinary_transition_times.clear()
+	wave_completion_receipts.clear()
 	set_process(false)
 
 func begin() -> void:
@@ -109,6 +114,17 @@ func _process(delta: float) -> void:
 			transition_history[transition_history.size() - 1] = last_transition_receipt.duplicate(true)
 		boss_requested.emit()
 	if wave_elapsed >= float(_definition(wave_index).duration) and wave_index < _wave_count() - 1:
+		var completed_definition := _definition(wave_index)
+		var completed_encounter: Dictionary = encounter_spawner.get_snapshot() if is_instance_valid(encounter_spawner) and encounter_spawner.has_method("get_snapshot") else {}
+		wave_completion_receipts.append({
+			"wave":wave_index + 1,
+			"wave_id":String(completed_definition.get("id", "")),
+			"elapsed":total_elapsed,
+			"spawn_budget":int(completed_definition.get("spawn_budget", 0)),
+			"spawned_in_wave":int(completed_encounter.get("wave_spawned", 0)),
+			"active_enemies":int(completed_encounter.get("live", 0)),
+			"ordinary_progression":ordinary_route_wave_ids.size() == wave_index + 1 and diagnostic_jump_count == 0,
+		})
 		phase = "intermission"
 		intermission_remaining = INTERMISSION_SECONDS
 		last_transition_receipt["intermission_seconds"] = INTERMISSION_SECONDS
@@ -205,6 +221,7 @@ func get_snapshot() -> Dictionary:
 		"expected_route_wave_ids":Array(expected_ids),
 		"ordinary_route_wave_ids":ordinary_route_wave_ids.duplicate(),
 		"ordinary_transition_times":ordinary_transition_times.duplicate(),
+		"wave_completion_receipts":wave_completion_receipts.duplicate(true),
 		"ordinary_route_next_wave_id":next_wave_id,
 		"ordinary_route_contiguous":route_contiguous,
 		"ordinary_route_complete":route_complete,

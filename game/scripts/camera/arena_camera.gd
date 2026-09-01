@@ -143,7 +143,13 @@ func _ready() -> void:
 	# sampled (before the first follow tick) while retaining the northward
 	# landmark read.  A southward bias avoids an initial offscreen fallback in
 	# camera_coverage when the player is still at the authored spawn marker.
-	framing_bias = Vector3(0.0, 0.0, 1.0)
+	# Keep the spawn composition aimed into the native north route.  The
+	# previous southward bias left the cracked bell and mausoleum roofs above
+	# the shipped frustum (camera_coverage reported 0.8/0.6 visibility) even
+	# though their collision/anchor bindings were valid.  A modest north bias
+	# preserves the Warden in the lower safe lane while keeping both landmarks
+	# fully readable; it does not move authored geometry.
+	framing_bias = Vector3(0.0, 0.0, -5.0)
 	obstruction_lateral_bypass = 0.0
 	current = true
 	normal_fov = 78.0
