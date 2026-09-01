@@ -34,6 +34,7 @@ var _card_styles: Array[StyleBoxFlat] = []
 var _presentation_serial := 0
 @onready var buttons: Array[Button] = [$Cards/CardA, $Cards/CardB, $Cards/CardC]
 @onready var cards_container: Control = $Cards
+@onready var shade: ColorRect = $Shade
 
 const CARD_SIZE := Vector2(328, 522)
 const CARD_OFFSETS := [0.0, 346.0, 692.0]
@@ -99,6 +100,11 @@ func _layout_cards() -> void:
 
 func present(next_cards: Array[Dictionary]) -> void:
 	_presentation_serial += 1
+	# The draft owns pointer input only while it is actually presented.  Keeping
+	# this explicit prevents a hidden full-screen Control from swallowing the
+	# gameplay mouse-look stream during retry/result handoffs.
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	shade.mouse_filter = Control.MOUSE_FILTER_STOP
 	# Normalize the externally supplied offer before touching any child controls.
 	# Tester fixtures intentionally exercise empty/malformed option data; a bad
 	# row should become an unavailable card rather than raising a typed-index
@@ -177,6 +183,11 @@ func _focus_first_available() -> void:
 func close() -> void:
 	_presentation_serial += 1
 	visible = false
+	# Hidden pages must not remain an input sink.  The root is normally excluded
+	# from hit-testing when invisible, but resetting the filter makes the contract
+	# explicit and protects against transient visibility changes during teardown.
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# Closing is the end of the visual transaction. Clear the latch along with
 	# the card state so Result/Retry and a later draft cannot retain a stale
 	# pressed/selected guard in the hidden UI tree.
