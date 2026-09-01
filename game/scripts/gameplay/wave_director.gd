@@ -31,6 +31,9 @@ var transition_serial := 0
 var transition_history: Array[Dictionary] = []
 var last_transition_receipt: Dictionary = {}
 var ordinary_transition_times: Array[float] = []
+## Sibling encounter owner used only for read-only receipts. Wave timing remains
+## authoritative here; the spawner owns entity lifetime and never drives phase.
+@onready var encounter_spawner: Node = get_parent().get_node_or_null("World/EncounterSpawner")
 
 func reset() -> void:
 	phase = "idle"
@@ -148,11 +151,15 @@ func prepare_test_wave(index: int) -> void:
 
 func get_snapshot() -> Dictionary:
 	var definition := _definition(wave_index) if wave_index >= 0 else {}
+	var encounter: Dictionary = encounter_spawner.get_snapshot() if is_instance_valid(encounter_spawner) and encounter_spawner.has_method("get_snapshot") else {}
 	var expected_ids: PackedStringArray = WAVE_SEQUENCE.get_meta("wave_ids", PackedStringArray())
 	var route_complete := _ordinary_route_complete()
 	var next_wave_id := ""
 	if ordinary_route_wave_ids.size() < expected_ids.size():
 		next_wave_id = String(expected_ids[ordinary_route_wave_ids.size()])
+	var route_contiguous := (diagnostic_jump_count == 0 and ordinary_route_wave_ids.size() == wave_index + 1) if wave_index >= 0 else ordinary_route_wave_ids.is_empty()
+	var budget_total := int(definition.get("spawn_budget", 0))
+	var spawned_in_wave := int(encounter.get("wave_spawned", 0))
 	return {"phase":phase,"wave":wave_index + 1,"wave_count":_wave_count(),"wave_elapsed":wave_elapsed,
 		"route_contract_id":ROUTE_CONTRACT_ID,
 		"ordinary_route_progress": {"completed":ordinary_route_wave_ids.size(), "required":expected_ids.size(), "next_wave_id":next_wave_id},
@@ -160,12 +167,21 @@ func get_snapshot() -> Dictionary:
 		"warning":String(definition.get("warning","PREPARE")),"total_elapsed":total_elapsed,
 		"boss_spawned":boss_spawned,"boss_request_count":boss_request_count,"boss_requested_exactly_once":boss_request_count == 1 if boss_spawned else true,
 		"boss_entry_elapsed":boss_entry_elapsed,"boss_entry_delay_seconds":BOSS_ENTRY_DELAY_SECONDS if wave_index == _boss_wave_index() else 0.0,
+		# Compact retest receipts: these mirror authoritative sibling state while
+		# keeping timing, spawn budget, and terminal ownership in separate systems.
+		"spawn_budget":budget_total,
+		"spawned_in_wave":spawned_in_wave,
+		"spawn_budget_remaining":maxi(0, budget_total - spawned_in_wave),
+		"active_enemies":int(encounter.get("live", 0)),
+		"enemy_cap":int(encounter.get("cap", definition.get("cap", 0))),
+		"boss_state":"absent" if not boss_spawned else ("requested" if boss_request_count > 0 else "pending"),
+		"terminal_predicate": {"terminated":terminated,"terminal_transition_count":terminal_transition_count,"spawning_allowed":not terminated and phase == "active"},
 		"terminated":terminated,"definition":definition,
 		"expected_route_wave_ids":Array(expected_ids),
 		"ordinary_route_wave_ids":ordinary_route_wave_ids.duplicate(),
 		"ordinary_transition_times":ordinary_transition_times.duplicate(),
 		"ordinary_route_next_wave_id":next_wave_id,
-		"ordinary_route_contiguous":diagnostic_jump_count == 0 and ordinary_route_wave_ids.size() == wave_index + 1 if wave_index >= 0 else ordinary_route_wave_ids.is_empty(),
+		"ordinary_route_contiguous":route_contiguous,
 		"ordinary_route_complete":route_complete,
 		"ordinary_route_eligible":route_complete and diagnostic_jump_count == 0,
 		"diagnostic_jump_count":diagnostic_jump_count,
