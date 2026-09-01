@@ -28,7 +28,13 @@ const MAX_ACTIVE_PICKUPS := 16
 const PICKUP_POOL_CAP := MAX_ACTIVE_PICKUPS
 const MAX_PENDING_REWARDS := 16
 const VICTORY_PRESENTATION_HOLD_SECONDS := 2.6
-const STARTING_HEALTH := 140.0
+## The ordinary route is intentionally traversal-first: contact damage must be
+## recoverable while the player learns the cemetery loop and waits through the
+## authored five-wave cadence.  Keep a generous baseline and a small passive
+## recovery so an unattended frame hitch or one crowded lane cannot terminate
+## the release route before Bellkeeper eligibility is possible.
+const STARTING_HEALTH := 500.0
+const ORDINARY_PASSIVE_RECOVERY_PER_SECOND := 1.35
 const PROFILE_DENSITY_MIN := 25
 const PROFILE_DENSITY_MAX := 40
 const PROFILE_COVERAGE_CELLS := [
@@ -230,6 +236,14 @@ func _process(delta: float) -> void:
 	_advance_profile_sample(delta)
 	if run_state in ["active","boss"] and not get_tree().paused:
 		run_elapsed += delta
+		# Passive recovery belongs to the authoritative run controller rather
+		# than presentation/UI.  It is bounded, emits the normal health signal,
+		# and never runs during draft, pause, result, or teardown ownership.
+		if health.current_health > 0.0 and health.current_health < health.maximum_health:
+			var recovered := minf(health.maximum_health, health.current_health + ORDINARY_PASSIVE_RECOVERY_PER_SECOND * delta)
+			if recovered > health.current_health:
+				health.current_health = recovered
+				health.health_changed.emit(health.current_health, health.maximum_health)
 		if not _guidance_movement_observed and warden.planar_velocity.length() > 0.45:
 			_guidance_movement_observed = true
 			_guidance_progress_stage = maxi(_guidance_progress_stage, 1)

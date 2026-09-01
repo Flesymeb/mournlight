@@ -65,15 +65,14 @@ func _ready() -> void:
 	if is_instance_valid(ground_collision):
 		ground_collision.collision_layer = 4
 		ground_collision.collision_mask = 1
-	# Tall landmark bodies live on the authored environment collision layer 4.
-	# The Warden and enemy masks include layer 4 (mask 7), while camera-coverage
-	# probes commonly use the landmark layer 2 to inspect boundary occlusion. This
-	# keeps landmark collision authoritative for movement without reporting the
-	# same body as a camera sightline blocker.
+	# Tall landmark bodies use the dedicated landmark layer 2.  Warden/enemy
+	# masks include layer 2 (mask 7), so movement still collides with the
+	# rendered footprint, while ArenaCamera's environment-layer (4) coverage
+	# query does not mistake the landmark itself for a sightline blocker.
 	for path in ["OuterDatum/MausoleumCollision", "OuterDatum/NortheastTreeCollision", "OuterDatum/NorthwestTreeCollision", "OuterDatum/SoutheastTreeCollision", "OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision", "OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision"]:
 		var landmark := get_node_or_null(path) as StaticBody3D
 		if is_instance_valid(landmark):
-			landmark.collision_layer = 4
+			landmark.collision_layer = 2
 			landmark.collision_mask = 1
 			landmark.set_meta("gameplay_collision", true)
 			landmark.set_meta("camera_visibility_blocker", false)
@@ -718,7 +717,7 @@ func get_snapshot() -> Dictionary:
 		# enemy masks include this layer, while camera coverage mask 2 audits only
 		# explicit boundary markers without treating the gameplay shell as a
 		# central building as a physics occluder.
-		"collision_layers":{"ground":4,"perimeter":4,"landmarks":4,"mausoleum_gameplay":4,"camera_query_excluded":camera_visibility_collision_mask,"navigation":0},
+		"collision_layers":{"ground":4,"perimeter":4,"landmarks":2,"mausoleum_gameplay":2,"camera_query_excluded":camera_visibility_collision_mask,"navigation":0},
 		"navigation_region":{"path":"OuterDatum/NativeNavigationRegion","layers":1,"source":"native_authored_streets","enabled":is_instance_valid(get_node_or_null("OuterDatum/NativeNavigationRegion"))},
 		"playable_rect":playable,
 		"playable_area":playable.size.x * playable.size.y,

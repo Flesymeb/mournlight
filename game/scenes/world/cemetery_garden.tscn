@@ -158,30 +158,31 @@ shape = SubResource("EastWestShape")
 
 [node name="MausoleumCollision" type="StaticBody3D" parent="OuterDatum" unique_id=631849061]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.53, 1.9, -2.52)
-# Gameplay still collides through the Warden/enemy mask (7), while the
-# camera-coverage query on landmark layer 2 excludes this body from sightline rays.
-collision_layer = 4
+# Dedicated landmark layer: gameplay masks include layer 2, while the
+# camera's environment-layer query (4) can inspect landmark visibility without
+# treating the landmark itself as a sightline blocker.
+collision_layer = 2
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/MausoleumCollision" unique_id=403615118]
 shape = SubResource("MausoleumShape")
 
 [node name="NortheastTreeCollision" type="StaticBody3D" parent="OuterDatum" unique_id=1768484639]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.85, 1.6, -5.46)
-collision_layer = 4
+collision_layer = 2
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/NortheastTreeCollision" unique_id=2136960841]
 shape = SubResource("TreeShape")
 
 [node name="NorthwestTreeCollision" type="StaticBody3D" parent="OuterDatum" unique_id=1610349841]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.9, 1.6, -6.42)
-collision_layer = 4
+collision_layer = 2
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/NorthwestTreeCollision" unique_id=55888550]
 shape = SubResource("TreeShape")
 
 [node name="SoutheastTreeCollision" type="StaticBody3D" parent="OuterDatum" unique_id=1909054674]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.28, 1.6, 8.94)
-collision_layer = 4
+collision_layer = 2
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/SoutheastTreeCollision" unique_id=1326067322]
 shape = SubResource("TreeShape")
@@ -234,6 +235,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.8, 0, 1.8)
 transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 0, 0, 0)
 
 [node name="KeeperPostCollision" type="StaticBody3D" parent="OuterDatum/KeeperLanternPostAnchor" unique_id=1253139806]
+collision_layer = 2
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision" unique_id=1833638720]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, 0)
@@ -302,6 +304,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.9, 0, -2.6)
 transform = Transform3D(-1.8248768, -0.8184283, -2.9627022e-06, 0, -7.2399803e-06, 2, -0.8184283, 1.8248768, 6.606036e-06, 0, 0, 0)
 
 [node name="CrackedBellCollision" type="StaticBody3D" parent="OuterDatum/CrackedMoonBellAnchor" unique_id=787450712]
+collision_layer = 2
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision" unique_id=997783122]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
