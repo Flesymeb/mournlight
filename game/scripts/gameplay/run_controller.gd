@@ -136,6 +136,13 @@ var _profile_setup_scene_scans := 0
 var _profile_sample_counter_reads := 0
 var _profile_gate_counter_reads := 0
 var _profile_sample_accumulator := 0.0
+## Dense windows retain a 100 ms metric cadence, but the expensive cross-system
+## coverage read is intentionally sampled at a coarser deterministic stride.
+## Coverage is cumulative for the whole window, so skipping an intermediate
+## read cannot erase a weapon/VFX/audio observation while it avoids repeatedly
+## walking the audio and presentation owners on every telemetry tick.
+var _profile_observation_stride := 0
+var _profile_last_system_observation: Dictionary = {}
 var _profile_coverage: Dictionary = {}
 var _profile_coverage_first_seen: Dictionary = {}
 var _first_run_guidance_completed := false
@@ -362,6 +369,8 @@ func _begin_run() -> void:
 	_profile_metric_samples.clear()
 	_profile_elapsed = 0.0
 	_profile_sample_accumulator = 0.0
+	_profile_observation_stride = 0
+	_profile_last_system_observation.clear()
 	_profile_completion_grace_frames = 0
 	_profile_start_counts.clear()
 	_profile_armed = false
@@ -1624,6 +1633,8 @@ func _prepare_final_profile() -> void:
 	_profile_metric_samples.clear()
 	_profile_elapsed = 0.0
 	_profile_sample_accumulator = 0.0
+	_profile_observation_stride = 0
+	_profile_last_system_observation.clear()
 	get_tree().paused = false
 	health.maximum_health = 5000.0
 	health.reset_warden_health()
@@ -1762,6 +1773,8 @@ func _advance_final_profile() -> void:
 	_profile_metric_samples.clear()
 	_profile_elapsed = 0.0
 	_profile_sample_accumulator = 0.0
+	_profile_observation_stride = 0
+	_profile_last_system_observation.clear()
 	_profile_sample_counter_reads = 0
 	_profile_active = true
 	_profile_origin = "diagnostic_prepared"
@@ -1965,7 +1978,14 @@ func _advance_profile_sample(delta: float) -> void:
 	_profile_sample_counter_reads += 1
 	var encounter_snapshot := spawner.get_snapshot()
 	var live_density := int(encounter_snapshot.get("live", 0))
-	_accumulate_profile_coverage(_profile_cached_system_observation(live_density))
+	# Keep the telemetry sample cadence at 100 ms, while amortising the more
+	# expensive owner/voice inspection across two samples.  The previous result
+	# remains truthful because coverage is an OR-reduced window receipt and all
+	# authoritative counters are still sampled below on every tick.
+	_profile_observation_stride += 1
+	if _profile_last_system_observation.is_empty() or _profile_observation_stride % DenseWaveProfileClass.SYSTEM_OBSERVATION_STRIDE == 1:
+		_profile_last_system_observation = _profile_cached_system_observation(live_density)
+	_accumulate_profile_coverage(_profile_last_system_observation)
 	if _profile_samples_ms.is_empty():
 		_profile_minimum_enemy_workload = live_density
 		_profile_maximum_enemy_workload = live_density
@@ -2230,6 +2250,8 @@ func _reset_final_profile() -> void:
 	_profile_active = false
 	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), false)
 	_profile_metric_samples.clear()
+	_profile_observation_stride = 0
+	_profile_last_system_observation.clear()
 	# Retire the public record immediately beside the active-owner flag. Any
 	# teardown callback or snapshot emitted below therefore sees one state.
 	validation_profile_sample = _profile_reset_sample(
@@ -3064,6 +3086,8 @@ func _profile_observation_work_receipt() -> Dictionary:
 		"target_candidate_visits":int(target_work.get("total_target_candidate_visits", 0)),
 		"target_registry_members":int(target_work.get("registered_count", 0)),
 		"sampled_frame_counter_read_count":_profile_sample_counter_reads,
+		"system_observation_stride":DenseWaveProfileClass.SYSTEM_OBSERVATION_STRIDE,
+		"system_observation_reads":int(ceil(float(_profile_observation_stride) / float(DenseWaveProfileClass.SYSTEM_OBSERVATION_STRIDE))),
 		"sample_cadence_seconds":PROFILE_SAMPLE_INTERVAL_SECONDS,
 		"sample_history_cap":PROFILE_MAX_SAMPLES,
 		"arming_gate_counter_read_count":_profile_gate_counter_reads,

@@ -12,6 +12,9 @@ const TARGET_ENEMIES := 32
 const WINDOW_SECONDS := 4.0
 const SAMPLE_INTERVAL_SECONDS := 0.1
 const SAMPLE_HISTORY_CAP := 128
+## Telemetry remains sampled every 100 ms; expensive cross-system coverage
+## inspection is amortised across this many samples. Coverage is cumulative.
+const SYSTEM_OBSERVATION_STRIDE := 2
 const STEERING_BUCKET_COUNT := 3
 const NEIGHBOR_QUERY_BUCKET_COUNT := 3
 const VITALITY_BUCKET_COUNT := 4
@@ -57,6 +60,7 @@ static func contract() -> Dictionary:
 		},
 		"window_seconds": WINDOW_SECONDS,
 		"sample_interval_seconds": SAMPLE_INTERVAL_SECONDS,
+		"system_observation_stride": SYSTEM_OBSERVATION_STRIDE,
 		"sample_history_cap": SAMPLE_HISTORY_CAP,
 		"dense_update_budget": {
 			"scheduler_version": "owner_snapshot_token_buckets.v1",
