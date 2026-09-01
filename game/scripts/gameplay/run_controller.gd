@@ -1002,7 +1002,10 @@ func _on_draft_cancel() -> bool:
 		"complete":true,
 		"tree_paused":false,
 		"draft_active":false,
-		"run_state":"active",
+		# Preserve the owner that resumes the encounter.  A level-up during the
+		# Bellkeeper wave must return to boss ownership; serializing `active`
+		# here made the receipt contradict the authoritative transition below.
+		"run_state":resume_state,
 		"active_enemy_count":int(spawner.get_snapshot().get("live", 0)),
 		"pending_levelup_transactions":_pending_levelup_transactions,
 	}
@@ -1185,7 +1188,7 @@ func _on_draft_choice(index: int) -> void:
 		"complete":true,
 		"tree_paused":false,
 		"draft_active":false,
-		"run_state":"active",
+		"run_state":resume_state,
 		"active_enemy_count":int(spawner.get_snapshot().get("live", 0)),
 		"pending_levelup_transactions":_pending_levelup_transactions,
 	}
@@ -1197,7 +1200,15 @@ func _on_draft_choice(index: int) -> void:
 	_emit_snapshot()
 
 func _on_wave_phase_changed(snapshot: Dictionary) -> void:
-	if String(snapshot.get("phase","")) == "active":
+	var phase := String(snapshot.get("phase", ""))
+	if phase == "intermission":
+		# Intermission owns the pressure handoff. Retire ordinary wave actors so
+		# no stale spawns leak across the boundary; the next active phase
+		# reconfigures and begins the encounter deterministically.
+		spawner.stop_encounter()
+		_emit_snapshot()
+		return
+	if phase == "active":
 		complete_run_ledger.record_wave(snapshot, run_elapsed, run_route_kind)
 		var definition: Dictionary = snapshot.get("definition",{})
 		spawner.configure_pressure(definition)

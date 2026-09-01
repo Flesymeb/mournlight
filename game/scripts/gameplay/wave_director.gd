@@ -13,6 +13,9 @@ const MAX_SPAWN_BUDGET := 160
 ## The director remains the sole owner of boss timing; this delay gives the
 ## HUD/camera a deterministic transition window before the boss is requested.
 const BOSS_ENTRY_DELAY_SECONDS := 1.5
+## A short explicit handoff keeps wave completion readable and gives the
+## upgrade transaction a stable intermission state between pressure bands.
+const INTERMISSION_SECONDS := 1.0
 const ROUTE_CONTRACT_ID := "mournlight.ordinary_five_wave_route.v1"
 
 var phase := "idle"
@@ -23,6 +26,7 @@ var total_elapsed := 0.0
 var boss_spawned := false
 var boss_request_count := 0
 var boss_entry_elapsed := 0.0
+var intermission_remaining := 0.0
 var terminated := false
 var terminal_transition_count := 0
 var ordinary_route_wave_ids: Array[String] = []
@@ -44,6 +48,7 @@ func reset() -> void:
 	boss_spawned = false
 	boss_request_count = 0
 	boss_entry_elapsed = 0.0
+	intermission_remaining = 0.0
 	terminated = false
 	terminal_transition_count = 0
 	ordinary_route_wave_ids.clear()
@@ -81,6 +86,11 @@ func _process(delta: float) -> void:
 		if warmup_remaining <= 0.0:
 			_start_wave(0, true)
 		return
+	if phase == "intermission":
+		intermission_remaining = maxf(0.0, intermission_remaining - delta)
+		if intermission_remaining <= 0.0:
+			_start_wave(wave_index + 1, true)
+		return
 	if phase != "active":
 		return
 	wave_elapsed += delta
@@ -97,7 +107,10 @@ func _process(delta: float) -> void:
 			transition_history[transition_history.size() - 1] = last_transition_receipt.duplicate(true)
 		boss_requested.emit()
 	if wave_elapsed >= float(_definition(wave_index).duration) and wave_index < _wave_count() - 1:
-		_start_wave(wave_index + 1, true)
+		phase = "intermission"
+		intermission_remaining = INTERMISSION_SECONDS
+		last_transition_receipt["intermission_seconds"] = INTERMISSION_SECONDS
+		_emit()
 
 func _start_wave(index: int, ordinary_progression: bool) -> void:
 	if terminated:
@@ -126,7 +139,8 @@ func _start_wave(index: int, ordinary_progression: bool) -> void:
 		"wave_id":wave_id, "ordinary_progression":ordinary_progression,
 		"diagnostic_jump_count":diagnostic_jump_count, "elapsed_before":total_elapsed,
 		"boss_entry_delay_seconds":BOSS_ENTRY_DELAY_SECONDS if bounded_index == _boss_wave_index() else 0.0,
-		"boss_entry_elapsed":0.0,
+	"boss_entry_elapsed":0.0,
+		"intermission_seconds":0.0,
 	}
 	transition_history.append(last_transition_receipt.duplicate(true))
 	while transition_history.size() > 8:
@@ -167,6 +181,7 @@ func get_snapshot() -> Dictionary:
 		"warning":String(definition.get("warning","PREPARE")),"total_elapsed":total_elapsed,
 		"boss_spawned":boss_spawned,"boss_request_count":boss_request_count,"boss_requested_exactly_once":boss_request_count == 1 if boss_spawned else true,
 		"boss_entry_elapsed":boss_entry_elapsed,"boss_entry_delay_seconds":BOSS_ENTRY_DELAY_SECONDS if wave_index == _boss_wave_index() else 0.0,
+		"intermission_remaining":intermission_remaining,
 		# Compact retest receipts: these mirror authoritative sibling state while
 		# keeping timing, spawn budget, and terminal ownership in separate systems.
 		"spawn_budget":budget_total,
