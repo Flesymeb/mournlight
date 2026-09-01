@@ -56,12 +56,13 @@ extends Camera3D
 @export var obstruction_distance_reduction := 0.5
 @export var obstruction_fov_boost := 2.0
 @export var coverage_occluder_visuals: Array[NodePath] = []
-## Physics mask used only by camera visibility probes. Gameplay bodies stay on
-## the environment layer (4); the world contract supplies the dedicated
-## landmark layer (2) at runtime so the camera never reports the ground shell as
-## a sightline blocker. ArenaCamera still narrows this to its registered
-## tall-occluder list, so ordinary graves never become occluders.
-@export_flags_3d_physics var camera_visibility_collision_mask := 4
+## Physics mask used only by camera visibility probes. The authored cemetery
+## contract reserves layer 2 for registered tall landmarks; keeping that as the
+## serialized default avoids an editor-side probe briefly treating the broad
+## gameplay ground shell (layer 4) as a sightline blocker before _ready() binds
+## the contract. ArenaCamera still narrows this to its registered tall-occluder
+## list, so ordinary graves never become occluders.
+@export_flags_3d_physics var camera_visibility_collision_mask := 2
 @export_range(0.0, 1.0, 0.01) var coverage_occluder_transparency := 0.78
 @export var coverage_settle_seconds := 0.28
 @export var tall_occluders: Array[NodePath] = []

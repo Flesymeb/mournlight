@@ -51,8 +51,8 @@ func _ready() -> void:
 	for prop in find_children("*", "StaticBody3D", true, false):
 		var authored_prop := prop as StaticBody3D
 		if is_instance_valid(authored_prop):
-	# Gameplay bodies use layer 4 so camera-coverage probes on the
-	# landmark/boundary layer 2 do not treat ordinary graves as opaque
+			# Gameplay bodies use layer 4 so camera-coverage probes on the
+			# landmark/boundary layer 2 do not treat ordinary graves as opaque
 			# sightline blockers. Warden/enemy masks include both layers.
 			authored_prop.collision_layer = 4
 			authored_prop.collision_mask = 1
