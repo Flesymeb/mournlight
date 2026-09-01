@@ -101,6 +101,7 @@ var pickup_spawned_total := 0
 var pickup_collected_total := 0
 var _profile_samples_ms: Array[float] = []
 var _profile_active := false
+var _profile_paused := false
 var _profile_elapsed := 0.0
 var _profile_duration := 4.0
 var _profile_origin := ""
@@ -376,6 +377,7 @@ func _begin_run() -> void:
 	get_tree().paused = false
 	world.visible = true
 	_profile_active = false
+	_profile_paused = false
 	_profile_origin = ""
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
@@ -640,6 +642,17 @@ func _pause_run() -> void:
 	warden.reset_input_latch("pause")
 	audio_director.reset_attack_audio_lifecycle("pause")
 	_resume_state = run_state
+	# A paused run suspends dense sampling explicitly. Keep the window owner and
+	# accumulated samples intact so resume can continue the same bounded window,
+	# but disable the renderer timing probe while no frames are advancing.
+	if _profile_active and not _profile_paused:
+		_profile_paused = true
+		RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), false)
+		validation_profile_sample["pause_lifecycle"] = {
+			"phase":"paused", "process_frame":Engine.get_process_frames(),
+			"elapsed_seconds":_profile_elapsed, "samples_retained":_profile_metric_samples.size(),
+			"renderer_probe_enabled":false,
+		}
 	_transition("paused")
 	get_tree().paused = true
 	shell.set_mode("pause", last_snapshot)
@@ -647,6 +660,14 @@ func _pause_run() -> void:
 
 func _resume_run() -> void:
 	get_tree().paused = false
+	if _profile_active and _profile_paused:
+		_profile_paused = false
+		RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
+		validation_profile_sample["pause_lifecycle"] = {
+			"phase":"resumed", "process_frame":Engine.get_process_frames(),
+			"elapsed_seconds":_profile_elapsed, "samples_retained":_profile_metric_samples.size(),
+			"renderer_probe_enabled":true,
+		}
 	warden.reset_input_latch("resume")
 	shell.set_mode("hidden")
 	_transition(_resume_state)
@@ -1182,7 +1203,7 @@ func _on_draft_choice(index: int) -> void:
 	upgrade_transaction_receipt["resolved"] = true
 	upgrade_transaction_receipt["applied_upgrade_id"] = String(choice.get("id", ""))
 	upgrade_transaction_receipt["tree_paused"] = get_tree().paused
-	upgrade_transaction_receipt["pause_owner_cleared"] = run_state == "active" and not get_tree().paused
+	upgrade_transaction_receipt["pause_owner_cleared"] = not get_tree().paused and not draft_controller.active
 	upgrade_transaction_receipt["requested"] = true
 	upgrade_transaction_receipt["reset_isolation"] = {
 		"complete":true,
@@ -1687,6 +1708,7 @@ func _prepare_final_profile() -> void:
 		return
 	_dense_cycle_index += 1
 	_profile_active = false
+	_profile_paused = false
 	_profile_origin = "diagnostic_prepared"
 	run_route_kind = "diagnostic_prepared"
 	_profile_samples_ms.clear()
@@ -1838,6 +1860,7 @@ func _advance_final_profile() -> void:
 	_profile_last_system_observation.clear()
 	_profile_sample_counter_reads = 0
 	_profile_active = true
+	_profile_paused = false
 	_profile_origin = "diagnostic_prepared"
 	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
 	_profile_advance_generation += 1
@@ -1980,6 +2003,7 @@ func _try_begin_passive_ordinary_profile() -> void:
 	_profile_sample_accumulator = 0.0
 	_profile_sample_counter_reads = 0
 	_profile_active = true
+	_profile_paused = false
 	_profile_process_frame_start = Engine.get_process_frames()
 	_profile_physics_frame_start = Engine.get_physics_frames()
 	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
@@ -2139,6 +2163,7 @@ func _advance_profile_sample(delta: float) -> void:
 		_profile_sample_accumulator = 0.0
 		return
 	_profile_active = false
+	_profile_paused = false
 	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), false)
 	var sorted := _profile_samples_ms.duplicate()
 	sorted.sort()
@@ -2309,6 +2334,7 @@ func _reset_final_profile() -> void:
 	_validation_setup_generation += 1
 	var setup_generation := _validation_setup_generation
 	_profile_active = false
+	_profile_paused = false
 	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), false)
 	_profile_metric_samples.clear()
 	_profile_observation_stride = 0
@@ -3699,6 +3725,7 @@ func _advance_validation_density_checkpoint() -> void:
 	_profile_sample_accumulator = 0.0
 	_profile_sample_counter_reads = 0
 	_profile_active = true
+	_profile_paused = false
 	_profile_origin = "diagnostic_density_matrix"
 	_profile_advance_generation += 1
 	_profile_start_counts = _profile_counts()
@@ -3732,6 +3759,8 @@ func _reset_validation_density() -> void:
 	if not OS.has_feature("editor") or run_state not in ["active", "boss"]:
 		return
 	_profile_active = false
+	_profile_paused = false
+	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), false)
 	spawner.end_validation_profile_cohort("density_matrix_reset")
 	var pending_retired := _pending_reward_events.size()
 	_pending_reward_events.clear()
@@ -3948,6 +3977,8 @@ func _mcp_state() -> Dictionary:
 	return {
 		"run_state":run_state, "run_serial":run_serial, "run_elapsed":run_elapsed,
 		"profile_status":validation_profile_sample.get("status", validation_profile_receipt.get("status", "idle")),
+		"profile_active":_profile_active,
+		"profile_paused":_profile_paused,
 		"profile_armed":_profile_armed,
 		"profile_arm_receipt":_profile_arm_receipt,
 		"profile_rearm_count":_profile_rearm_count,

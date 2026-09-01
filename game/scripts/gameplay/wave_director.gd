@@ -179,7 +179,11 @@ func get_snapshot() -> Dictionary:
 		"ordinary_route_progress": {"completed":ordinary_route_wave_ids.size(), "required":expected_ids.size(), "next_wave_id":next_wave_id},
 		"wave_duration":float(definition.get("duration",0.0)),"title":String(definition.get("title","WARMUP")),
 		"warning":String(definition.get("warning","PREPARE")),"total_elapsed":total_elapsed,
-		"boss_spawned":boss_spawned,"boss_request_count":boss_request_count,"boss_requested_exactly_once":boss_request_count == 1 if boss_spawned else true,
+		"boss_spawned":boss_spawned,"boss_request_count":boss_request_count,
+		# Before the request, zero is the only valid count; after it, exactly one
+		# is required. This makes duplicate-request regressions observable even
+		# when a stale callback arrives before the Bellkeeper node is attached.
+		"boss_requested_exactly_once": (boss_request_count == 0 and not boss_spawned) or (boss_spawned and boss_request_count == 1),
 		"boss_entry_elapsed":boss_entry_elapsed,"boss_entry_delay_seconds":BOSS_ENTRY_DELAY_SECONDS if wave_index == _boss_wave_index() else 0.0,
 		"intermission_remaining":intermission_remaining,
 		# Compact retest receipts: these mirror authoritative sibling state while
