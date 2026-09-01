@@ -60,7 +60,10 @@ extends Camera3D
 ## the environment layer (4); keeping this mask separate prevents a landmark's
 ## movement collider from being reported as a camera blocker by the authored
 ## sight-lane response.
-@export_flags_3d_physics var camera_visibility_collision_mask := 2
+## Tall landmark volumes share the authored environment layer with gameplay
+## collision. ArenaCamera narrows this to its registered tall-occluder list,
+## so ordinary graves never become sightline blockers.
+@export_flags_3d_physics var camera_visibility_collision_mask := 4
 @export_range(0.0, 1.0, 0.01) var coverage_occluder_transparency := 0.78
 @export var coverage_settle_seconds := 0.28
 @export var tall_occluders: Array[NodePath] = []
@@ -432,6 +435,29 @@ func _compose_arena_target(requested_target: Vector3, subjects: Array[Node3D]) -
 			var obstruction_node := get_node_or_null(obstruction) as Node3D
 			if is_instance_valid(obstruction_node):
 				_obstruction_bypass_sign = -1.0 if target.global_position.x <= obstruction_node.global_position.x else 1.0
+	# Landmark readability is part of the shipped composition, not only an
+	# enemy-framing concern.  The mausoleum can sit between the camera and the
+	# keeper post/bell even while the Warden remains unobstructed, so inspect
+	# those two authored anchors explicitly and feed the same selective-fade
+	# response.  The mausoleum anchor is intentionally omitted to avoid a
+	# self-hit against its own registered collision volume.
+	for landmark_path in [
+		"../CemeteryGarden/OuterDatum/KeeperLanternPostAnchor",
+		"../CemeteryGarden/OuterDatum/CrackedMoonBellAnchor",
+	]:
+		var landmark := get_node_or_null(landmark_path) as Node3D
+		if not is_instance_valid(landmark):
+			continue
+		var landmark_obstruction := _find_registered_subject_occluder(landmark)
+		if landmark_obstruction.is_empty() or _coverage_obstructing_paths.has(landmark_obstruction):
+			continue
+		_coverage_obstructed_count += 1
+		_coverage_obstructing_paths.append(landmark_obstruction)
+		if _coverage_obstructing_path.is_empty():
+			_coverage_obstructing_path = landmark_obstruction
+			var landmark_obstruction_node := get_node_or_null(landmark_obstruction) as Node3D
+			if is_instance_valid(landmark_obstruction_node):
+				_obstruction_bypass_sign = -1.0 if target.global_position.x <= landmark_obstruction_node.global_position.x else 1.0
 	if _coverage_obstructed_count > 0:
 		# If a registered visual really crosses a sight lane, bias toward the
 		# playable datum center rather than the world origin.  The previous zero

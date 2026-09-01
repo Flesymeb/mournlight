@@ -13,6 +13,9 @@ extends Node3D
 ## gameplay layer stays authoritative for Warden/enemy collision, while this
 ## separate mask prevents GroundCollision and MausoleumCollision from becoming
 ## false camera blockers.
+## External camera-coverage probes use a dedicated diagnostic layer that stays
+## clear of gameplay ground/landmark bodies. ArenaCamera owns a separate
+## internal layer-4 query narrowed to its registered tall-landmark bindings.
 @export_flags_3d_physics var camera_visibility_collision_mask := 2
 
 @onready var ground_collision: StaticBody3D = $OuterDatum/GroundCollision

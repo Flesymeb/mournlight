@@ -13,6 +13,7 @@ const MAX_SPAWN_BUDGET := 160
 ## The director remains the sole owner of boss timing; this delay gives the
 ## HUD/camera a deterministic transition window before the boss is requested.
 const BOSS_ENTRY_DELAY_SECONDS := 1.5
+const ROUTE_CONTRACT_ID := "mournlight.ordinary_five_wave_route.v1"
 
 var phase := "idle"
 var wave_index := -1
@@ -153,6 +154,8 @@ func get_snapshot() -> Dictionary:
 	if ordinary_route_wave_ids.size() < expected_ids.size():
 		next_wave_id = String(expected_ids[ordinary_route_wave_ids.size()])
 	return {"phase":phase,"wave":wave_index + 1,"wave_count":_wave_count(),"wave_elapsed":wave_elapsed,
+		"route_contract_id":ROUTE_CONTRACT_ID,
+		"ordinary_route_progress": {"completed":ordinary_route_wave_ids.size(), "required":expected_ids.size(), "next_wave_id":next_wave_id},
 		"wave_duration":float(definition.get("duration",0.0)),"title":String(definition.get("title","WARMUP")),
 		"warning":String(definition.get("warning","PREPARE")),"total_elapsed":total_elapsed,
 		"boss_spawned":boss_spawned,"boss_request_count":boss_request_count,"boss_requested_exactly_once":boss_request_count == 1 if boss_spawned else true,
