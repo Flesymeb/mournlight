@@ -936,6 +936,23 @@ func _on_logical_press_edge(action: StringName, activation: int, receipt: Dictio
 		var cancelled := _on_draft_cancel()
 		input_router.bind_destination("back", "upgrade_draft_cancelled" if cancelled else "upgrade_draft_cancel_rejected", 1 if cancelled else 0)
 		return
+	if action == &"context_back":
+		var destination := "context_back_ignored"
+		var count := 0
+		if run_state == "draft":
+			var cancelled := _on_draft_cancel()
+			destination = "upgrade_draft_cancelled" if cancelled else "upgrade_draft_cancel_rejected"
+			count = 1 if cancelled else 0
+		elif run_state in ["settings", "help"] and shell.return_mode == "pause":
+			_return_from_shell_page()
+			destination = "pause_page_returned"
+			count = 1
+		elif run_state == "title" and shell.mode in ["settings", "help", "credits"]:
+			_return_from_shell_page()
+			destination = "title_page_returned"
+			count = 1
+		input_router.bind_destination("back", destination, count)
+		return
 	if action != &"dash":
 		return
 	var accepted := false

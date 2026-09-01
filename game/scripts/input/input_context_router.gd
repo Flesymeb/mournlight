@@ -8,6 +8,7 @@ signal device_changed(previous: String, current: String, device_generation: int)
 const CONFIRM_PHYSICAL := &"context_confirm"
 const BACK_PHYSICAL := &"context_back"
 const PAUSE_PHYSICAL := &"pause"
+const CONTEXT_BACK_LOGICAL := &"context_back"
 
 var context := "title"
 var context_generation := 0
@@ -250,8 +251,10 @@ func _confirm_action() -> StringName:
 	return &""
 
 func _back_action() -> StringName:
-	if context in ["active", "boss", "pause", "paused"]:
-		return &"pause"
+	if context in ["active", "boss", "pause", "paused", "settings", "help", "credits", "title"]:
+		# Back/View is a distinct semantic from Escape/Start pause. The controller
+		# can return from nested pages without double-toggling pause ownership.
+		return CONTEXT_BACK_LOGICAL
 	if context in ["draft"]:
 		return &"ui_cancel"
 	if context in ["title", "settings", "help", "credits"]:
@@ -296,7 +299,11 @@ func _dispatch_press(physical: String, action: StringName) -> void:
 		# but authoritative gameplay never has to rediscover a transient global
 		# Input edge during a later physics tick.
 		logical_press_edge.emit(action, activation_generation, transaction.duplicate(true))
-		_parse_action(action, true)
+		# Pause is consumed by the router/controller signal above. Re-emitting a
+		# synthetic InputEventAction named "pause" would satisfy the same physical
+		# binding again and can create duplicate activations in embedded runners.
+		if action not in [PAUSE_PHYSICAL, CONTEXT_BACK_LOGICAL]:
+			_parse_action(action, true)
 
 func _dispatch_release(physical: String) -> void:
 	var transaction: Dictionary = active_transactions.get(physical, {})
@@ -369,7 +376,7 @@ func transaction_receipt(physical: String, expected_activation_generation: int) 
 	return {}
 
 func _release_action(action: StringName) -> void:
-	if action != &"":
+	if action != &"" and action not in [PAUSE_PHYSICAL, CONTEXT_BACK_LOGICAL]:
 		_parse_action(action, false)
 
 func _parse_action(action: StringName, pressed: bool) -> void:
@@ -415,8 +422,10 @@ func get_binding_audit() -> Dictionary:
 			escape_back += 1
 	return {
 		"pause_action":String(PAUSE_PHYSICAL), "context_back_action":String(BACK_PHYSICAL),
+		"context_back_logical":String(CONTEXT_BACK_LOGICAL),
 		"pause_event_count":pause_events.size(), "context_back_event_count":back_events.size(),
 		"escape_pause_bindings":escape_pause, "escape_context_back_bindings":escape_back,
 		"escape_owner":"pause" if escape_pause == 1 and escape_back == 0 else "invalid",
 		"unique":escape_pause == 1 and escape_back == 0,
+		"synthetic_reemit_guard":true,
 	}

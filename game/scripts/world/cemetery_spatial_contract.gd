@@ -144,6 +144,7 @@ func _bind_outer_datum_to_authored_package() -> void:
 		visual_rect.size - Vector2.ONE * authored_playable_inset * 2.0
 	)
 	_bind_perimeter_to_world_rect(playable)
+	_bind_spawn_lanes(playable)
 	var crypt_path := "PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/Crypt"
 	var crypt_bounds := get_visual_subtree_aabb(crypt_path)
 	var crypt_bound := _bind_box_collision_to_visual("OuterDatum/MausoleumCollision", crypt_bounds, landmark_collision_margin)
@@ -196,6 +197,30 @@ func _bind_perimeter_to_world_rect(playable: Rect2) -> void:
 	_bind_box_body_world(south_boundary, Vector3(center.x, wall_height * 0.5, playable.end.y + wall_thickness * 0.5), Vector3(playable.size.x + wall_thickness * 2.0, wall_height, wall_thickness))
 	_bind_box_body_world(west_boundary, Vector3(playable.position.x - wall_thickness * 0.5, wall_height * 0.5, center.y), Vector3(wall_thickness, wall_height, playable.size.y + wall_thickness * 2.0))
 	_bind_box_body_world(east_boundary, Vector3(playable.end.x + wall_thickness * 0.5, wall_height * 0.5, center.y), Vector3(wall_thickness, wall_height, playable.size.y + wall_thickness * 2.0))
+
+func _bind_spawn_lanes(playable: Rect2) -> void:
+	# Rebase candidate-owned spawn markers to the expanded native perimeter.
+	# This keeps ordinary waves on approach streets instead of the old central pad.
+	var center := playable.get_center()
+	var inset := 2.4
+	var lanes := [
+		Vector3(playable.position.x + inset, 0.05, playable.position.y + inset),
+		Vector3(center.x - playable.size.x * 0.24, 0.05, playable.position.y + inset),
+		Vector3(center.x + playable.size.x * 0.24, 0.05, playable.position.y + inset),
+		Vector3(playable.end.x - inset, 0.05, playable.position.y + inset),
+		Vector3(playable.end.x - inset, 0.05, center.y - playable.size.y * 0.24),
+		Vector3(playable.end.x - inset, 0.05, center.y + playable.size.y * 0.24),
+		Vector3(playable.end.x - inset, 0.05, playable.end.y - inset),
+		Vector3(center.x + playable.size.x * 0.24, 0.05, playable.end.y - inset),
+		Vector3(center.x - playable.size.x * 0.24, 0.05, playable.end.y - inset),
+		Vector3(playable.position.x + inset, 0.05, playable.end.y - inset),
+		Vector3(playable.position.x + inset, 0.05, center.y + playable.size.y * 0.24),
+		Vector3(playable.position.x + inset, 0.05, center.y - playable.size.y * 0.24),
+	]
+	for index in lanes.size():
+		var marker := get_node_or_null("OuterDatum/SpawnLanes/Lane%02d" % index) as Marker3D
+		if is_instance_valid(marker):
+			marker.global_position = lanes[index]
 
 func _bind_box_body_world(body: StaticBody3D, world_center: Vector3, world_size: Vector3) -> bool:
 	if not is_instance_valid(body):
@@ -720,7 +745,7 @@ func get_snapshot() -> Dictionary:
 			"warm_anchor":"OuterDatum/KeeperLanternPostAnchor/WarmLandmarkLight",
 			"cool_fills":["OuterDatum/RouteMoonFill","OuterDatum/WestMoonRim","OuterDatum/EastMoonRim","OuterDatum/SmallMausoleumAnchor/MausoleumMoonLift"],
 			"escape_lane_policy":"native_street_network_preserved",
-				"camera_profile":{"fov":78.0,"follow_height":34.0,"follow_distance":34.0,"follow_lateral":0.0,"framing_bias":Vector3(0.0,0.0,-6.0),"visibility_collision_mask":camera_visibility_collision_mask},
+				"camera_profile":{"fov":82.0,"follow_height":40.0,"follow_distance":40.0,"follow_lateral":0.0,"framing_bias":Vector3(0.0,0.0,-6.0),"visibility_collision_mask":camera_visibility_collision_mask},
 			"proxy_geometry_count":0,
 		},
 		"external_world":{"source":"intact_authored_package_plus_candidate_authored_distant_silhouette_ring", "procedural_scenery":false, "primitive_meshes":0, "external_dressing_nodes":6, "opaque":true, "non_playable_depth_beyond_all_edges":is_instance_valid(external_depth), "collision_enabled":false, "fog_depth_bound":true},

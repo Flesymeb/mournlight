@@ -3,8 +3,8 @@ extends Camera3D
 
 @export var target: Node3D
 @export var arena_contract: CemeterySpatialContract
-@export var follow_height := 34.0
-@export var follow_distance := 34.0
+@export var follow_height := 40.0
+@export var follow_distance := 40.0
 ## Fixed three-quarter azimuth keeps the Warden out of the mausoleum's stair
 ## silhouette while retaining a high-angle escape-lane read.  The rig still
 ## follows the player; this is only the authored lateral offset of that rig.
@@ -28,7 +28,7 @@ extends Camera3D
 # safe lane. This is an authored target datum, not a landmark hide/fade.
 @export var framing_bias: Vector3 = Vector3(0.0, 0.0, -6.0)
 @export var arena_limit := Vector2(34.0, 32.0)
-@export var normal_fov := 78.0
+@export var normal_fov := 82.0
 @export var safe_frame_fraction := Vector2(0.08, 0.10)
 @export var safe_frame_activation_buffer := 0.04
 @export var safe_frame_correction_damping := 11.0
@@ -123,13 +123,13 @@ func _ready() -> void:
 	# The native street package is materially larger than the old combat pad.
 	# A wider authored orbit keeps the mausoleum readable as a landmark while
 	# retaining keeper/bell silhouettes and a visible escape lane in one frame.
-	follow_height = 34.0
-	follow_distance = 34.0
+	follow_height = 40.0
+	follow_distance = 40.0
 	follow_lateral = 0.0
 	framing_bias = Vector3(0.0, 0.0, -6.0)
 	obstruction_lateral_bypass = 0.0
 	current = true
-	normal_fov = 78.0
+	normal_fov = 82.0
 	fov = normal_fov
 	if target:
 		_normalize_occluder_bindings()
@@ -284,7 +284,7 @@ func _process(delta: float) -> void:
 		# Keep enough native cemetery depth in every cardinal view. At the old
 		# eight-metre inset the high-angle frustum crossed the authored edge and
 		# exposed the empty world background as a hard dark band.
-		var camera_margin := 18.0
+		var camera_margin := 16.0
 		desired_position.x = clampf(desired_position.x, visual_rect.position.x + camera_margin, visual_rect.end.x - camera_margin)
 		desired_position.z = clampf(desired_position.z, visual_rect.position.y + camera_margin, visual_rect.end.y - camera_margin)
 	global_position = global_position.lerp(desired_position, 1.0 - exp(-follow_damping * delta))
