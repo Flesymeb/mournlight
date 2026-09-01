@@ -29,6 +29,9 @@ const AUTHORED_LOCAL_MIN := Vector2(-12.143, -11.415)
 const AUTHORED_LOCAL_MAX := Vector2(12.149, 11.418)
 
 func _ready() -> void:
+	set_meta("camera_visibility_collision_mask", camera_visibility_collision_mask)
+	set_meta("gameplay_collision_layer", 4)
+	set_meta("spatial_binding_strategy", "single_authored_package_plus_additive_outer_datum")
 	# Reassert the single transform-space collision contract after the authored
 	# scene is instanced. Some inherited scene overrides restore StaticBody3D's
 	# default layer (1), which makes landmark/perimeter bodies invisible to the
@@ -45,6 +48,8 @@ func _ready() -> void:
 			# sightline blockers. Warden/enemy masks include both layers.
 			authored_prop.collision_layer = 4
 			authored_prop.collision_mask = 1
+			authored_prop.set_meta("gameplay_collision", true)
+			authored_prop.set_meta("camera_visibility_blocker", false)
 	for body in [north_boundary, south_boundary, east_boundary, west_boundary]:
 		if is_instance_valid(body):
 			body.collision_layer = 4
@@ -62,6 +67,8 @@ func _ready() -> void:
 		if is_instance_valid(landmark):
 			landmark.collision_layer = 4
 			landmark.collision_mask = 1
+			landmark.set_meta("gameplay_collision", true)
+			landmark.set_meta("camera_visibility_blocker", false)
 	# The complete cemetery is authored with a native local datum.  Rebase the
 	# instance once at runtime so nested scene overrides cannot regress the
 	# release framing back to the old camera-sized pad.
@@ -705,7 +712,7 @@ func get_snapshot() -> Dictionary:
 			"warm_anchor":"OuterDatum/KeeperLanternPostAnchor/WarmLandmarkLight",
 			"cool_fills":["OuterDatum/RouteMoonFill","OuterDatum/WestMoonRim","OuterDatum/EastMoonRim","OuterDatum/SmallMausoleumAnchor/MausoleumMoonLift"],
 			"escape_lane_policy":"native_street_network_preserved",
-			"camera_profile":{"fov":74.0,"follow_height":30.0,"follow_distance":26.0,"follow_lateral":0.0,"framing_bias":Vector3(0.0,0.0,-6.0),"visibility_collision_mask":camera_visibility_collision_mask},
+				"camera_profile":{"fov":78.0,"follow_height":34.0,"follow_distance":34.0,"follow_lateral":0.0,"framing_bias":Vector3(0.0,0.0,-6.0),"visibility_collision_mask":camera_visibility_collision_mask},
 			"proxy_geometry_count":0,
 		},
 		"external_world":{"source":"intact_authored_package_native_terrain_and_perimeter_plus_atmospheric_fog", "procedural_scenery":false, "primitive_meshes":0, "opaque":true, "non_playable_depth_beyond_all_edges":true, "fog_depth_bound":true},

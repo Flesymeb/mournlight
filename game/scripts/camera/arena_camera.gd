@@ -3,8 +3,8 @@ extends Camera3D
 
 @export var target: Node3D
 @export var arena_contract: CemeterySpatialContract
-@export var follow_height := 27.0
-@export var follow_distance := 24.0
+@export var follow_height := 34.0
+@export var follow_distance := 34.0
 ## Fixed three-quarter azimuth keeps the Warden out of the mausoleum's stair
 ## silhouette while retaining a high-angle escape-lane read.  The rig still
 ## follows the player; this is only the authored lateral offset of that rig.
@@ -28,7 +28,7 @@ extends Camera3D
 # safe lane. This is an authored target datum, not a landmark hide/fade.
 @export var framing_bias: Vector3 = Vector3(0.0, 0.0, -6.0)
 @export var arena_limit := Vector2(34.0, 32.0)
-@export var normal_fov := 72.0
+@export var normal_fov := 78.0
 @export var safe_frame_fraction := Vector2(0.08, 0.10)
 @export var safe_frame_activation_buffer := 0.04
 @export var safe_frame_correction_damping := 11.0
@@ -56,6 +56,11 @@ extends Camera3D
 @export var obstruction_distance_reduction := 0.5
 @export var obstruction_fov_boost := 2.0
 @export var coverage_occluder_visuals: Array[NodePath] = []
+## Physics mask used only by camera visibility probes. Gameplay bodies stay on
+## the environment layer (4); keeping this mask separate prevents a landmark's
+## movement collider from being reported as a camera blocker by the authored
+## sight-lane response.
+@export_flags_3d_physics var camera_visibility_collision_mask := 2
 @export_range(0.0, 1.0, 0.01) var coverage_occluder_transparency := 0.78
 @export var coverage_settle_seconds := 0.28
 @export var tall_occluders: Array[NodePath] = []
@@ -115,13 +120,16 @@ func _ready() -> void:
 	# Match the authored composition datum in CemeterySpatialContract.  This
 	# keeps the shipped player silhouette large enough to read while the native
 	# package, external depth, and escape lanes remain in frame.
-	follow_height = 30.0
-	follow_distance = 26.0
+	# The native street package is materially larger than the old combat pad.
+	# A wider authored orbit keeps the mausoleum readable as a landmark while
+	# retaining keeper/bell silhouettes and a visible escape lane in one frame.
+	follow_height = 34.0
+	follow_distance = 34.0
 	follow_lateral = 0.0
 	framing_bias = Vector3(0.0, 0.0, -6.0)
 	obstruction_lateral_bypass = 0.0
 	current = true
-	normal_fov = 74.0
+	normal_fov = 78.0
 	fov = normal_fov
 	if target:
 		_normalize_occluder_bindings()
@@ -407,7 +415,7 @@ func _compose_arena_target(requested_target: Vector3, subjects: Array[Node3D]) -
 		# Keep player movement primary while reserving a stable 18% look-ahead for
 		# the authored landmark cluster. This retains the north route in-frame on
 		# cardinal views without pulling the camera off the street.
-		composed = composed.lerp(landmark_target, 0.18)
+		composed = composed.lerp(landmark_target, 0.36)
 	_coverage_obstructed_count = 0
 	_coverage_obstructing_path = ""
 	_coverage_obstructing_paths.clear()
@@ -425,8 +433,17 @@ func _compose_arena_target(requested_target: Vector3, subjects: Array[Node3D]) -
 			if is_instance_valid(obstruction_node):
 				_obstruction_bypass_sign = -1.0 if target.global_position.x <= obstruction_node.global_position.x else 1.0
 	if _coverage_obstructed_count > 0:
-		var inward := Vector3.ZERO
-		inward.y = composed.y
+		# If a registered visual really crosses a sight lane, bias toward the
+		# playable datum center rather than the world origin.  The previous zero
+		# vector silently pulled the camera toward (0, 0), which could expose an
+		# unrelated edge and made obstruction handling fight arena containment.
+		var datum_center := Vector3.ZERO
+		if is_instance_valid(arena_contract):
+			var playable := arena_contract.get_playable_rect()
+			datum_center = Vector3(playable.get_center().x, composed.y, playable.get_center().y)
+		else:
+			datum_center = Vector3(0.0, composed.y, 0.0)
+		var inward := datum_center
 		composed = composed.lerp(inward, obstruction_inward_weight)
 	if is_instance_valid(arena_contract):
 		composed = arena_contract.clamp_camera_target(composed)
@@ -439,6 +456,12 @@ func _find_registered_subject_occluder(subject: Node3D) -> String:
 	var subject_points := [subject.global_position + Vector3.UP * 0.35, subject.global_position + Vector3.UP * 1.0]
 	for binding in _tall_occluder_bindings:
 		if not bool(binding.get("bound", false)):
+			continue
+		# Landmark collision remains authoritative for movement, but visibility
+		# probing is intentionally isolated to its own physics mask.  Bodies on
+		# the gameplay layer must never classify as camera occluders.
+		var body := binding.get("body") as CollisionObject3D
+		if is_instance_valid(body) and (int(body.collision_layer) & camera_visibility_collision_mask) == 0:
 			continue
 		var visual_bounds: AABB = binding.get("visual_bounds", AABB())
 		if visual_bounds.size.length_squared() > 0.001:
@@ -632,6 +655,7 @@ func _bind_tall_occluders() -> void:
 			"body":body,
 			"shapes":shapes,
 			"bound":is_instance_valid(body) and not shapes.is_empty() and visual_bounds.size.length_squared() > 0.001,
+			"visibility_bound":is_instance_valid(body) and (int(body.collision_layer) & camera_visibility_collision_mask) != 0,
 			"shape_count":shapes.size(),
 		})
 
@@ -755,11 +779,13 @@ func _segment_intersects_centered_aabb(from: Vector3, to: Vector3, extents: Vect
 	return true
 
 func _snap_to_target() -> void:
-	framing_target = target.global_position
+	framing_target = target.global_position + framing_bias
+	if is_instance_valid(arena_contract):
+		framing_target = arena_contract.clamp_camera_target(framing_target)
 	_safe_frame_offset = Vector3.ZERO
 	_coverage_offset = Vector3.ZERO
 	global_position = framing_target + Vector3(follow_lateral, follow_height, follow_distance)
-	look_at(framing_target + Vector3(0.0, 0.65, 0.0), Vector3.UP)
+	look_at(framing_target + Vector3(0.0, 1.8, 0.0), Vector3.UP)
 
 func _update_mouse_look() -> void:
 	# ArenaCamera lives under World; the router is a sibling of World on the
@@ -826,6 +852,8 @@ func _mcp_state() -> Dictionary:
 		"multi_subject_coverage":_coverage_receipt.duplicate(true),
 		"coverage_frame_fraction":coverage_frame_fraction,
 		"coverage_active_count":_coverage_active_count,
+		"visibility_collision_mask":camera_visibility_collision_mask,
+		"gameplay_collision_layers_excluded":true,
 		"coverage_projection_updates":_coverage_projection_updates,
 		"coverage_projection_skips":_coverage_projection_skips,
 		"coverage_projection_refresh_seconds":DENSE_COVERAGE_REFRESH_SECONDS,
@@ -864,6 +892,7 @@ func _mcp_state() -> Dictionary:
 		"occluder_detection_source":"registered_subject_sight_volume" if not _coverage_obstructing_paths.is_empty() else "clear",
 		"active_occluder_path":_coverage_obstructing_path,
 		"registered_tall_occluder_count":_tall_occluder_bindings.filter(func(binding: Dictionary) -> bool: return bool(binding.get("bound", false))).size(),
+		"camera_visibility_occluder_count":_tall_occluder_bindings.filter(func(binding: Dictionary) -> bool: return bool(binding.get("bound", false)) and bool(binding.get("visibility_bound", false))).size(),
 		"presentation_binding_complete":true,
 		"presentation_roles":["primary_camera_world"],
 		"original_presentation_restored":true,
