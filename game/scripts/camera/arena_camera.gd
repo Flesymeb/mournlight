@@ -26,7 +26,7 @@ extends Camera3D
 # Aim slightly into the south escape lane so the mausoleum/bell stay in the
 # upper third while the Warden and nearby threats occupy the readable lower
 # safe lane. This is an authored target datum, not a landmark hide/fade.
-@export var framing_bias: Vector3 = Vector3(0.0, 0.0, 5.0)
+@export var framing_bias: Vector3 = Vector3(0.0, 0.0, -6.0)
 @export var arena_limit := Vector2(34.0, 32.0)
 @export var normal_fov := 72.0
 @export var safe_frame_fraction := Vector2(0.08, 0.10)
@@ -118,7 +118,7 @@ func _ready() -> void:
 	follow_height = 30.0
 	follow_distance = 26.0
 	follow_lateral = 0.0
-	framing_bias = Vector3(0.0, 0.0, 5.0)
+	framing_bias = Vector3(0.0, 0.0, -6.0)
 	obstruction_lateral_bypass = 0.0
 	current = true
 	normal_fov = 74.0

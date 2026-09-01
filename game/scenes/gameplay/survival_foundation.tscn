@@ -44,14 +44,16 @@ glow_enabled = true
 glow_intensity = 0.64
 bloom = 0.08
 fog_enabled = true
-fog_light_color = Color(0.17, 0.20, 0.36, 1)
-fog_light_energy = 0.26
-fog_density = 0.0065
-fog_sky_affect = 0.52
-fog_aerial_perspective = 0.2
-fog_depth_begin = 8.0
-fog_depth_end = 58.0
-fog_depth_curve = 1.15
+fog_light_color = Color(0.20, 0.24, 0.46, 1)
+fog_light_energy = 0.34
+# Atmospheric falloff fills the expanded outer sight lanes with moonlit depth
+# while leaving the authored streets and landmarks as the only gameplay surface.
+fog_density = 0.012
+fog_sky_affect = 0.68
+fog_aerial_perspective = 0.28
+fog_depth_begin = 14.0
+fog_depth_end = 82.0
+fog_depth_curve = 1.22
 fog_height = 0.0
 fog_height_density = 0.045
 
@@ -120,7 +122,7 @@ follow_distance = 26.0
 follow_lateral = 0.0
 # Keep the player in the lower-safe lane while the authored mausoleum and bell
 # sit above the route instead of filling the camera's center sight lane.
-framing_bias = Vector3(0.0, 0, 5.0)
+framing_bias = Vector3(0.0, 0, -6.0)
 arena_fill_limit = Vector2(33.0, 30.5)
 coverage_max_correction = 3.5
 coverage_threat_weight = 0.18
