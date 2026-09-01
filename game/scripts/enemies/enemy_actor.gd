@@ -32,6 +32,7 @@ var _lifetime := 0.0
 var _flank_sign := 1.0
 var _pool_return_pending := false
 var retirement_count := 0
+var pool_return_rejections := 0
 var neighbor_registry: EnemyNeighborRegistry
 var encounter_owner: EncounterSpawner
 var telegraph_admitted := false
@@ -92,6 +93,7 @@ func activate(next_profile: EnemyProfile, next_target: WardenController, at_posi
 	hurt_count = 0
 	death_count = 0
 	_pool_return_pending = false
+	pool_return_rejections = 0
 	_flank_sign = -1.0 if (String(stable_id).hash() + generation) % 2 == 0 else 1.0
 	_facing_bucket = DenseProfile.bucket_for(stable_id, generation, EnemySemanticPresenter.DENSE_APPROACH_ANIMATION_BUCKETS)
 	_facing_updates = 0
@@ -128,6 +130,12 @@ func activate(next_profile: EnemyProfile, next_target: WardenController, at_posi
 	lifecycle_event.emit(_event("spawn", {"position": global_position, "role_id": String(profile.role_id)}))
 
 func return_to_pool() -> void:
+	# Retirement is an exactly-once lifecycle edge. Several owners may observe
+	# the same death during deferred teardown; a duplicate call must not emit a
+	# second pool_return event or mutate the completed lifecycle trace.
+	if state == "pooled":
+		pool_return_rejections += 1
+		return
 	_release_telegraph_admission("pool_return")
 	if is_instance_valid(neighbor_registry) and state != "death":
 		neighbor_registry.unregister_actor(stable_id, spawn_generation)
@@ -162,6 +170,7 @@ func retire_from_pressure(reason: String, reconciliation_id: int) -> Dictionary:
 		"reason": reason,
 		"reconciliation_id": reconciliation_id,
 		"retirement_count": retirement_count,
+		"pool_return_rejections": pool_return_rejections,
 		"reward_committed": false,
 		"defeat_committed": false,
 	})

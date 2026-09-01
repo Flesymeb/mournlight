@@ -2005,7 +2005,11 @@ func _advance_profile_sample(delta: float) -> void:
 			"pooled_pickups":int(metric_counts.get("pooled_pickups", 0)),
 			"spawned_total":int(encounter_snapshot.get("spawned", 0)),
 			"despawned_total":int(encounter_snapshot.get("retired", 0)),
-			"runtime_error_count":0,
+			# Runtime log ownership stays with the host collector. Keep the field for
+			# schema stability, but mark the candidate-side value as unobserved rather
+			# than implying that this sampler inspected the editor debugger.
+			"runtime_error_count":-1,
+			"runtime_error_status":"host_runtime_log_required",
 			"subsystems": {
 				"targeting":(workload_sample.get("targeting", {}) as Dictionary).duplicate(true),
 				"steering":(workload_sample.get("steering", {}) as Dictionary).duplicate(true),
@@ -2106,7 +2110,7 @@ func _advance_profile_sample(delta: float) -> void:
 		"allocation_gc":{"allocation_bytes_p95":_percentile_metric(_profile_metric_samples, "allocation_bytes", 0.95),"allocation_bytes_max":_max_metric(_profile_metric_samples, "allocation_bytes"),"orphan_nodes_max":_max_metric(_profile_metric_samples, "orphan_nodes")},
 		"start_counts":_profile_start_counts.duplicate(true),
 		"end_counts":end_counts.duplicate(true), "counts":end_counts.duplicate(true),
-		"lifecycle_metrics":{"spawned_total":int(spawner.get_snapshot().get("spawned", 0)), "despawned_total":int(spawner.get_snapshot().get("retired", 0)), "runtime_error_count":0, "runtime_error_source":"godot_runtime_log"},
+		"lifecycle_metrics":{"spawned_total":int(spawner.get_snapshot().get("spawned", 0)), "despawned_total":int(spawner.get_snapshot().get("retired", 0)), "runtime_error_count":-1, "runtime_error_status":"host_runtime_log_required", "runtime_error_source":"godot_runtime_log"},
 		"start_lifecycle":_profile_start_lifecycle.duplicate(true),
 		"end_lifecycle":end_lifecycle,
 		"lifecycle_deltas":_profile_lifecycle_delta(_profile_start_lifecycle, end_lifecycle),
@@ -2114,7 +2118,7 @@ func _advance_profile_sample(delta: float) -> void:
 		"requested_enemy_workload":int(cohort.get("requested", _profile_start_counts.get("enemies", 0))),
 		"start_enemy_workload":int(cohort.get("start", _profile_start_counts.get("enemies", 0))),
 		"minimum_enemy_workload":int(cohort.get("minimum", _profile_minimum_enemy_workload)),
-		"maximum_enemy_workload":int(cohort.get("requested", _profile_maximum_enemy_workload)),
+		"maximum_enemy_workload":int(_profile_maximum_enemy_workload),
 		"end_enemy_workload":int(cohort.get("end_live", end_counts.get("enemies", 0))),
 		"replenished_enemy_count":int(cohort.get("replenished", 0)),
 		"viewport":_profile_viewport_receipt(),
@@ -2232,6 +2236,15 @@ func _reset_final_profile() -> void:
 	input_router._sync_context()
 	var immediate_input_context := input_router.context
 	var counts := _profile_counts()
+	# The teardown receipt was assembled before _begin_run restored the Warden's
+	# authored idle pose, so its first reset-invariants snapshot can legitimately
+	# describe the retiring cast/death semantic. Refresh that nested receipt at
+	# the post-reset boundary; Host/Tester should judge isolation from the fresh
+	# run state, not from the pre-reset terminal frame.
+	var post_reset_invariants := _terminal_reset_invariants("profile_reset")
+	retirement["reset_invariants"] = post_reset_invariants
+	retirement["post_reset_invariants"] = post_reset_invariants.duplicate(true)
+	retirement["complete"] = bool(post_reset_invariants.get("complete", false)) and bool(retirement.get("complete", false))
 	validation_profile_sample["run_serial"] = run_serial
 	validation_profile_sample["ordinary_run_counts"] = counts.duplicate(true)
 	validation_profile_sample["ordinary_run_state"] = run_state
@@ -2248,7 +2261,7 @@ func _reset_final_profile() -> void:
 		"requested_profile":"reset", "resolved_profile":"ordinary_run_ready",
 		"requested_counts": requested_counts, "resolved_retirement": retirement,
 		"post_reset_counts":counts, "counts":counts,
-		"reset_isolation":_counts_are_isolated(counts),
+		"reset_isolation":_counts_are_isolated(counts) and bool(post_reset_invariants.get("complete", false)),
 		"route_kind":run_route_kind,
 		"input_context":immediate_input_context,
 		"wave_route":_route_qualification(wave_director.get_snapshot()),
