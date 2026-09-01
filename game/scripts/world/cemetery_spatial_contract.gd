@@ -69,7 +69,18 @@ func _ready() -> void:
 	# masks include layer 2 (mask 7), so movement still collides with the
 	# rendered footprint, while ArenaCamera's environment-layer (4) coverage
 	# query does not mistake the landmark itself for a sightline blocker.
-	for path in ["OuterDatum/MausoleumCollision", "OuterDatum/NortheastTreeCollision", "OuterDatum/NorthwestTreeCollision", "OuterDatum/SoutheastTreeCollision", "OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision", "OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision"]:
+	# The mausoleum remains a gameplay blocker, but its broad footprint must not
+	# participate in the landmark sight query: a ray aimed at the mausoleum (or
+	# across its facade toward the keeper/bell) would otherwise self-occlude all
+	# three authored landmarks. Keep it on the gameplay layer while the camera
+	# query stays narrowed to the dedicated tall-tree/anchor layer below.
+	var mausoleum_collision := get_node_or_null("OuterDatum/MausoleumCollision") as StaticBody3D
+	if is_instance_valid(mausoleum_collision):
+		mausoleum_collision.collision_layer = 4
+		mausoleum_collision.collision_mask = 1
+		mausoleum_collision.set_meta("gameplay_collision", true)
+		mausoleum_collision.set_meta("camera_visibility_blocker", false)
+	for path in ["OuterDatum/NortheastTreeCollision", "OuterDatum/NorthwestTreeCollision", "OuterDatum/SoutheastTreeCollision", "OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision", "OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision"]:
 		var landmark := get_node_or_null(path) as StaticBody3D
 		if is_instance_valid(landmark):
 			landmark.collision_layer = 2
@@ -717,7 +728,7 @@ func get_snapshot() -> Dictionary:
 		# enemy masks include this layer, while camera coverage mask 2 audits only
 		# explicit boundary markers without treating the gameplay shell as a
 		# central building as a physics occluder.
-		"collision_layers":{"ground":4,"perimeter":4,"landmarks":2,"mausoleum_gameplay":2,"camera_query_excluded":camera_visibility_collision_mask,"navigation":0},
+		"collision_layers":{"ground":4,"perimeter":4,"landmarks":2,"mausoleum_gameplay":4,"camera_query_excluded":camera_visibility_collision_mask,"navigation":0},
 		"navigation_region":{"path":"OuterDatum/NativeNavigationRegion","layers":1,"source":"native_authored_streets","enabled":is_instance_valid(get_node_or_null("OuterDatum/NativeNavigationRegion"))},
 		"playable_rect":playable,
 		"playable_area":playable.size.x * playable.size.y,
@@ -747,7 +758,7 @@ func get_snapshot() -> Dictionary:
 			"warm_anchor":"OuterDatum/KeeperLanternPostAnchor/WarmLandmarkLight",
 			"cool_fills":["OuterDatum/RouteMoonFill","OuterDatum/WestMoonRim","OuterDatum/EastMoonRim","OuterDatum/SmallMausoleumAnchor/MausoleumMoonLift"],
 			"escape_lane_policy":"native_street_network_preserved",
-				"camera_profile":{"fov":82.0,"follow_height":40.0,"follow_distance":40.0,"follow_lateral":0.0,"framing_bias":Vector3(0.0,0.0,-6.0),"visibility_collision_mask":camera_visibility_collision_mask},
+				"camera_profile":{"fov":82.0,"follow_height":46.0,"follow_distance":46.0,"follow_lateral":0.0,"framing_bias":Vector3(0.0,0.0,-2.0),"landmark_blend":0.18,"visibility_collision_mask":camera_visibility_collision_mask},
 			"proxy_geometry_count":0,
 		},
 		"external_world":{"source":"intact_authored_package_plus_candidate_authored_distant_silhouette_ring", "procedural_scenery":false, "primitive_meshes":0, "external_dressing_nodes":6, "opaque":true, "non_playable_depth_beyond_all_edges":is_instance_valid(external_depth), "collision_enabled":false, "fog_depth_bound":true},

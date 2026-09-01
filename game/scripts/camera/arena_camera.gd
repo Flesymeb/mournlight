@@ -124,10 +124,10 @@ func _ready() -> void:
 	# The native street package is materially larger than the old combat pad.
 	# A wider authored orbit keeps the mausoleum readable as a landmark while
 	# retaining keeper/bell silhouettes and a visible escape lane in one frame.
-	follow_height = 40.0
-	follow_distance = 40.0
+	follow_height = 46.0
+	follow_distance = 46.0
 	follow_lateral = 0.0
-	framing_bias = Vector3(0.0, 0.0, -6.0)
+	framing_bias = Vector3(0.0, 0.0, -2.0)
 	obstruction_lateral_bypass = 0.0
 	current = true
 	normal_fov = 82.0
@@ -425,7 +425,11 @@ func _compose_arena_target(requested_target: Vector3, subjects: Array[Node3D]) -
 		# Keep player movement primary while reserving a stable 18% look-ahead for
 		# the authored landmark cluster. This retains the north route in-frame on
 		# cardinal views without pulling the camera off the street.
-		composed = composed.lerp(landmark_target, 0.36)
+		# Keep the player as the primary framing owner. A smaller landmark blend
+		# prevents the mausoleum from being pulled into the optical centre at the
+		# south spawn while preserving keeper/bell silhouettes in the upper safe
+		# lane and leaving a readable escape route around the central stair.
+		composed = composed.lerp(landmark_target, 0.18)
 	_coverage_obstructed_count = 0
 	_coverage_obstructing_path = ""
 	_coverage_obstructing_paths.clear()
