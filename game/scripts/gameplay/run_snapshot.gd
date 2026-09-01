@@ -1,6 +1,8 @@
 class_name RunSnapshot
 extends RefCounted
 
+const DenseWaveProfileClass := preload("res://scripts/gameplay/dense_profile.gd")
+
 static func make(controller: Node, world: Node, warden: Node, health: Node, spawner: Node, inventory: Node) -> Dictionary:
 	var health_current := float(health.current_health) if health else 0.0
 	var health_maximum := float(health.maximum_health) if health else 0.0
@@ -41,6 +43,7 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 		"ordinary_route_wave_ids":(wave_snapshot.get("ordinary_route_wave_ids", []) as Array).duplicate(),
 		"ordinary_route_complete":bool(wave_snapshot.get("ordinary_route_complete", false)),
 		"ordinary_route_eligible":String(controller.run_route_kind) == "ordinary" and bool(wave_snapshot.get("ordinary_route_eligible", false)),
+		"route_contract":controller.wave_director.get_route_contract_receipt() if controller.wave_director.has_method("get_route_contract_receipt") else {},
 		"diagnostic_jump_count":int(wave_snapshot.get("diagnostic_jump_count", 0)),
 		"run_route_kind":String(controller.run_route_kind),
 		"boss_active": bool(controller.boss_snapshot.get("active",false)),
@@ -90,6 +93,7 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 		"ordinary_profile_cycles":controller.ordinary_profile_cycles.duplicate(true),
 		"validation_profile_cycle_comparison":controller._profile_cycle_comparison(),
 		"dense_profile_cycle_comparison":controller._dense_profile_cycle_comparison(),
+		"dense_profile_contract":DenseWaveProfileClass.contract(),
 		"ordinary_profile_contract_checks":controller.ordinary_profile_contract_checks.duplicate(true),
 		"density_matrix_contract_checks":controller.density_matrix_contract_checks.duplicate(true),
 		"validation_retry_baselines":controller.validation_retry_baselines.duplicate(true),

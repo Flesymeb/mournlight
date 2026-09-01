@@ -531,4 +531,16 @@ func _displayed_result_fields() -> Dictionary:
 	for weapon in (summary.get("weapons",{}) as Dictionary).get("weapons",[]):
 		if bool(weapon.get("equipped",false)):
 			weapon_ranks.append({"weapon_id":weapon.get("weapon_id",""),"rank":weapon.get("rank",0)})
-	return {"outcome":summary.get("outcome","failure"),"elapsed":summary.get("elapsed",0.0),"wave":summary.get("wave",1),"level":summary.get("level",1),"defeated":summary.get("defeated",0),"damage_dealt":summary.get("damage_dealt",0),"damage_taken":summary.get("damage_taken",0),"weapon_ranks":weapon_ranks,"selected_upgrades":summary.get("selected_upgrades",[])}
+	var selected: Array = summary.get("selected_upgrades", [])
+	var build_summary := _weapon_summary(summary)
+	return {
+		"outcome":summary.get("outcome","failure"), "elapsed":summary.get("elapsed",0.0),
+		"wave":summary.get("wave",1), "wave_count":summary.get("wave_count",5),
+		"level":summary.get("level",1), "defeated":summary.get("defeated",0),
+		"damage_dealt":summary.get("damage_dealt",0), "damage_taken":summary.get("damage_taken",0),
+		"weapon_ranks":weapon_ranks, "build_summary":build_summary,
+		"selected_upgrades":selected,
+		"selected_upgrade_count":selected.size(),
+		"actions":["retry", "title"],
+		"presentation_contract":{"summary_stats":true,"build_summary":true,"retry":true,"title":true},
+	}

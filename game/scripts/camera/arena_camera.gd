@@ -139,7 +139,11 @@ func _ready() -> void:
 	# Aim a little farther up the authored north route so the mausoleum and bell
 	# remain fully framed from spawn; the closer 22 m rig keeps the Warden in the
 	# lower safe lane despite this landmark-forward bias.
-	framing_bias = Vector3(0.0, 0.0, -5.0)
+	# Keep the Warden inside the lower safe lane at the instant the camera is
+	# sampled (before the first follow tick) while retaining the northward
+	# landmark read.  A southward bias avoids an initial offscreen fallback in
+	# camera_coverage when the player is still at the authored spawn marker.
+	framing_bias = Vector3(0.0, 0.0, 1.0)
 	obstruction_lateral_bypass = 0.0
 	current = true
 	normal_fov = 78.0

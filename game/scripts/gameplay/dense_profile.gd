@@ -30,6 +30,10 @@ const SOFTWARE_STATUS := "rejected_software_renderer"
 const UNKNOWN_STATUS := "pending_native_renderer"
 const QUALIFICATION_MODE := "native_renderer_three_cycle"
 const PREFLIGHT_ID := "mournlight.native_dense_preflight.v1"
+## Qualification controls are intentionally editor-only.  Keeping the guard in
+## the profile contract gives host tooling one authoritative predicate instead
+## of duplicating release checks across RunController entry points.
+const RELEASE_GUARD := "OS.has_feature(\"editor\") and not OS.has_feature(\"release\")"
 ## Stable provenance marker.  Keep this literal immutable so host recapture can
 ## reject receipts produced by a different contract without trusting mutable
 ## runtime state.
@@ -41,7 +45,7 @@ static func contract() -> Dictionary:
 		"contract_version": CONTRACT_VERSION,
 		"contract_signature": CONTRACT_SIGNATURE,
 		"sampling_renderer_independent": true,
-		"release_guard": "OS.has_feature(\"editor\")",
+		"release_guard": RELEASE_GUARD,
 		"default_enabled": false,
 		"editor_opt_in": true,
 		"release_presentation_impact": "none_when_disabled",
@@ -107,6 +111,9 @@ static func contract() -> Dictionary:
 			"native_renderer_required_for_qualification": true,
 		},
 }
+
+static func tester_guard() -> bool:
+	return OS.has_feature("editor") and not OS.has_feature("release")
 
 static func preflight(renderer: Dictionary, viewport: Dictionary, process_frame_start: int, process_frame_end: int, frame_sample_count: int, physics_sample_count: int, phase: String, cycle_provenance: Dictionary = {}, reset_isolation: Dictionary = {}) -> Dictionary:
 	var frames_delta := maxi(0, process_frame_end - process_frame_start)

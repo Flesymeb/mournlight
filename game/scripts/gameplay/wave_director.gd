@@ -227,6 +227,25 @@ func _ordinary_route_complete() -> bool:
 			return false
 	return true
 
+## Compact, read-only receipt used by focused route checks and runtime probes.
+## It reports the contiguous sequence, cap/budget ownership, and single boss
+## request predicate without mutating director state.
+func get_route_contract_receipt() -> Dictionary:
+	var snapshot := get_snapshot()
+	return {
+		"contract_id": ROUTE_CONTRACT_ID,
+		"expected_wave_ids": (snapshot.get("expected_route_wave_ids", []) as Array).duplicate(),
+		"observed_wave_ids": (snapshot.get("ordinary_route_wave_ids", []) as Array).duplicate(),
+		"contiguous": bool(snapshot.get("ordinary_route_contiguous", false)),
+		"complete": bool(snapshot.get("ordinary_route_complete", false)),
+		"eligible": bool(snapshot.get("ordinary_route_eligible", false)),
+		"live_cap": int(snapshot.get("enemy_cap", 0)),
+		"spawn_budget_remaining": int(snapshot.get("spawn_budget_remaining", 0)),
+		"boss_request_count": int(snapshot.get("boss_request_count", 0)),
+		"boss_requested_exactly_once": bool(snapshot.get("boss_requested_exactly_once", false)),
+		"terminal": (snapshot.get("terminal_predicate", {}) as Dictionary).duplicate(true),
+	}
+
 func _definition(index: int) -> Dictionary:
 	if index < 0 or index >= _wave_count():
 		return {}

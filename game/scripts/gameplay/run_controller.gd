@@ -290,15 +290,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		_reset_final_profile()
 		get_viewport().set_input_as_handled()
 		return
-	if OS.has_feature("editor") and event.is_action_pressed(&"tester_dense_prepare"):
+	if DenseWaveProfileClass.tester_guard() and event.is_action_pressed(&"tester_dense_prepare"):
 		_prepare_final_profile()
 		get_viewport().set_input_as_handled()
 		return
-	if OS.has_feature("editor") and event.is_action_pressed(&"tester_dense_advance"):
+	if DenseWaveProfileClass.tester_guard() and event.is_action_pressed(&"tester_dense_advance"):
 		_advance_final_profile()
 		get_viewport().set_input_as_handled()
 		return
-	if OS.has_feature("editor") and event.is_action_pressed(&"tester_dense_reset"):
+	if DenseWaveProfileClass.tester_guard() and event.is_action_pressed(&"tester_dense_reset"):
 		_reset_final_profile()
 		get_viewport().set_input_as_handled()
 		return
@@ -1129,7 +1129,10 @@ func _set_title_surface(exposed: bool) -> void:
 		title_menu.process_mode = Node.PROCESS_MODE_DISABLED
 
 func _open_upgrade_draft() -> void:
-	if run_state != "active" or draft_controller.active:
+	# Drafts are legal during the Bellkeeper wave as well as ordinary pressure.
+	# The boss state remains authoritative after the transaction, so allowing the
+	# modal here prevents final-wave level-ups from becoming inert.
+	if run_state not in ["active", "boss"] or draft_controller.active:
 		return
 	warden.reset_input_latch("draft")
 	arena_camera.reset_occlusion_response()
@@ -1813,13 +1816,13 @@ func _prepare_final_profile() -> void:
 # a later state read. They never exist in release builds and do not alter the
 # ordinary route.
 func tester_dense_prepare() -> Dictionary:
-	if not OS.has_feature("editor"):
+	if not DenseWaveProfileClass.tester_guard():
 		return {"accepted":false,"status":"release_disabled","phase":"prepare"}
 	_prepare_final_profile()
 	return validation_profile_receipt.duplicate(true)
 
 func tester_dense_advance() -> Dictionary:
-	if not OS.has_feature("editor"):
+	if not DenseWaveProfileClass.tester_guard():
 		return {"accepted":false,"status":"release_disabled","phase":"advance"}
 	if _profile_active:
 		_record_profile_control_rejection("tester_dense_advance", "advance_already_active_timeout_safe")
@@ -1831,7 +1834,7 @@ func tester_dense_advance() -> Dictionary:
 	return validation_profile_sample.duplicate(true)
 
 func tester_dense_reset() -> Dictionary:
-	if not OS.has_feature("editor"):
+	if not DenseWaveProfileClass.tester_guard():
 		return {"accepted":false,"status":"release_disabled","phase":"reset"}
 	_reset_final_profile()
 	return validation_profile_receipt.duplicate(true)
