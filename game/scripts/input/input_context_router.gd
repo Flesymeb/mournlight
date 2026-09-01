@@ -26,6 +26,12 @@ var active_device := "keyboard"
 var device_generation := 0
 var last_device_receipt: Dictionary = {}
 var movement_vector := Vector2.ZERO
+## Relative mouse motion is routed here instead of being consumed by HUD
+## controls. The gameplay camera samples and clears this bounded accumulator
+## during its process tick, keeping look ownership separate from movement and
+## upgrade-confirm transactions.
+var mouse_look_delta := Vector2.ZERO
+var mouse_look_generation := 0
 var _movement_actions := {
 	&"move_left": false, &"move_right": false,
 	&"move_forward": false, &"move_back": false,
@@ -42,6 +48,11 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.echo:
 		return
 	_observe_device(event)
+	if event is InputEventMouseMotion:
+		var motion := event as InputEventMouseMotion
+		mouse_look_delta += motion.relative
+		mouse_look_delta = mouse_look_delta.limit_length(180.0)
+		mouse_look_generation += 1
 	# Keep an authoritative edge-backed movement state. Some embedded runners
 	# synthesize InputEventAction edges without updating Input's polling cache;
 	# Warden can consume this state during its physics tick just like a native
@@ -107,6 +118,11 @@ func _raw_keyboard_is(event: InputEvent, keycode: int) -> bool:
 
 func get_movement_vector() -> Vector2:
 	return movement_vector
+
+func consume_mouse_look() -> Vector2:
+	var result := mouse_look_delta
+	mouse_look_delta = Vector2.ZERO
+	return result
 
 func clear_movement_latch(reason := "reset") -> void:
 	reset_generation += 1

@@ -425,6 +425,7 @@ func _begin_run() -> void:
 	_upgrade_commit_in_progress = false
 	draft_controller.reset()
 	arena_camera.reset_occlusion_response()
+	arena_camera.reset_view()
 	audio_director.reset_for_run()
 	world.reset_session(true, "begin_run_%s" % _next_baseline_reason)
 	_guidance_attack_baseline = world.attack_runtime.authorized_count
@@ -1158,7 +1159,19 @@ func _spawn_bellkeeper() -> void:
 	if String(requested_wave.get("phase", "")) != "active":
 		return
 	boss = BELLKEEPER_SCENE.instantiate() as BellkeeperActor
-	world.get_node("BossAnchor").add_child(boss)
+	var boss_anchor := world.get_node("BossAnchor") as Node3D
+	# Rebase the encounter onto the authored cracked-bell landmark. The old
+	# fixed anchor was inside the mausoleum sightline after native package scale
+	# calibration, so the Bellkeeper could begin completely occluded. Keep it on
+	# the same native street datum, just south of the bell for a clear approach.
+	var bell_anchor := world.arena_contract.get_node_or_null("OuterDatum/CrackedMoonBellAnchor") as Node3D
+	if is_instance_valid(bell_anchor):
+		boss_anchor.global_position = bell_anchor.global_position + Vector3(0.0, 0.05, 5.2)
+	else:
+		boss_anchor.global_position = Vector3(8.6, 0.05, 6.2)
+	boss_anchor.set_meta("encounter_anchor", "authored_cracked_bell_south_approach")
+	boss_anchor.set_meta("encounter_anchor_position", boss_anchor.global_position)
+	boss_anchor.add_child(boss)
 	boss.position = Vector3.ZERO
 	boss.configure(warden, spawner.neighbor_registry)
 	var wave_state := wave_director.get_snapshot()
@@ -1375,6 +1388,7 @@ func _teardown_run(route: String, reason: String) -> Dictionary:
 	draft_controller.reset()
 	draft_view.close()
 	arena_camera.reset_occlusion_response()
+	arena_camera.reset_view()
 	if route == "result":
 		wave_director.terminate(reason)
 	else:

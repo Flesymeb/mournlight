@@ -12,6 +12,14 @@ extends Camera3D
 @export var follow_damping := 8.5
 @export var lead_distance := 2.4
 @export var lead_damping := 5.0
+@export_category("Optional aim bias")
+## Mouse motion gently rotates the high-angle rig; it never enters first-person
+## or free-orbit mode. The bounded pitch range preserves arena context.
+@export var mouse_look_sensitivity := 0.11
+@export var mouse_pitch_min := 38.0
+@export var mouse_pitch_max := 58.0
+@export var mouse_yaw_degrees := 0.0
+@export var mouse_pitch_degrees := 49.0
 # Keep the Warden in the lower-safe lane without aiming the camera through the
 # mausoleum volume.  The previous -5.5 north bias put several Warden AABB
 # samples behind the landmark and under-reported shipped visibility.
@@ -97,6 +105,7 @@ var _coverage_occluder_original_transparency: Dictionary = {}
 var _coverage_occluder_original_visibility: Dictionary = {}
 var _tall_occluder_bindings: Array[Dictionary] = []
 var _camera_response_allowed := false
+var _mouse_look_receipt: Dictionary = {}
 
 func _ready() -> void:
 	# Rebase the shipped camera from one authoritative sight lane. Older
@@ -167,6 +176,7 @@ func _process(delta: float) -> void:
 		return
 	if not _camera_response_allowed:
 		return
+	_update_mouse_look()
 	_coverage_members_refresh_remaining = maxf(0.0, _coverage_members_refresh_remaining - delta)
 	var desired_lead := Vector3.ZERO
 	if movement_velocity.length_squared() > 0.04:
@@ -241,7 +251,15 @@ func _process(delta: float) -> void:
 		# not from pushing the shipped lens into a thumbnail view.
 		effective_height += 0.8
 		effective_distance += 1.2
-	var desired_position := framing_target + Vector3(follow_lateral, effective_height, effective_distance)
+	var orbit_radius := maxf(0.1, Vector2(effective_height, effective_distance).length())
+	var pitch_radians := deg_to_rad(mouse_pitch_degrees)
+	var yaw_radians := deg_to_rad(mouse_yaw_degrees)
+	var orbit_offset := Vector3(
+		 sin(yaw_radians) * cos(pitch_radians) * orbit_radius,
+		 sin(pitch_radians) * orbit_radius,
+		 cos(yaw_radians) * cos(pitch_radians) * orbit_radius
+	)
+	var desired_position := framing_target + orbit_offset + Vector3(follow_lateral, 0.0, 0.0)
 	desired_position.x += _obstruction_bypass_sign * obstruction_lateral_bypass * _obstruction_response_strength
 	# Keep the shipped camera inside the intact authored world.  At the outer
 	# perimeter the follow offset can otherwise place the camera beyond the GLB
@@ -330,6 +348,12 @@ func _select_coverage_subjects() -> Array[Node3D]:
 	)
 	for index in mini(coverage_subject_limit, candidates.size()):
 		subjects.append(candidates[index].node as Node3D)
+	# The Bellkeeper begins outside the ordinary threat radius. Always include
+	# the active boss as one bounded coverage subject so the shipped camera keeps
+	# its silhouette in frame during entrance, near contact, and departure.
+	var boss := get_node_or_null("../BossAnchor/Bellkeeper") as Node3D
+	if is_instance_valid(boss) and not bool(boss.get("committed")) and boss not in subjects:
+		subjects.append(boss)
 	_coverage_subject_paths.clear()
 	for subject in subjects:
 		_coverage_subject_paths.append(String(subject.get_path()))
@@ -663,6 +687,15 @@ func reset_occlusion_response() -> void:
 		visual.transparency = float(_coverage_occluder_original_transparency.get(instance_id, visual.transparency))
 		visual.visible = bool(_coverage_occluder_original_visibility.get(instance_id, visual.visible))
 
+func reset_view() -> void:
+	"""Return the optional aim bias to the authored high-angle release datum."""
+	mouse_yaw_degrees = 0.0
+	mouse_pitch_degrees = 49.0
+	_mouse_look_receipt.clear()
+	var router := get_node_or_null("../../InputContextRouter")
+	if is_instance_valid(router) and router.has_method("consume_mouse_look"):
+		router.consume_mouse_look()
+
 func _collect_visuals(root: Node) -> Array[VisualInstance3D]:
 	var result: Array[VisualInstance3D] = []
 	if not is_instance_valid(root):
@@ -723,6 +756,27 @@ func _snap_to_target() -> void:
 	_coverage_offset = Vector3.ZERO
 	global_position = framing_target + Vector3(follow_lateral, follow_height, follow_distance)
 	look_at(framing_target + Vector3(0.0, 0.65, 0.0), Vector3.UP)
+
+func _update_mouse_look() -> void:
+	# ArenaCamera lives under World; the router is a sibling of World on the
+	# run-shell root, so keep this binding explicit and scene-relative.
+	var router := get_node_or_null("../../InputContextRouter")
+	if not is_instance_valid(router) or not router.has_method("consume_mouse_look"):
+		return
+	var relative := router.consume_mouse_look() as Vector2
+	if relative.length_squared() <= 0.0001:
+		return
+	# Horizontal motion changes yaw; vertical motion changes pitch. Both are
+	# deliberately bounded so the arena remains readable during dense waves.
+	mouse_yaw_degrees = fposmod(mouse_yaw_degrees - relative.x * mouse_look_sensitivity + 180.0, 360.0) - 180.0
+	mouse_pitch_degrees = clampf(mouse_pitch_degrees - relative.y * mouse_look_sensitivity, mouse_pitch_min, mouse_pitch_max)
+	_mouse_look_receipt = {
+		"generation":int(router.get("mouse_look_generation")),
+		"relative":relative,
+		"yaw_degrees":mouse_yaw_degrees,
+		"pitch_degrees":mouse_pitch_degrees,
+		"camera_forward":(-global_transform.basis.z).normalized(),
+	}
 
 func _coverage_occluders_restored() -> bool:
 	# Camera containment also contributes to the shared response strength. It does
@@ -790,6 +844,14 @@ func _mcp_state() -> Dictionary:
 		"effective_follow_distance":follow_distance - obstruction_distance_reduction * _obstruction_response_strength,
 		"isolated_visual_count":isolated_visual_count,
 		"movement_velocity": movement_velocity,
+		"mouse_look": {
+			"sensitivity":mouse_look_sensitivity,
+			"yaw_degrees":mouse_yaw_degrees,
+			"pitch_degrees":mouse_pitch_degrees,
+			"pitch_bounds":[mouse_pitch_min, mouse_pitch_max],
+			"last_receipt":_mouse_look_receipt.duplicate(true),
+			"camera_relative":true,
+		},
 		"follow_height": follow_height,
 		"follow_distance": follow_distance,
 		"follow_lateral": follow_lateral,
