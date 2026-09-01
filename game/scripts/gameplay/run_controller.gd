@@ -1395,7 +1395,19 @@ func _advance_victory_transaction(delta: float) -> void:
 	ordinary_victory_receipt["held_animation"] = warden.animation_binding.get_snapshot() if warden.animation_binding else {}
 	var wall_elapsed := float(Time.get_ticks_msec() - _victory_hold_started_msec) / 1000.0
 	var audio_source_completed := audio_director.terminal_voice_retirement_reason == "source_finished"
-	if _victory_hold_remaining <= 0.0 and wall_elapsed >= VICTORY_PRESENTATION_HOLD_SECONDS and audio_source_completed:
+	# Terminal presentation must not deadlock Result when an optional victory
+	# stream is unavailable or the backend retires a voice without emitting the
+	# `finished` callback.  The audio director remains authoritative for source
+	# ownership; this fallback only accepts the already-completed visual hold
+	# when no terminal voice is active or pending.  A playing/pending voice still
+	# gates the handoff, preserving the authored cue when it is available.
+	var terminal_audio_state := audio_director._mcp_state()
+	var terminal_voice: Dictionary = terminal_audio_state.get("terminal_voice", {})
+	var terminal_voice_idle := not bool(terminal_voice.get("playing", false)) and not bool(audio_director.terminal_voice_start_pending)
+	var audio_handoff_ready := audio_source_completed or terminal_voice_idle
+	ordinary_victory_receipt["presentation_hold"]["audio_handoff_ready"] = audio_handoff_ready
+	ordinary_victory_receipt["presentation_hold"]["terminal_voice_idle"] = terminal_voice_idle
+	if _victory_hold_remaining <= 0.0 and wall_elapsed >= VICTORY_PRESENTATION_HOLD_SECONDS and audio_handoff_ready:
 		_commit_victory_transaction()
 
 func _commit_victory_transaction() -> void:
