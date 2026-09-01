@@ -4127,6 +4127,37 @@ func _mcp_state() -> Dictionary:
 		"shell_focus": String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none",
 	}
 
+## Public, read-only snapshot entrypoint for black-box harnesses.
+##
+## Most MCP probes consume `_mcp_state()` directly, but host/Tester replay
+## scripts may only have access to the authoritative controller node. Keeping
+## this tiny alias avoids forcing those probes to depend on a private method
+## name while preserving one source of truth for all receipts.
+func get_snapshot() -> Dictionary:
+	return _mcp_state().duplicate(true)
+
+## Stable route receipt used by ordinary-run replay checks. This delegates to
+## the wave director so route eligibility can never diverge between the
+## controller snapshot and the director's contiguous-wave ledger.
+func get_route_contract_receipt() -> Dictionary:
+	return wave_director.get_route_contract_receipt().duplicate(true)
+
+## Read-only handles for the two bounded release-convergence protocols. The
+## returned dictionaries are deep copies so a diagnostic collector cannot
+## mutate authoritative lifecycle state while inspecting a receipt.
+func get_dense_profile_receipt() -> Dictionary:
+	return {
+		"contract":DenseWaveProfileClass.contract(),
+		"requested":validation_profile_receipt.duplicate(true),
+		"sample":validation_profile_sample.duplicate(true),
+		"cycles":validation_profile_cycles.duplicate(true),
+		"active":_profile_active,
+		"cycle_index":_dense_cycle_index,
+	}.duplicate(true)
+
+func get_upgrade_transaction_receipt() -> Dictionary:
+	return upgrade_transaction_receipt.duplicate(true)
+
 func _terminal_snapshot_digest() -> Dictionary:
 	if terminal_snapshot.is_empty(): return {}
 	return {"committed":terminal_snapshot.get("committed",false),"commit_run_serial":terminal_snapshot.get("commit_run_serial",0),
