@@ -1704,7 +1704,11 @@ func _record_profile_control_rejection(requested_profile: String, reason: String
 	_emit_snapshot()
 
 func _prepare_final_profile() -> void:
-	if not OS.has_feature("editor"):
+	# Dense qualification is a tester-only protocol, not merely an editor
+	# convenience. Use the shared contract predicate so an exported build can
+	# never enter diagnostic preparation even if a stale caller reaches this
+	# private entrypoint.
+	if not DenseWaveProfileClass.tester_guard():
 		return
 	if run_state not in ["active", "boss"]:
 		_record_profile_control_rejection("tester_dense_prepare", "ordinary_run_required:%s" % run_state)
@@ -1840,7 +1844,7 @@ func tester_dense_reset() -> Dictionary:
 	return validation_profile_receipt.duplicate(true)
 
 func _advance_final_profile() -> void:
-	if not OS.has_feature("editor"):
+	if not DenseWaveProfileClass.tester_guard():
 		return
 	if _profile_active:
 		# A second advance can arrive while the host collector is still waiting on
@@ -2327,7 +2331,7 @@ func _advance_profile_sample(delta: float) -> void:
 	_emit_snapshot()
 
 func _reset_final_profile() -> void:
-	if not OS.has_feature("editor"):
+	if not DenseWaveProfileClass.tester_guard():
 		return
 	var source_run_serial := run_serial
 	var source_sample := validation_profile_sample.duplicate(true)

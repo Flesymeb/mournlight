@@ -26,6 +26,11 @@ var vulnerable := false
 var bell_wave_count := 0
 var lane_pressure_count := 0
 var phase_shift_count := 0
+## Defeat is a single terminal transaction. Keep explicit counters in the
+## authoritative boss receipt so a duplicated HealthComponent signal or a
+## deferred teardown callback is observable rather than silently ignored.
+var defeat_emit_count := 0
+var duplicate_defeat_rejections := 0
 var _telegraph_direction := Vector3.FORWARD
 var _retirement_receipt: Dictionary = {}
 var _death_tween: Tween
@@ -70,6 +75,8 @@ func configure(next_target: WardenController, registry: EnemyNeighborRegistry = 
 	bell_wave_count = 0
 	lane_pressure_count = 0
 	phase_shift_count = 0
+	defeat_emit_count = 0
+	duplicate_defeat_rejections = 0
 	state_clock = 1.7
 	attack_clock = 2.4
 	state_clock = 1.7
@@ -150,8 +157,11 @@ func _on_hurt(_event: Dictionary) -> void:
 
 func _on_died(event: Dictionary) -> void:
 	if committed:
+		duplicate_defeat_rejections += 1
+		boss_changed.emit(get_snapshot())
 		return
 	committed = true
+	defeat_emit_count += 1
 	state = "defeated"
 	_set_targetable(false)
 	set_physics_process(false)
@@ -230,6 +240,8 @@ func get_snapshot() -> Dictionary:
 		"attack_clock":attack_clock,"telegraph_kind":telegraph_kind,"vulnerable":vulnerable,
 		"bell_wave_count":bell_wave_count,"lane_pressure_count":lane_pressure_count,
 		"phase_shift_count":phase_shift_count,"defeat_committed":committed,
+		"defeat_emit_count":defeat_emit_count,"duplicate_defeat_rejections":duplicate_defeat_rejections,
+		"defeat_requested_exactly_once":defeat_emit_count == 1 and duplicate_defeat_rejections == 0,
 		"presentation_scale":presentation.scale,"authored_presentation_scale":_authored_presentation_scale,
 		"death_scale_relative":Vector3(
 			presentation.scale.x / maxf(_authored_presentation_scale.x, 0.0001),
