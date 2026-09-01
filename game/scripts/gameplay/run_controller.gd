@@ -959,7 +959,22 @@ func _on_logical_press_edge(action: StringName, activation: int, receipt: Dictio
 	if action == &"pause":
 		var physical := String(receipt.get("physical", "back"))
 		var accepted := false
-		if run_state in ["active", "boss"] and not get_tree().paused:
+		# Escape is the single physical pause owner, but its destination remains
+		# context-aware. A draft must cancel its transaction, nested shell pages
+		# return to their owner, and Result returns to Title; none of these paths
+		# should also toggle SceneTree pause or dispatch ui_cancel a second time.
+		if run_state == "draft":
+			accepted = _on_draft_cancel()
+		elif run_state in ["settings", "help", "credits"]:
+			_return_from_shell_page()
+			accepted = true
+		elif run_state == "result":
+			_begin_terminal_title_handoff()
+			accepted = true
+		elif run_state == "title" and shell.mode in ["settings", "help", "credits"]:
+			_return_from_shell_page()
+			accepted = true
+		elif run_state in ["active", "boss"] and not get_tree().paused:
 			_pause_run()
 			accepted = true
 		elif run_state == "paused":

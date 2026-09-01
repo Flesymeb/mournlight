@@ -41,7 +41,19 @@ var _movement_actions := {
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_sanitize_escape_bindings()
 	_sync_context()
+
+func _sanitize_escape_bindings() -> void:
+	# Godot seeds the built-in ui_cancel action with Escape even when the
+	# project file declares an empty event list. Escape ownership is intentionally
+	# centralized in the pause action; remove the implicit duplicate at runtime
+	# while preserving gamepad/UI back semantics through context_back.
+	if not InputMap.has_action(&"ui_cancel"):
+		return
+	for event in InputMap.action_get_events(&"ui_cancel"):
+		if event is InputEventKey and (event as InputEventKey).physical_keycode == KEY_ESCAPE:
+			InputMap.action_erase_event(&"ui_cancel", event)
 
 func _process(_delta: float) -> void:
 	_sync_context()
@@ -388,6 +400,10 @@ func _parse_action(action: StringName, pressed: bool) -> void:
 
 func _mcp_state() -> Dictionary:
 	return {
+		# Keep the single-owner Escape proof at the front of the compact runtime
+		# state so bounded digests retain it even when the wider router receipt is
+		# truncated by the collector.
+		"binding_audit":get_binding_audit(),
 		"context":context, "context_generation":context_generation,
 		"activation_generation":activation_generation,
 		"confirm_dispatch":String(confirm_dispatch),
@@ -406,7 +422,6 @@ func _mcp_state() -> Dictionary:
 		"last_device_receipt":last_device_receipt,
 		"movement_vector":movement_vector,
 		"movement_actions":_movement_actions,
-		"binding_audit":get_binding_audit(),
 	}
 
 func get_binding_audit() -> Dictionary:

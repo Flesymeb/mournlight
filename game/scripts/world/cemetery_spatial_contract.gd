@@ -72,8 +72,9 @@ func _ready() -> void:
 	# The mausoleum remains a gameplay blocker, but its broad footprint must not
 	# participate in the landmark sight query: a ray aimed at the mausoleum (or
 	# across its facade toward the keeper/bell) would otherwise self-occlude all
-	# three authored landmarks. Keep it on the gameplay layer while the camera
-	# query stays narrowed to the dedicated tall-tree/anchor layer below.
+	# three authored landmarks. Keep it on the gameplay/environment layer (4),
+	# while the camera coverage query stays narrowed to the dedicated landmark
+	# layer (2) and therefore cannot self-occlude the broad mausoleum volume.
 	var mausoleum_collision := get_node_or_null("OuterDatum/MausoleumCollision") as StaticBody3D
 	if is_instance_valid(mausoleum_collision):
 		mausoleum_collision.collision_layer = 4
