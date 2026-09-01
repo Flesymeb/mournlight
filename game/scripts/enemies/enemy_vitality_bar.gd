@@ -7,8 +7,14 @@ signal visibility_state_changed(event: Dictionary)
 # indicator is still sparse (only engaged actors reveal it), but a threat that
 # has entered the player's attack envelope should not disappear between two
 # sampler frames before damage/focus evidence can observe it.
-const USEFUL_PROXIMITY := 12.5
+## Keep the indicator readable from the shipped high-angle framing.  The
+## previous 12.5m gate meant freshly spawned actors were already outside the
+## useful window, so a bound bar stayed hidden until the first successful hit.
+## A slightly wider gate still remains sparse because bars fade as soon as an
+## actor leaves the player's approach envelope.
+const USEFUL_PROXIMITY := 16.0
 const DAMAGE_HOLD_SECONDS := 4.0
+const SPAWN_REVEAL_SECONDS := 1.0
 
 @onready var background: MeshInstance3D = $Background
 @onready var fill: MeshInstance3D = $Fill
@@ -44,9 +50,12 @@ func bind_actor(health: HealthComponent, next_actor_id: StringName, generation: 
 	_bound_health = health
 	if is_instance_valid(_bound_health) and not _bound_health.health_changed.is_connected(_on_health_changed):
 		_bound_health.health_changed.connect(_on_health_changed)
-	damage_hold_remaining = 0.0
+	# Give every newly admitted actor one short, low-alpha orientation cue. This
+	# makes the authoritative binding visible before combat damage lands while
+	# preserving the sparse/fading policy for ordinary enemies.
+	damage_hold_remaining = SPAWN_REVEAL_SECONDS
 	alpha = 0.0
-	useful_reason = "hidden"
+	useful_reason = "spawn"
 	current_health = health.current_health
 	maximum_health = maxf(1.0, health.maximum_health)
 	_set_ratio(current_health / maximum_health)
@@ -91,7 +100,9 @@ func advance(delta: float, target_distance: float, lifecycle_active: bool) -> vo
 	var proximity_useful := target_distance <= USEFUL_PROXIMITY
 	var should_show := damage_hold_remaining > 0.0 or proximity_useful or _elite
 	if damage_hold_remaining > 0.0:
-		useful_reason = "damaged"
+		# Preserve the semantic reason for the hold: freshly admitted actors are
+		# previewed as "spawn", while an actual health delta remains "damaged".
+		useful_reason = "spawn" if useful_reason == "spawn" else "damaged"
 	elif _elite:
 		useful_reason = "elite_engaged"
 	elif proximity_useful:
@@ -181,6 +192,8 @@ func get_snapshot() -> Dictionary:
 		"generation_mismatch_retirements":generation_mismatch_retirements,
 		"last_retirement_reason":last_retirement_reason,
 		"health_signal_bound":is_instance_valid(_bound_health) and _bound_health.health_changed.is_connected(_on_health_changed),
+		"visibility_policy":"damage_focus_proximity_fade",
+		"spawn_reveal_seconds":SPAWN_REVEAL_SECONDS,
 	}
 
 func _mcp_state() -> Dictionary:

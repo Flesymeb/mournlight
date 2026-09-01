@@ -166,7 +166,7 @@ func prepare_test_wave(index: int) -> void:
 func get_snapshot() -> Dictionary:
 	var definition := _definition(wave_index) if wave_index >= 0 else {}
 	var encounter: Dictionary = encounter_spawner.get_snapshot() if is_instance_valid(encounter_spawner) and encounter_spawner.has_method("get_snapshot") else {}
-	var expected_ids: PackedStringArray = WAVE_SEQUENCE.get_meta("wave_ids", PackedStringArray())
+	var expected_ids: PackedStringArray = _meta_string_array("wave_ids", PackedStringArray(["first_toll", "crossing_shadows", "gravewind", "long_procession", "bellkeeper"]))
 	var route_complete := _ordinary_route_complete()
 	var next_wave_id := ""
 	if ordinary_route_wave_ids.size() < expected_ids.size():
@@ -207,14 +207,15 @@ func get_snapshot() -> Dictionary:
 		"sequence_resource":"res://resources/waves/mournlight_wave_sequence.tres"}
 
 func _wave_count() -> int:
-	var ids: PackedStringArray = WAVE_SEQUENCE.get_meta("wave_ids", PackedStringArray())
+	var ids: PackedStringArray = _meta_string_array("wave_ids", PackedStringArray())
 	return ids.size()
 
 func _boss_wave_index() -> int:
-	return int(WAVE_SEQUENCE.get_meta("boss_wave_index", _wave_count() - 1))
+	var value: Variant = WAVE_SEQUENCE.get_meta("boss_wave_index", _wave_count() - 1)
+	return clampi(int(value), 0, maxi(0, _wave_count() - 1))
 
 func _ordinary_route_complete() -> bool:
-	var expected: PackedStringArray = WAVE_SEQUENCE.get_meta("wave_ids", PackedStringArray())
+	var expected: PackedStringArray = _meta_string_array("wave_ids", PackedStringArray(["first_toll", "crossing_shadows", "gravewind", "long_procession", "bellkeeper"]))
 	if ordinary_route_wave_ids.size() != expected.size():
 		return false
 	for index in expected.size():
@@ -225,18 +226,18 @@ func _ordinary_route_complete() -> bool:
 func _definition(index: int) -> Dictionary:
 	if index < 0 or index >= _wave_count():
 		return {}
-	var ids: PackedStringArray = WAVE_SEQUENCE.get_meta("wave_ids")
-	var titles: PackedStringArray = WAVE_SEQUENCE.get_meta("wave_titles")
-	var durations: PackedFloat32Array = WAVE_SEQUENCE.get_meta("durations")
-	var caps: PackedInt32Array = WAVE_SEQUENCE.get_meta("live_caps")
-	var cadences: PackedFloat32Array = WAVE_SEQUENCE.get_meta("cadences")
-	var budgets: PackedInt32Array = WAVE_SEQUENCE.get_meta("spawn_budgets")
-	var initial_spawns: PackedInt32Array = WAVE_SEQUENCE.get_meta("initial_spawns", PackedInt32Array([6, 6, 6, 6, 6]))
-	var warnings: PackedStringArray = WAVE_SEQUENCE.get_meta("warnings")
-	var elite_every: PackedInt32Array = WAVE_SEQUENCE.get_meta("elite_every")
+	var ids: PackedStringArray = _meta_string_array("wave_ids", PackedStringArray(["first_toll", "crossing_shadows", "gravewind", "long_procession", "bellkeeper"]))
+	var titles: PackedStringArray = _meta_string_array("wave_titles", PackedStringArray(["The First Toll", "Crossing Shadows", "Gravewind", "The Long Procession", "The Bellkeeper"]))
+	var durations: PackedFloat32Array = _meta_float_array("durations", PackedFloat32Array([20.0, 70.0, 100.0, 110.0, 120.0]))
+	var caps: PackedInt32Array = _meta_int_array("live_caps", PackedInt32Array([6, 14, 18, 36, 32]))
+	var cadences: PackedFloat32Array = _meta_float_array("cadences", PackedFloat32Array([1.9, 1.15, 0.98, 0.58, 0.48]))
+	var budgets: PackedInt32Array = _meta_int_array("spawn_budgets", PackedInt32Array([22, 46, 60, 120, 128]))
+	var initial_spawns: PackedInt32Array = _meta_int_array("initial_spawns", PackedInt32Array([6, 6, 6, 6, 6]))
+	var warnings: PackedStringArray = _meta_string_array("warnings", PackedStringArray(["TEACHING PRESSURE", "FLANK PRESSURE", "RANGED ELITE", "MIXED DENSITY", "FINAL TOLL"]))
+	var elite_every: PackedInt32Array = _meta_int_array("elite_every", PackedInt32Array([0, 0, 9, 7, 8]))
 	var weights := {}
 	for role in ROLE_KEYS:
-		var values: PackedInt32Array = WAVE_SEQUENCE.get_meta(role + "_weights")
+		var values: PackedInt32Array = _meta_int_array(role + "_weights", PackedInt32Array([0, 0, 0, 0, 0]))
 		weights[role] = int(values[index])
 	return {
 		"id": ids[index], "index": index, "title": titles[index],
@@ -248,7 +249,19 @@ func _definition(index: int) -> Dictionary:
 		"composition_weights": weights, "elite_every": int(elite_every[index]),
 		"elite_enabled": int(elite_every[index]) > 0, "warning": warnings[index],
 		"boss_wave": index == _boss_wave_index(),
-	}
+}
+
+func _meta_string_array(key: String, fallback: PackedStringArray) -> PackedStringArray:
+	var value: Variant = WAVE_SEQUENCE.get_meta(key, fallback)
+	return value if value is PackedStringArray and value.size() > 0 else fallback
+
+func _meta_float_array(key: String, fallback: PackedFloat32Array) -> PackedFloat32Array:
+	var value: Variant = WAVE_SEQUENCE.get_meta(key, fallback)
+	return value if value is PackedFloat32Array and value.size() > 0 else fallback
+
+func _meta_int_array(key: String, fallback: PackedInt32Array) -> PackedInt32Array:
+	var value: Variant = WAVE_SEQUENCE.get_meta(key, fallback)
+	return value if value is PackedInt32Array and value.size() > 0 else fallback
 
 func _mcp_state() -> Dictionary:
 	return get_snapshot()
