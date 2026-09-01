@@ -347,12 +347,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		_prepare_tester_victory()
 		get_viewport().set_input_as_handled()
 		return
-	if event.is_action_pressed("pause") and not event.is_echo():
-		if run_state in ["active","boss"]:
-			_pause_run()
-		elif run_state == "paused":
-			_resume_run()
-		get_viewport().set_input_as_handled()
+	# Pause ownership is routed exclusively through InputContextRouter.  The
+	# physical Escape/Start event is also bound to context_back, so handling it
+	# here would toggle twice (once from the router's synthetic logical edge and
+	# once from this raw event) and leave the run in its prior state.  Keeping the
+	# fallback out of _unhandled_input preserves one activation per transaction.
 
 func start_run() -> void:
 	_next_baseline_reason = "fresh_start"
@@ -922,6 +921,16 @@ func _on_dash_changed(_phase: String, _invulnerable: bool) -> void:
 	_emit_snapshot()
 
 func _on_logical_press_edge(action: StringName, activation: int, receipt: Dictionary) -> void:
+	if action == &"pause":
+		var accepted := false
+		if run_state in ["active", "boss"] and not get_tree().paused:
+			_pause_run()
+			accepted = true
+		elif run_state == "paused":
+			_resume_run()
+			accepted = true
+		input_router.bind_destination("back", "pause_toggled" if accepted else "pause_rejected", 1 if accepted else 0)
+		return
 	if action == &"ui_cancel" and run_state == "draft":
 		var cancelled := _on_draft_cancel()
 		input_router.bind_destination("back", "upgrade_draft_cancelled" if cancelled else "upgrade_draft_cancel_rejected", 1 if cancelled else 0)
