@@ -986,7 +986,12 @@ func _on_draft_cancel() -> bool:
 		return false
 	draft_view.close()
 	get_tree().paused = false
-	_transition("active")
+	# A level-up can occur during the fifth wave while the Bellkeeper is
+	# entering or already present. Resume the state that owns the current
+	# encounter rather than downgrading the boss route to ordinary active play.
+	var wave_snapshot := wave_director.get_snapshot()
+	var resume_state := "boss" if is_instance_valid(boss) or int(wave_snapshot.get("wave", 0)) == 5 else "active"
+	_transition(resume_state)
 	upgrade_transaction_receipt["phase"] = "cancelled"
 	upgrade_transaction_receipt["resolved"] = false
 	upgrade_transaction_receipt["cancelled"] = true
@@ -1165,7 +1170,11 @@ func _on_draft_choice(index: int) -> void:
 	complete_run_ledger.record_draft(choice, run_elapsed, run_route_kind, int(wave_state.get("diagnostic_jump_count", 0)))
 	draft_view.close()
 	get_tree().paused = false
-	_transition("active")
+	# Preserve boss-state ownership when the draft was opened from wave five;
+	# Bellkeeper timing and HUD presentation must continue under the boss state
+	# after the selected upgrade is committed.
+	var resume_state := "boss" if is_instance_valid(boss) or int(wave_state.get("wave", 0)) == 5 else "active"
+	_transition(resume_state)
 	upgrade_transaction_receipt["phase"] = "resolved"
 	upgrade_transaction_receipt["resolved"] = true
 	upgrade_transaction_receipt["applied_upgrade_id"] = String(choice.get("id", ""))
