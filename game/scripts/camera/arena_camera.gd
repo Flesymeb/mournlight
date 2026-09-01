@@ -133,8 +133,8 @@ func _ready() -> void:
 	# 28 m rig rendered the Warden as a thumbnail and weakened threat reads.
 	# A 22 m high-angle orbit still exposes the mausoleum, bell and an escape
 	# lane while giving the player silhouette enough pixels for ordinary play.
-	follow_height = 22.0
-	follow_distance = 22.0
+	follow_height = 30.0
+	follow_distance = 30.0
 	follow_lateral = 0.0
 	# Aim a little farther up the authored north route so the mausoleum and bell
 	# remain fully framed from spawn; the closer 22 m rig keeps the Warden in the
@@ -149,7 +149,7 @@ func _ready() -> void:
 	# though their collision/anchor bindings were valid.  A modest north bias
 	# preserves the Warden in the lower safe lane while keeping both landmarks
 	# fully readable; it does not move authored geometry.
-	framing_bias = Vector3(0.0, 0.0, -5.0)
+	framing_bias = Vector3(0.0, 0.0, -6.0)
 	obstruction_lateral_bypass = 0.0
 	current = true
 	normal_fov = 78.0
