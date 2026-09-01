@@ -22,6 +22,7 @@ extends Node3D
 @onready var west_boundary: StaticBody3D = $OuterDatum/WestBoundary
 @onready var player_spawn: Marker3D = $OuterDatum/PlayerSpawn
 @onready var package_root: Node3D = $PackageTransform/AuthoredCemeteryPackage
+@onready var external_depth: Node3D = $ExternalDepth
 var uv_binding_receipt: Dictionary = {}
 var datum_binding_receipt: Dictionary = {}
 
@@ -32,6 +33,10 @@ func _ready() -> void:
 	set_meta("camera_visibility_collision_mask", camera_visibility_collision_mask)
 	set_meta("gameplay_collision_layer", 4)
 	set_meta("spatial_binding_strategy", "single_authored_package_plus_additive_outer_datum")
+	if is_instance_valid(external_depth):
+		external_depth.set_meta("non_playable", true)
+		external_depth.set_meta("collision_enabled", false)
+		set_meta("external_depth_binding", "candidate_authored_distant_silhouette_ring")
 	# Reassert the single transform-space collision contract after the authored
 	# scene is instanced. Some inherited scene overrides restore StaticBody3D's
 	# default layer (1), which makes landmark/perimeter bodies invisible to the
@@ -654,6 +659,7 @@ func _landmark_alignment_receipt() -> Dictionary:
 func get_snapshot() -> Dictionary:
 	var playable := get_playable_rect()
 	var visual := get_authored_visual_rect()
+	var external_visual := get_visual_subtree_aabb("ExternalDepth")
 	var fill := get_camera_fill_rect()
 	var landmark_alignment := _landmark_alignment_receipt()
 	var playable_inside_authored := playable.position.x > visual.position.x and playable.end.x < visual.end.x and playable.position.y > visual.position.y and playable.end.y < visual.end.y
@@ -696,6 +702,8 @@ func get_snapshot() -> Dictionary:
 			"north":playable.position.y - visual.position.y,
 			"south":visual.end.y - playable.end.y,
 		},
+		"external_depth_bounds":external_visual,
+		"external_depth_node":"ExternalDepth",
 		"spawn_lane_count":get_spawn_lanes().size(),
 		"route_checkpoints":get_route_checkpoints(),
 		"route_checkpoint_count":get_route_checkpoints().size(),
@@ -715,7 +723,7 @@ func get_snapshot() -> Dictionary:
 				"camera_profile":{"fov":78.0,"follow_height":34.0,"follow_distance":34.0,"follow_lateral":0.0,"framing_bias":Vector3(0.0,0.0,-6.0),"visibility_collision_mask":camera_visibility_collision_mask},
 			"proxy_geometry_count":0,
 		},
-		"external_world":{"source":"intact_authored_package_native_terrain_and_perimeter_plus_atmospheric_fog", "procedural_scenery":false, "primitive_meshes":0, "opaque":true, "non_playable_depth_beyond_all_edges":true, "fog_depth_bound":true},
+		"external_world":{"source":"intact_authored_package_plus_candidate_authored_distant_silhouette_ring", "procedural_scenery":false, "primitive_meshes":0, "external_dressing_nodes":6, "opaque":true, "non_playable_depth_beyond_all_edges":is_instance_valid(external_depth), "collision_enabled":false, "fog_depth_bound":true},
 		"uv_binding":uv_binding_receipt.duplicate(true),
 		"landmark_collision":{"keeper_post":is_instance_valid(get_node_or_null("OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision")), "small_mausoleum":is_instance_valid(get_node_or_null("OuterDatum/MausoleumCollision")), "cracked_bell":is_instance_valid(get_node_or_null("OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision"))},
 		"landmark_collision_alignment":_landmark_alignment_receipt(),

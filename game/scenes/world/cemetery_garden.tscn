@@ -44,6 +44,27 @@ size = Vector3(2.8, 1, 1.5)
 [sub_resource type="BoxShape3D" id="GraveClusterShape"]
 size = Vector3(3.8, 1.2, 1.9)
 
+[sub_resource type="SphereMesh" id="ExternalHillMesh"]
+radius = 1.0
+height = 2.0
+radial_segments = 20
+rings = 10
+
+[sub_resource type="StandardMaterial3D" id="ExternalHillMaterial"]
+albedo_color = Color(0.035, 0.055, 0.12, 1)
+metallic = 0.05
+roughness = 0.96
+
+[sub_resource type="CylinderMesh" id="ExternalSpireMesh"]
+top_radius = 0.12
+bottom_radius = 1.0
+height = 5.0
+radial_segments = 8
+
+[sub_resource type="StandardMaterial3D" id="ExternalSpireMaterial"]
+albedo_color = Color(0.055, 0.07, 0.16, 1)
+roughness = 0.9
+
 [node name="CemeteryGarden" type="Node3D" unique_id=220135597 groups=["authored_environment", "mcp_watch"]]
 script = ExtResource("4_spatial_contract")
 
@@ -54,6 +75,46 @@ transform = Transform3D(4.602, 0, 0, 0, 4.602, 0, 0, 0, 4.602, 0.28, 0.02, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -66.8727)
 
 [node name="OuterDatum" type="Node3D" parent="." unique_id=227997051]
+
+[node name="ExternalDepth" type="Node3D" parent="." unique_id=227997052 groups=["external_world_depth"]]
+metadata/non_playable = true
+metadata/spatial_role = "distant_cemetery_silhouette"
+
+[node name="WestHill" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997053]
+position = Vector3(-48, -1.8, 0)
+scale = Vector3(9, 3.2, 14)
+mesh = SubResource("ExternalHillMesh")
+material_override = SubResource("ExternalHillMaterial")
+
+[node name="EastHill" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997054]
+position = Vector3(48, -1.8, -2)
+scale = Vector3(9, 3.0, 14)
+mesh = SubResource("ExternalHillMesh")
+material_override = SubResource("ExternalHillMaterial")
+
+[node name="NorthHill" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997055]
+position = Vector3(0, -1.8, -48)
+scale = Vector3(14, 3.4, 8)
+mesh = SubResource("ExternalHillMesh")
+material_override = SubResource("ExternalHillMaterial")
+
+[node name="SouthHill" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997056]
+position = Vector3(0, -1.8, 48)
+scale = Vector3(14, 2.8, 8)
+mesh = SubResource("ExternalHillMesh")
+material_override = SubResource("ExternalHillMaterial")
+
+[node name="WestSpire" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997057]
+position = Vector3(-42, 0.8, -28)
+scale = Vector3(1.2, 1.8, 1.2)
+mesh = SubResource("ExternalSpireMesh")
+material_override = SubResource("ExternalSpireMaterial")
+
+[node name="EastSpire" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997058]
+position = Vector3(42, 0.8, 28)
+scale = Vector3(1.1, 1.6, 1.1)
+mesh = SubResource("ExternalSpireMesh")
+material_override = SubResource("ExternalSpireMaterial")
 
 [node name="NativeNavigationRegion" type="NavigationRegion3D" parent="OuterDatum" unique_id=798922117]
 navigation_mesh = SubResource("CemeteryNavigationMesh")

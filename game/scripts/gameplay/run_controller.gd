@@ -922,6 +922,7 @@ func _on_dash_changed(_phase: String, _invulnerable: bool) -> void:
 
 func _on_logical_press_edge(action: StringName, activation: int, receipt: Dictionary) -> void:
 	if action == &"pause":
+		var physical := String(receipt.get("physical", "back"))
 		var accepted := false
 		if run_state in ["active", "boss"] and not get_tree().paused:
 			_pause_run()
@@ -929,7 +930,7 @@ func _on_logical_press_edge(action: StringName, activation: int, receipt: Dictio
 		elif run_state == "paused":
 			_resume_run()
 			accepted = true
-		input_router.bind_destination("back", "pause_toggled" if accepted else "pause_rejected", 1 if accepted else 0)
+		input_router.bind_destination(physical, "pause_toggled" if accepted else "pause_rejected", 1 if accepted else 0)
 		return
 	if action == &"ui_cancel" and run_state == "draft":
 		var cancelled := _on_draft_cancel()

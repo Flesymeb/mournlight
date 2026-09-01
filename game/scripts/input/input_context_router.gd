@@ -7,6 +7,7 @@ signal device_changed(previous: String, current: String, device_generation: int)
 
 const CONFIRM_PHYSICAL := &"context_confirm"
 const BACK_PHYSICAL := &"context_back"
+const PAUSE_PHYSICAL := &"pause"
 
 var context := "title"
 var context_generation := 0
@@ -76,6 +77,17 @@ func _input(event: InputEvent) -> void:
 	var dash_pressed := event.is_action_pressed(&"dash") or _raw_keyboard_is(event, KEY_SPACE)
 	if dash_pressed and context in ["active", "boss"]:
 		_dispatch_press("confirm", &"dash")
+		get_viewport().set_input_as_handled()
+		return
+	# Escape/Start owns the pause transaction. It is intentionally separate from
+	# context_back (B/View on gamepad) so a single physical activation can never
+	# dispatch both pause and UI-cancel/back semantics.
+	if event.is_action_pressed(PAUSE_PHYSICAL):
+		_dispatch_press("pause", &"pause")
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_released(PAUSE_PHYSICAL):
+		_dispatch_release("pause")
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed(CONFIRM_PHYSICAL):
@@ -387,4 +399,24 @@ func _mcp_state() -> Dictionary:
 		"last_device_receipt":last_device_receipt,
 		"movement_vector":movement_vector,
 		"movement_actions":_movement_actions,
+		"binding_audit":get_binding_audit(),
+	}
+
+func get_binding_audit() -> Dictionary:
+	var pause_events := InputMap.action_get_events(PAUSE_PHYSICAL) if InputMap.has_action(PAUSE_PHYSICAL) else []
+	var back_events := InputMap.action_get_events(BACK_PHYSICAL) if InputMap.has_action(BACK_PHYSICAL) else []
+	var escape_pause := 0
+	var escape_back := 0
+	for event in pause_events:
+		if event is InputEventKey and (event as InputEventKey).physical_keycode == KEY_ESCAPE:
+			escape_pause += 1
+	for event in back_events:
+		if event is InputEventKey and (event as InputEventKey).physical_keycode == KEY_ESCAPE:
+			escape_back += 1
+	return {
+		"pause_action":String(PAUSE_PHYSICAL), "context_back_action":String(BACK_PHYSICAL),
+		"pause_event_count":pause_events.size(), "context_back_event_count":back_events.size(),
+		"escape_pause_bindings":escape_pause, "escape_context_back_bindings":escape_back,
+		"escape_owner":"pause" if escape_pause == 1 and escape_back == 0 else "invalid",
+		"unique":escape_pause == 1 and escape_back == 0,
 	}
