@@ -78,13 +78,15 @@ static func contract() -> Dictionary:
 			"spawned_total", "despawned_total", "runtime_error_count", "subsystem_samples", "sample_distributions", "high_water_marks", "lifecycle_deltas",
 		],
 		"telemetry": {"sample_history_cap": SAMPLE_HISTORY_CAP, "per_sample_metrics": true, "runtime_errors_source": "godot_runtime_log"},
-		"receipts": ["requested", "resolved", "reset_isolation"],
+		"receipts": ["requested", "resolved", "reset_isolation", "setup_generation", "advance_generation", "cycle_id", "phase"],
 		"phase_receipts": ["prepare", "advance_start", "advance_complete", "reset", "reset_next_frame"],
 		"cycle_identity": ["identity", "cycle_index", "cycle_id", "run_serial", "setup_generation", "advance_generation"],
 		"target_viewport": {"width": 1920, "height": 1080},
 		"target_density": TARGET_ENEMIES,
 		"release_export_available": false,
 		"cycle_protocol": ["prepare", "advance", "reset"],
+		"host_sequence": "tester_dense_prepare -> tester_dense_advance -> tester_dense_reset (serial, once per cycle)",
+		"self_audit_id": "mournlight.dense_receipt_self_audit.v1",
 		"cycle_aggregation": {
 			"identity":"mournlight.native_dense_three_cycle.v1",
 			"required_complete_cycles":3,
@@ -181,6 +183,101 @@ static func qualification_contract() -> Dictionary:
 		"target_density":TARGET_ENEMIES,
 		"reset_isolation_required":true,
 	}
+
+## Deterministic, side-effect-free contract fixtures used by the release guard.
+## These checks validate the receipt protocol itself; they never fabricate
+## performance samples or alter the live profile lifecycle.
+static func self_audit() -> Dictionary:
+	var valid := _audit_cycle([
+		{"phase":"prepare", "cycle_id":"audit.1", "setup_generation":1, "advance_generation":0, "requested":32, "resolved":32},
+		{"phase":"advance_complete", "cycle_id":"audit.1", "setup_generation":1, "advance_generation":1, "requested":32, "resolved":32, "sample_count":8, "physics_sample_count":8, "sample_distributions":{"frame_ms":{"sample_count":8}, "render_ms":{"sample_count":8}}, "lifecycle_deltas":{}, "reset_isolation":false},
+		{"phase":"reset_next_frame", "cycle_id":"audit.1", "setup_generation":2, "advance_generation":1, "requested":32, "resolved":0, "reset_isolation":true}
+	])
+	var duplicate := _audit_cycle([
+		{"phase":"prepare", "cycle_id":"audit.dup", "setup_generation":1, "advance_generation":0, "requested":32, "resolved":32},
+		{"phase":"prepare", "cycle_id":"audit.dup", "setup_generation":1, "advance_generation":0, "requested":32, "resolved":32}
+	])
+	var incomplete := _audit_cycle([
+		{"phase":"prepare", "cycle_id":"audit.incomplete", "setup_generation":1, "advance_generation":0, "requested":32, "resolved":32},
+		{"phase":"advance_start", "cycle_id":"audit.incomplete", "setup_generation":1, "advance_generation":1, "requested":32, "resolved":32}
+	])
+	var timeout := _audit_cycle([
+		{"phase":"prepare", "cycle_id":"audit.timeout", "setup_generation":1, "advance_generation":0, "requested":32, "resolved":32},
+		{"phase":"advance_timeout", "cycle_id":"audit.timeout", "setup_generation":1, "advance_generation":1, "requested":32, "resolved":32, "timeout":true}
+	])
+	var reset_failure := _audit_cycle([
+		{"phase":"prepare", "cycle_id":"audit.reset_failure", "setup_generation":1, "advance_generation":0, "requested":32, "resolved":32},
+		{"phase":"advance_complete", "cycle_id":"audit.reset_failure", "setup_generation":1, "advance_generation":1, "requested":32, "resolved":32, "sample_count":8, "physics_sample_count":8, "sample_distributions":{"frame_ms":{"sample_count":8}, "render_ms":{"sample_count":8}}, "lifecycle_deltas":{}, "reset_isolation":false},
+		{"phase":"reset_next_frame", "cycle_id":"audit.reset_failure", "setup_generation":2, "advance_generation":1, "requested":32, "resolved":0, "reset_isolation":false}
+	])
+	var required_metrics: Array[String] = []
+	for metric in contract().get("metrics", []):
+		required_metrics.append(String(metric))
+	var checks := {
+		"valid_cycle_complete":bool(valid.get("complete", false)),
+		"duplicate_cycle_rejected":String(duplicate.get("status", "")) == "rejected" and duplicate.get("reasons", []).has("duplicate_phase"),
+		"incomplete_cycle_pending":String(incomplete.get("status", "")) == "pending" and incomplete.get("reasons", []).has("incomplete_phase_sequence"),
+		"timeout_bounded_pending":String(timeout.get("status", "")) == "pending" and timeout.get("reasons", []).has("timeout"),
+		"reset_isolation_failure_rejected":String(reset_failure.get("status", "")) == "rejected" and reset_failure.get("reasons", []).has("reset_isolation_false"),
+		"required_metric_names_present":required_metrics.size() >= 10 and required_metrics.has("frame_ms") and required_metrics.has("physics_ms") and required_metrics.has("render_ms") and required_metrics.has("allocation_bytes") and required_metrics.has("subsystem_samples") and required_metrics.has("lifecycle_deltas") and required_metrics.has("runtime_error_count"),
+	}
+	var all_pass := true
+	for value in checks.values():
+		all_pass = all_pass and bool(value)
+	return {
+		"identity":"mournlight.dense_receipt_self_audit.v1",
+		"release_guard":"OS.has_feature(\"editor\")",
+		"contract_id":CONTRACT_ID,
+		"contract_version":CONTRACT_VERSION,
+		"contract_signature":CONTRACT_SIGNATURE,
+		"enemy_range":{"minimum":MIN_ENEMIES,"maximum":MAX_ENEMIES,"target":TARGET_ENEMIES},
+		"target_viewport":{"width":1920,"height":1080},
+		"required_metrics":required_metrics,
+		"required_cycles":3,
+		"cycle_protocol":["prepare","advance","reset"],
+		"bounded_history_cap":SAMPLE_HISTORY_CAP,
+		"fixtures":{"valid":valid,"duplicate":duplicate,"incomplete":incomplete,"timeout":timeout,"reset_isolation_failure":reset_failure},
+		"checks":checks,
+		"all_checks_pass":all_pass,
+	}
+
+static func _audit_cycle(records: Array) -> Dictionary:
+	var phases := ["prepare", "advance_complete", "reset_next_frame"]
+	var reasons: Array[String] = []
+	var seen_phases: Dictionary = {}
+	var cycle_id := ""
+	for value in records:
+		if not value is Dictionary:
+			reasons.append("malformed_receipt")
+			continue
+		var receipt: Dictionary = value
+		var phase := String(receipt.get("phase", ""))
+		if not cycle_id.is_empty() and String(receipt.get("cycle_id", "")) != cycle_id:
+			reasons.append("cycle_id_mismatch")
+		cycle_id = String(receipt.get("cycle_id", cycle_id))
+		if seen_phases.has(phase):
+			reasons.append("duplicate_phase")
+		seen_phases[phase] = true
+		if phase not in phases and phase != "advance_start":
+			reasons.append("unknown_phase")
+		if int(receipt.get("setup_generation", 0)) <= 0:
+			reasons.append("setup_generation_missing")
+		if phase in ["advance_start", "advance_complete", "advance_timeout"] and int(receipt.get("advance_generation", 0)) <= 0:
+			reasons.append("advance_generation_missing")
+		if bool(receipt.get("timeout", false)) or phase == "advance_timeout":
+			reasons.append("timeout")
+		if phase == "reset_next_frame" and not bool(receipt.get("reset_isolation", false)):
+			reasons.append("reset_isolation_false")
+	var has_complete_sample := seen_phases.has("advance_complete")
+	var has_reset := seen_phases.has("reset_next_frame")
+	if not phases.all(func(expected: String) -> bool: return seen_phases.has(expected)):
+		reasons.append("incomplete_phase_sequence")
+	if has_complete_sample:
+		var sample: Dictionary = records[1] if records.size() > 1 and records[1] is Dictionary else {}
+		if int(sample.get("sample_count", 0)) <= 0 or int(sample.get("physics_sample_count", 0)) <= 0:
+			reasons.append("nonzero_samples_required")
+	var status := "complete" if reasons.is_empty() and has_complete_sample and has_reset else ("rejected" if reasons.has("duplicate_phase") or reasons.has("reset_isolation_false") or reasons.has("malformed_receipt") else "pending")
+	return {"status":status,"complete":status == "complete","cycle_id":cycle_id,"phases":seen_phases.keys(),"reasons":reasons,"bounded":records.size() <= 4}
 
 ## Normalize the bounded per-frame history into host-auditable distributions.
 ## Raw samples remain available; this summary keeps collector logic consistent.

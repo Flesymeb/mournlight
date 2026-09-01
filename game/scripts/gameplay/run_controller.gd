@@ -87,6 +87,7 @@ var validation_retry_baselines: Array[Dictionary] = []
 var validation_profile_cycles: Array[Dictionary] = []
 var ordinary_profile_cycles: Array[Dictionary] = []
 var ordinary_profile_contract_checks: Dictionary = {}
+var dense_profile_self_audit: Dictionary = {}
 var ordinary_victory_receipt: Dictionary = {}
 var ordinary_victory_transactions: Array[Dictionary] = []
 var tester_victory_fixture_receipt: Dictionary = {}
@@ -184,6 +185,7 @@ func _ready() -> void:
 				InputMap.erase_action(action)
 	complete_run_ledger = CompleteRunLedgerClass.new()
 	ordinary_profile_contract_checks = _ordinary_profile_contract_checks()
+	dense_profile_self_audit = DenseWaveProfileClass.self_audit()
 	density_matrix_contract_checks = _density_matrix_contract_checks()
 	_profile_static_light_count = _bounded_static_light_snapshot()
 	shell.action_requested.connect(_on_shell_action)
@@ -1588,6 +1590,8 @@ func _record_profile_control_rejection(requested_profile: String, reason: String
 		"renderer_gate_status": renderer_status,
 		"qualification_mode": DenseWaveProfileClass.QUALIFICATION_MODE,
 		"phase_sample_availability": {},
+		"requested_resolved_receipt": {"requested":DenseWaveProfileClass.TARGET_ENEMIES,"resolved":0,"reset_isolation":false},
+		"timeout_safe": true,
 		"cycle_provenance": cycle_provenance,
 		"preflight": DenseWaveProfileClass.preflight(
 			renderer_receipt,
@@ -1702,6 +1706,8 @@ func _prepare_final_profile() -> void:
 		"advance_action_required":true,
 		"reset_isolation_pending":true,
 		"phase_sample_availability":{"prepare":{"frames_ran":false,"frame_sample_count":0,"physics_sample_count":0,"samples_available":false}},
+		"requested_resolved_receipt":{"requested":32,"resolved":int(encounter.get("live",0)),"reset_isolation":false},
+		"timeout_policy":"bounded_pending_until_advance_complete_or_reset",
 	}
 	validation_density_receipt = validation_profile_receipt.duplicate(true)
 	_record_profile_cycle("prepare", validation_profile_receipt)
@@ -1721,6 +1727,12 @@ func tester_dense_prepare() -> Dictionary:
 func tester_dense_advance() -> Dictionary:
 	if not OS.has_feature("editor"):
 		return {"accepted":false,"status":"release_disabled","phase":"advance"}
+	if _profile_active:
+		_record_profile_control_rejection("tester_dense_advance", "advance_already_active_timeout_safe")
+		validation_profile_receipt["status"] = DenseWaveProfileClass.UNKNOWN_STATUS
+		validation_profile_receipt["phase"] = "advance_pending"
+		validation_profile_receipt["timeout_safe"] = true
+		return validation_profile_receipt.duplicate(true)
 	_advance_final_profile()
 	return validation_profile_sample.duplicate(true)
 
@@ -1734,6 +1746,13 @@ func _advance_final_profile() -> void:
 	if not OS.has_feature("editor"):
 		return
 	if _profile_active:
+		# A second advance can arrive while the host collector is still waiting on
+		# the first window. Keep the original sampling owner intact and publish a
+		# bounded pending receipt instead of replaying an outcome-unknown edge.
+		_record_profile_control_rejection("tester_dense_advance", "advance_already_active_timeout_safe")
+		validation_profile_receipt["status"] = DenseWaveProfileClass.UNKNOWN_STATUS
+		validation_profile_receipt["phase"] = "advance_pending"
+		validation_profile_receipt["timeout_safe"] = true
 		return
 	if not bool(validation_profile_receipt.get("accepted", false)):
 		_record_profile_control_rejection("tester_dense_advance", "accepted_prepare_required")
@@ -1787,6 +1806,8 @@ func _advance_final_profile() -> void:
 		"target_viewport":{"width":1920,"height":1080},
 		"target_density":DenseWaveProfileClass.TARGET_ENEMIES,
 		"phase_sample_availability":{"advance_start":{"frames_ran":false,"frame_sample_count":0,"physics_sample_count":0,"samples_available":false}},
+		"requested_resolved_receipt":{"requested":32,"resolved":int(initial_density),"reset_isolation":false},
+		"timeout_policy":"bounded_pending_until_advance_complete_or_reset",
 		"preflight":DenseWaveProfileClass.preflight(_profile_renderer_receipt(), _profile_viewport_receipt(), _profile_process_frame_start, _profile_process_frame_start, 0, 0, "advance_start", {"branch_id":validation_profile_receipt.get("branch_id", ""), "run_serial":run_serial, "setup_generation":validation_profile_receipt.get("setup_generation", 0), "advance_generation":_profile_advance_generation}, {"required":true,"pending":true}),
 	}
 	get_tree().paused = false
@@ -2649,6 +2670,8 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 			}
 		elif phase in ["advance", "advance_complete"] and not current.is_empty() and String(entry.get("cycle_id", "")) == String(current.get("cycle_id", "")):
 			current["advance"] = entry.duplicate(true)
+			current["advance_generation"] = int(entry.get("advance_generation", (entry.get("cycle_provenance", {}) as Dictionary).get("advance_generation", 0)))
+			current["requested_resolved_receipt"] = (entry.get("requested_resolved_receipt", {}) as Dictionary).duplicate(true)
 			current["sample"] = {
 				"status":entry.get("status", ""),
 				"sample_count":entry.get("sample_count", 0),
@@ -2670,6 +2693,7 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 			}
 		elif phase == "reset_next_frame" and not current.is_empty() and String(entry.get("cycle_id", "")) == String(current.get("cycle_id", "")):
 			current["reset"] = entry.duplicate(true)
+			current["reset_isolation"] = bool(entry.get("next_frame_isolation", entry.get("reset_isolation", false)))
 			var renderer: Dictionary = current.get("sample", {}).get("renderer", current.get("renderer", {}))
 			var gate := DenseWaveProfileClass.renderer_status(String(renderer.get("classification", "unknown")), bool(renderer.get("hardware_qualification_eligible", false)))
 			var reset: Dictionary = current.get("reset", {})
@@ -2693,12 +2717,29 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 	var native_ready := completed.size() == 3
 	var reset_ready := native_ready
 	var renderer_statuses: Array[String] = []
+	var protocol_rejections: Array[Dictionary] = []
+	var cycle_ids_seen: Dictionary = {}
+	var distinct_cycle_ids := true
 	for cycle in completed:
 		var qualification: Dictionary = cycle.get("qualification", {})
+		var protocol_reasons: Array[String] = []
+		if String(cycle.get("cycle_id", "")).is_empty(): protocol_reasons.append("cycle_id_missing")
+		var cycle_id := String(cycle.get("cycle_id", ""))
+		if cycle_ids_seen.has(cycle_id):
+			protocol_reasons.append("duplicate_cycle_id")
+			distinct_cycle_ids = false
+		cycle_ids_seen[cycle_id] = true
+		if int(cycle.get("setup_generation", 0)) <= 0: protocol_reasons.append("setup_generation_missing")
+		if int(cycle.get("advance_generation", 0)) <= 0: protocol_reasons.append("advance_generation_missing")
+		if not cycle.has("requested_resolved_receipt"): protocol_reasons.append("requested_resolved_receipt_missing")
+		if not cycle.has("reset_isolation"): protocol_reasons.append("reset_isolation_receipt_missing")
+		cycle["receipt_protocol_valid"] = protocol_reasons.is_empty()
+		cycle["receipt_protocol_reasons"] = protocol_reasons
+		if not protocol_reasons.is_empty(): protocol_rejections.append({"cycle_id":cycle.get("cycle_id", ""),"reasons":protocol_reasons})
 		reset_ready = reset_ready and bool(qualification.get("reset_isolation", false)) and bool(qualification.get("sample_available", false))
 		renderer_statuses.append(String(qualification.get("renderer_gate_status", DenseWaveProfileClass.UNKNOWN_STATUS)))
 	var renderer_consistent := renderer_statuses.size() == 3 and renderer_statuses.all(func(value: String) -> bool: return value == renderer_statuses[0])
-	var native_renderer_ready := native_ready and renderer_consistent and not renderer_statuses.is_empty() and renderer_statuses[0] == DenseWaveProfileClass.NATIVE_STATUS
+	var native_renderer_ready := native_ready and distinct_cycle_ids and protocol_rejections.is_empty() and renderer_consistent and not renderer_statuses.is_empty() and renderer_statuses[0] == DenseWaveProfileClass.NATIVE_STATUS
 	var aggregate_high_water_marks: Dictionary = {}
 	var aggregate_lifecycle_deltas: Dictionary = {}
 	for cycle in completed:
@@ -2718,6 +2759,8 @@ func _dense_profile_cycle_comparison() -> Dictionary:
 		"completed_cycle_count":completed.size(),
 		"cycles":completed,
 		"renderer_statuses":renderer_statuses,
+		"receipt_protocol_valid":protocol_rejections.is_empty() and completed.size() == 3 and distinct_cycle_ids,
+		"receipt_protocol_rejections":protocol_rejections,
 		"renderer_consistent":renderer_consistent,
 		"native_renderer_eligible":native_renderer_ready,
 		"three_cycle_reset_isolation":reset_ready,
@@ -3868,6 +3911,16 @@ func _mcp_state() -> Dictionary:
 		"dense_profile_completed_cycles":dense_cycle_comparison.get("completed_cycle_count", 0),
 		"dense_profile_three_cycle_ready":dense_cycle_comparison.get("three_cycle_ready", false),
 		"dense_profile_release_status":dense_cycle_comparison.get("release_qualification_status", DenseWaveProfileClass.UNKNOWN_STATUS),
+		"dense_profile_receipt_protocol": {
+			"contract_signature":DenseWaveProfileClass.CONTRACT_SIGNATURE,
+			"contract_version":DenseWaveProfileClass.CONTRACT_VERSION,
+			"required_enemy_range":{"minimum":PROFILE_DENSITY_MIN,"maximum":PROFILE_DENSITY_MAX,"target":DenseWaveProfileClass.TARGET_ENEMIES},
+			"target_viewport":{"width":1920,"height":1080},
+			"required_cycles":3,
+			"sequence":["prepare","advance","reset"],
+			"timeout_policy":"bounded_pending_then_reset",
+			"self_audit_pass":bool(dense_profile_self_audit.get("all_checks_pass", false)),
+		},
 		"profile_reset_contexts":{
 			"immediate":validation_profile_receipt.get("input_context", "unavailable"),
 			"next_frame":validation_profile_receipt.get("next_frame_input_context", "pending"),
@@ -3926,6 +3979,7 @@ func _mcp_state() -> Dictionary:
 		"validation_profile_cycle_comparison":cycle_comparison,
 		"validation_controls":_validation_controls_receipt(),
 		"dense_profile_contract":DenseWaveProfileClass.contract(),
+		"dense_profile_self_audit":dense_profile_self_audit,
 		"validation_retry_baselines":validation_retry_baselines,
 		"ordinary_victory_receipt":ordinary_victory_receipt,
 		"ordinary_victory_transactions":ordinary_victory_transactions,

@@ -494,11 +494,16 @@ func _card_style(state: String, emphasized: bool) -> StyleBoxFlat:
 
 func _mcp_state() -> Dictionary:
 	var visible_cards: Array[Dictionary] = []
+	var hierarchy_ok := true
+	var truthful_values := true
 	for index in mini(cards.size(), buttons.size()):
 		var card: Dictionary = cards[index]
 		var changes := _decision_changes(card.get("changes", []))
+		hierarchy_ok = hierarchy_ok and not str(card.get("icon_path", "")).is_empty() and changes.size() <= 3
+		for change in changes:
+			truthful_values = truthful_values and not _is_placeholder_value(change.get("current")) and not _is_placeholder_value(change.get("result"))
 		visible_cards.append({"id":str(card.get("id", "")), "title":str(card.get("title", "")), "icon_path":str(card.get("icon_path", FALLBACK_ICON_PATH)), "changes":changes, "decision_delta_count":changes.size(), "silhouette_first":not str(card.get("icon_path", "")).is_empty(), "consequence":str(card.get("consequence", "")), "interaction_state":_state_nodes[index].text})
 	var card_rects: Array[Dictionary] = []
 	for index in buttons.size():
 		card_rects.append({"index":index,"position":buttons[index].position,"size":buttons[index].size,"visible":buttons[index].visible,"slot_offset":CARD_OFFSETS[index]})
-	return {"authored_cards":visible_cards, "visible":visible, "latched":latched, "selected_index":selected_index, "focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none", "input_device":input_device, "device_generation":device_generation, "focus_states":{"keyboard":"KEYBOARD FOCUS  •  CONFIRM TO CHOOSE","gamepad":"GAMEPAD FOCUS  •  CONFIRM TO CHOOSE","mouse":"MOUSE HOVER  •  CLICK TO CHOOSE","hover":"MOUSE HOVER  •  CLICK TO CHOOSE","pressed":"PRESSED  •  RELEASE TO CHOOSE","unavailable":"UNAVAILABLE","newly_unlocked":"NEW WEAPON","selected":"SELECTED  •  APPLYING"}, "activation_policy":"release_edge + pre_await_latch + 0.42s unscaled selected beat + exactly_once_authoritative_apply_before_unpause", "cancel_policy":"back_or_escape_closes_without_mutation", "cancel_action":"ui_cancel", "stable_card_dimensions":CARD_SIZE, "card_rects":card_rects, "render_ownership":"three_fixed_control_slots_no_shared_container_minimum", "hierarchy":"dominant_icon + consequence + projected_change_rows"}
+	return {"authored_cards":visible_cards, "visible":visible, "latched":latched, "selected_index":selected_index, "focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none", "input_device":input_device, "device_generation":device_generation, "focus_states":{"keyboard":"KEYBOARD FOCUS  •  CONFIRM TO CHOOSE","gamepad":"GAMEPAD FOCUS  •  CONFIRM TO CHOOSE","mouse":"MOUSE HOVER  •  CLICK TO CHOOSE","hover":"MOUSE HOVER  •  CLICK TO CHOOSE","pressed":"PRESSED  •  RELEASE TO CHOOSE","unavailable":"UNAVAILABLE","newly_unlocked":"NEW WEAPON","selected":"SELECTED  •  APPLYING"}, "presentation_contract":{"hierarchy_ok":hierarchy_ok,"truthful_current_to_new":truthful_values,"maximum_decision_deltas":3,"focus_states_complete":true,"icon_led":true}, "activation_policy":"release_edge + pre_await_latch + 0.42s unscaled selected beat + exactly_once_authoritative_apply_before_unpause", "cancel_policy":"back_or_escape_closes_without_mutation", "cancel_action":"ui_cancel", "stable_card_dimensions":CARD_SIZE, "card_rects":card_rects, "render_ownership":"three_fixed_control_slots_no_shared_container_minimum", "hierarchy":"dominant_icon + consequence + projected_change_rows"}
