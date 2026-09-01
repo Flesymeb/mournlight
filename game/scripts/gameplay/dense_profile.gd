@@ -91,6 +91,15 @@ static func contract() -> Dictionary:
 		"cycle_identity": ["identity", "cycle_index", "cycle_id", "run_serial", "setup_generation", "advance_generation"],
 		"target_viewport": {"width": 1920, "height": 1080},
 		"target_density": TARGET_ENEMIES,
+		"native_recapture_prerequisites": {
+			"renderer_classification": "hardware",
+			"hardware_qualification_eligible": true,
+			"viewport": {"width": 1920, "height": 1080},
+			"serial_protocol": ["tester_dense_prepare", "tester_dense_advance", "tester_dense_reset"],
+			"required_complete_cycles": 3,
+			"reset_isolation": "next_frame_input_context_active_and_zero_live_actors",
+			"software_evidence_policy": "retain_as_rejected_software_renderer; do_not_qualify",
+		},
 		"release_export_available": false,
 		"cycle_protocol": ["prepare", "advance", "reset"],
 		"host_sequence": "tester_dense_prepare -> tester_dense_advance -> tester_dense_reset (serial, once per cycle)",
@@ -192,6 +201,15 @@ static func qualification_contract() -> Dictionary:
 		"target_resolution":Vector2i(1920, 1080),
 		"target_viewport":{"width":1920,"height":1080},
 		"target_density":TARGET_ENEMIES,
+		"native_recapture_prerequisites": {
+			"renderer_classification": "hardware",
+			"hardware_qualification_eligible": true,
+			"viewport": {"width": 1920, "height": 1080},
+			"serial_protocol": ["tester_dense_prepare", "tester_dense_advance", "tester_dense_reset"],
+			"required_complete_cycles": 3,
+			"reset_isolation": "next_frame_input_context_active_and_zero_live_actors",
+			"software_evidence_policy": "retain_as_rejected_software_renderer; do_not_qualify",
+		},
 		"reset_isolation_required":true,
 	}
 
