@@ -158,10 +158,10 @@ shape = SubResource("EastWestShape")
 
 [node name="MausoleumCollision" type="StaticBody3D" parent="OuterDatum" unique_id=631849061]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.53, 1.9, -2.52)
-# Dedicated landmark layer: gameplay masks include layer 2, while the
-# camera's environment-layer query (4) can inspect landmark visibility without
-# treating the landmark itself as a sightline blocker.
-collision_layer = 2
+# Gameplay-only environment layer. Camera coverage queries use the dedicated
+# landmark layer (2), so the broad mausoleum footprint cannot self-occlude the
+# keeper post, mausoleum, or cracked bell sightline.
+collision_layer = 4
 
 [node name="Shape" type="CollisionShape3D" parent="OuterDatum/MausoleumCollision" unique_id=403615118]
 shape = SubResource("MausoleumShape")
