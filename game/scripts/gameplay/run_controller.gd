@@ -1693,6 +1693,29 @@ func _prepare_final_profile() -> void:
 	_record_profile_cycle("prepare", validation_profile_receipt)
 	_emit_snapshot()
 
+# Explicit editor-only lifecycle boundaries for the host-owned dense collector.
+# These wrappers return the persisted receipt from the same call that performs
+# the transition, avoiding an outcome-unknown gap between an input dispatch and
+# a later state read. They never exist in release builds and do not alter the
+# ordinary route.
+func tester_dense_prepare() -> Dictionary:
+	if not OS.has_feature("editor"):
+		return {"accepted":false,"status":"release_disabled","phase":"prepare"}
+	_prepare_final_profile()
+	return validation_profile_receipt.duplicate(true)
+
+func tester_dense_advance() -> Dictionary:
+	if not OS.has_feature("editor"):
+		return {"accepted":false,"status":"release_disabled","phase":"advance"}
+	_advance_final_profile()
+	return validation_profile_sample.duplicate(true)
+
+func tester_dense_reset() -> Dictionary:
+	if not OS.has_feature("editor"):
+		return {"accepted":false,"status":"release_disabled","phase":"reset"}
+	_reset_final_profile()
+	return validation_profile_receipt.duplicate(true)
+
 func _advance_final_profile() -> void:
 	if not OS.has_feature("editor"):
 		return

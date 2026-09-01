@@ -81,7 +81,12 @@ func _layout_cards() -> void:
 	var height_ratio := (size.y - 190.0) / 522.0
 	var fit := clampf(minf(width_ratio, height_ratio), 0.58, 1.0)
 	cards_container.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	cards_container.position = size * 0.5 - cards_container.pivot_offset * fit
+	# The pivot is the visual center of the fixed 1020x522 canvas.  Position it
+	# at the viewport center independently of scale; multiplying the pivot by
+	# `fit` shifts the whole draft down/right in narrow windows and can clip the
+	# first card while CardB/CardC remain visible.  Scaling still happens around
+	# this centered pivot, so every fixed slot stays inside the same viewport.
+	cards_container.position = size * 0.5 - cards_container.pivot_offset
 	cards_container.size = Vector2(1020, 522)
 	cards_container.scale = Vector2.ONE * fit
 	# Each card owns one fixed render slot. A focused state label or style can

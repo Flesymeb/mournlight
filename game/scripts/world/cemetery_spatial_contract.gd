@@ -229,6 +229,13 @@ func _bind_route_checkpoints(playable: Rect2, crypt_bounds: AABB) -> void:
 	var east := playable.end.x - 4.5
 	var north := playable.position.y + 3.2
 	var south := playable.end.y - 4.5
+	# Landmark checkpoints follow the bound native anchors instead of stale
+	# hand-authored coordinates. This keeps the ordinary route on the same
+	# transform-space datum as the intact cemetery package after wrapper scaling.
+	var keeper_anchor := get_node_or_null("OuterDatum/KeeperLanternPostAnchor") as Node3D
+	var bell_anchor := get_node_or_null("OuterDatum/CrackedMoonBellAnchor") as Node3D
+	var keeper_position := keeper_anchor.global_position if is_instance_valid(keeper_anchor) else Vector3(-9.8, 0.05, 5.8)
+	var bell_position := bell_anchor.global_position if is_instance_valid(bell_anchor) else Vector3(12.0, 0.05, -5.1)
 	var positions := {
 		"00_Spawn":player_spawn.global_position,
 		"01_South":Vector3(center.x,0.05,south),
@@ -238,8 +245,8 @@ func _bind_route_checkpoints(playable: Rect2, crypt_bounds: AABB) -> void:
 		"05_North":Vector3(center.x,0.05,north),
 		"06_Northwest":Vector3(west,0.05,north),
 		"07_West":Vector3(west,0.05,center.y),
-		"08_KeeperPost":Vector3(-9.8,0.05,5.8),
-		"09_CrackedBell":Vector3(12.0,0.05,-5.1),
+		"08_KeeperPost":Vector3(keeper_position.x,0.05,keeper_position.z),
+		"09_CrackedBell":Vector3(bell_position.x,0.05,bell_position.z),
 		"10_Mausoleum":Vector3(crypt_bounds.end.x + 3.2,0.05,crypt_bounds.get_center().z),
 		"11_CrossRouteEast":Vector3(crypt_bounds.end.x + 4.0,0.05,crypt_bounds.end.z + 4.5),
 		"12_Return":player_spawn.global_position,
@@ -247,7 +254,13 @@ func _bind_route_checkpoints(playable: Rect2, crypt_bounds: AABB) -> void:
 	for checkpoint_name in positions:
 		var checkpoint := get_node_or_null("OuterDatum/RouteCheckpoints/%s" % checkpoint_name) as Marker3D
 		if is_instance_valid(checkpoint):
-			checkpoint.global_position = positions[checkpoint_name]
+			var route_position: Vector3 = positions[checkpoint_name]
+			# Keep every marker reachable even if a future authored package export
+			# shifts a landmark toward the perimeter. The small inset preserves a
+			# readable approach lane and never expands gameplay beyond the datum.
+			route_position.x = clampf(route_position.x, playable.position.x + 1.2, playable.end.x - 1.2)
+			route_position.z = clampf(route_position.z, playable.position.y + 1.2, playable.end.y - 1.2)
+			checkpoint.global_position = route_position
 
 func get_visual_subtree_aabb(node_path: String) -> AABB:
 	var source := get_node_or_null(node_path)

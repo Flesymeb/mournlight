@@ -84,7 +84,7 @@ func _process(delta: float) -> void:
 		boss_entry_elapsed += delta
 		last_transition_receipt["boss_entry_elapsed"] = boss_entry_elapsed
 	var boss_route_ready := diagnostic_jump_count > 0 or _ordinary_route_complete()
-	if wave_index == _boss_wave_index() and not boss_spawned and boss_entry_elapsed >= BOSS_ENTRY_DELAY_SECONDS and boss_route_ready:
+	if wave_index == _boss_wave_index() and not boss_spawned and boss_request_count == 0 and boss_entry_elapsed >= BOSS_ENTRY_DELAY_SECONDS and boss_route_ready:
 		boss_spawned = true
 		boss_request_count += 1
 		last_transition_receipt["boss_trigger"] = "final_wave_elapsed"
