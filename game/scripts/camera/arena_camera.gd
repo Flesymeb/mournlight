@@ -57,12 +57,10 @@ extends Camera3D
 @export var obstruction_fov_boost := 2.0
 @export var coverage_occluder_visuals: Array[NodePath] = []
 ## Physics mask used only by camera visibility probes. Gameplay bodies stay on
-## the environment layer (4); keeping this mask separate prevents a landmark's
-## movement collider from being reported as a camera blocker by the authored
-## sight-lane response.
-## Tall landmark volumes share the authored environment layer with gameplay
-## collision. ArenaCamera narrows this to its registered tall-occluder list,
-## so ordinary graves never become sightline blockers.
+## the environment layer (4); the world contract supplies the dedicated
+## landmark layer (2) at runtime so the camera never reports the ground shell as
+## a sightline blocker. ArenaCamera still narrows this to its registered
+## tall-occluder list, so ordinary graves never become occluders.
 @export_flags_3d_physics var camera_visibility_collision_mask := 4
 @export_range(0.0, 1.0, 0.01) var coverage_occluder_transparency := 0.78
 @export var coverage_settle_seconds := 0.28
@@ -134,6 +132,15 @@ func _ready() -> void:
 	current = true
 	normal_fov = 82.0
 	fov = normal_fov
+	# Keep the shipped camera's visibility query bound to the same dedicated
+	# landmark layer as CemeterySpatialContract.  The scene resource historically
+	# carried the old environment-layer value (4), which made camera-coverage
+	# rays hit the gameplay ground shell and report false landmark occlusion.
+	# Resolve the binding from the authoritative world contract at runtime so the
+	# intact map, movement collision, and diagnostic visibility stay in one
+	# transform/layer contract even when an older scene override is loaded.
+	if is_instance_valid(arena_contract) and arena_contract.has_method("get_camera_visibility_collision_mask"):
+		camera_visibility_collision_mask = int(arena_contract.get_camera_visibility_collision_mask())
 	if target:
 		_normalize_occluder_bindings()
 		_bind_tall_occluders()
