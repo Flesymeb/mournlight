@@ -10,7 +10,7 @@ extends Node3D
 ## Keep a measurable non-playable world band around the authored streets so
 ## perimeter camera views retain cemetery depth instead of exposing an abrupt
 ## edge. This datum is consumed by perimeter, spawn, and route binding.
-@export var authored_playable_inset := 9.0
+@export var authored_playable_inset := 9.25
 ## A slightly wider additive shell keeps the authored mausoleum/tree footprints
 ## aligned with their rendered bounds during near-contact movement replays.
 ## This is product-owned collision datum; imported child meshes remain intact.
@@ -56,8 +56,8 @@ func _ready() -> void:
 	# Candidate-owned release receipt: the intact cemetery package, its native
 	# transform-space datum, and additive collision/navigation anchors are bound
 	# as one spatial contract for runtime inspection.
-	set_meta("release_spatial_binding_revision", "release_convergence_native_datum_v5")
-	set_meta("route_spatial_revision", "release_convergence_native_route_v5")
+	set_meta("release_spatial_binding_revision", "release_convergence_native_datum_v6")
+	set_meta("route_spatial_revision", "release_convergence_native_route_v6")
 	set_meta("landmark_sight_lane_margin", landmark_sight_lane_margin)
 	set_meta("landmark_collision_contract", {
 		"source": "AuthoredCemeteryPackage",

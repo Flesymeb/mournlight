@@ -42,7 +42,7 @@ var _presentation_serial := 0
 const CARD_SIZE := Vector2(328, 522)
 const CARD_OFFSETS := [0.0, 346.0, 692.0]
 const MAX_DECISION_DELTAS := 3
-const SURFACE_CONTRACT_REVISION := "upgrade_draft_icon_led_v3"
+const SURFACE_CONTRACT_REVISION := "upgrade_draft_icon_led_v4"
 const DRAFT_AFFORDANCE_REVISION := "upgrade_draft_focus_affordance_v5"
 
 @onready var title_label: Label = $Title

@@ -410,6 +410,10 @@ func _reset_first_run_guidance_for_fresh_title_start() -> void:
 
 func _begin_run() -> void:
 	get_tree().paused = false
+	# A quit request belongs to the prior shell transaction. Clear it before
+	# exposing a fresh ordinary run so retry/title replay receipts cannot inherit
+	# a stale terminal intent from a previous Quit activation.
+	quit_requested = false
 	world.visible = true
 	_profile_active = false
 	_profile_paused = false
@@ -543,6 +547,7 @@ func _enter_title() -> void:
 	_context_handoff_active = false
 	_terminal_handoff_active = false
 	_teardown_run("title", "return_to_title")
+	_clear_terminal_state_for_title()
 	boss_snapshot.clear()
 	hud.clear_snapshot()
 	world.visible = false
@@ -561,7 +566,13 @@ func _begin_terminal_title_handoff() -> void:
 	terminal_handoff_receipt = context_handoff_receipt.duplicate(true)
 
 func _begin_shell_title_handoff(source: String, physical: String) -> void:
+	if run_serial > 0 and run_state != "title":
+		# Persist the player-caused Result/credits/settings → title traversal in
+		# the same run ledger used by _enter_title. This closes the shell-back path
+		# without duplicating an already observed title return.
+		complete_run_ledger.record_exit(run_serial, "title", run_elapsed)
 	_teardown_run("title", "return_to_title")
+	_clear_terminal_state_for_title()
 	boss_snapshot.clear()
 	hud.clear_snapshot()
 	world.visible = false
@@ -570,6 +581,21 @@ func _begin_shell_title_handoff(source: String, physical: String) -> void:
 	_set_title_surface(false)
 	_begin_context_handoff(source, "title", physical)
 	_emit_snapshot()
+
+func _clear_terminal_state_for_title() -> void:
+	# Title is a clean shell surface, not a latent Result page. Retire terminal
+	# ownership and pending level-up transactions after the teardown receipt has
+	# captured the prior run, preventing stale victory/failure flags from leaking
+	# into a later title snapshot or fresh Play transaction.
+	result_committed = false
+	terminal_snapshot.clear()
+	terminal_commit_count = 0
+	outcome = ""
+	_pending_levelup_transactions = 0
+	_victory_transaction_active = false
+	_victory_hold_remaining = 0.0
+	_victory_hold_elapsed = 0.0
+	_victory_source_run_serial = -1
 
 func _begin_context_handoff(source: String, destination: String, physical: String) -> void:
 	var transaction: Dictionary = input_router.active_transactions.get(physical, {})
@@ -1169,7 +1195,10 @@ func _return_from_shell_page() -> void:
 		_emit_snapshot()
 	else:
 		var source := shell.mode
+		if run_serial > 0 and run_state != "title":
+			complete_run_ledger.record_exit(run_serial, "title", run_elapsed)
 		_teardown_run("title", "return_from_%s" % source)
+		_clear_terminal_state_for_title()
 		boss_snapshot.clear()
 		hud.clear_snapshot()
 		world.visible = false
