@@ -9,6 +9,10 @@ extends Node3D
 @export var authored_wrapper_scale_multiplier := 2.36
 @export var authored_playable_inset := 8.5
 @export var landmark_collision_margin := 0.35
+## Reference locomotion speed used only for spatial receipts.  This keeps the
+## expanded-world contract measurable (time-to-cross and perimeter loop) while
+## leaving the Warden's authoritative movement owner unchanged.
+@export var reference_traversal_speed := 5.8
 ## Visibility probes intentionally use the perimeter/landmark layer only.  The
 ## gameplay layer stays authoritative for Warden/enemy collision, while this
 ## separate mask prevents GroundCollision and MausoleumCollision from becoming
@@ -117,6 +121,17 @@ func _ready() -> void:
 	# immutable instance; only candidate-owned collision, navigation metadata,
 	# spawn/route markers, and perimeter bodies are authored from its world AABBs.
 	_bind_outer_datum_to_authored_package()
+	# Expose the measured traversal envelope as immutable runtime metadata so
+	# host evidence can bind movement distance and time-to-cross without parsing
+	# presentation-only text or inferring scale from a screenshot.
+	var bound_playable := get_playable_rect()
+	set_meta("traversal_metrics", {
+		"reference_speed_mps": reference_traversal_speed,
+		"time_to_cross_x_seconds": bound_playable.size.x / maxf(0.01, reference_traversal_speed),
+		"time_to_cross_z_seconds": bound_playable.size.y / maxf(0.01, reference_traversal_speed),
+		"perimeter_loop_distance": 2.0 * (bound_playable.size.x + bound_playable.size.y),
+		"perimeter_loop_seconds": 2.0 * (bound_playable.size.x + bound_playable.size.y) / maxf(0.01, reference_traversal_speed),
+	})
 	# Run the bounded integration audit now that the intact GLB is instantiated.
 	# Several imported surfaces carry degenerate UVs; repairing those arrays on
 	# candidate-owned mesh copies prevents black/flat shading without mutating the
@@ -733,6 +748,13 @@ func get_snapshot() -> Dictionary:
 		"navigation_region":{"path":"OuterDatum/NativeNavigationRegion","layers":1,"source":"native_authored_streets","enabled":is_instance_valid(get_node_or_null("OuterDatum/NativeNavigationRegion"))},
 		"playable_rect":playable,
 		"playable_area":playable.size.x * playable.size.y,
+		"traversal_metrics":{
+			"reference_speed_mps":reference_traversal_speed,
+			"time_to_cross_x_seconds":playable.size.x / maxf(0.01, reference_traversal_speed),
+			"time_to_cross_z_seconds":playable.size.y / maxf(0.01, reference_traversal_speed),
+			"perimeter_loop_distance":2.0 * (playable.size.x + playable.size.y),
+			"perimeter_loop_seconds":2.0 * (playable.size.x + playable.size.y) / maxf(0.01, reference_traversal_speed),
+		},
 		"authored_visual_rect":visual,
 		"camera_fill_rect":fill,
 		"external_depth_margin":{

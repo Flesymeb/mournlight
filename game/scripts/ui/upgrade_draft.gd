@@ -27,6 +27,7 @@ var _hovered: Array[bool] = [false, false, false]
 var _pressed: Array[bool] = [false, false, false]
 var _icon_nodes: Array[TextureRect] = []
 var _title_nodes: Array[Label] = []
+var _rank_nodes: Array[Label] = []
 var _consequence_nodes: Array[Label] = []
 var _state_nodes: Array[Label] = []
 var _stat_bodies: Array[VBoxContainer] = []
@@ -121,6 +122,8 @@ func present(next_cards: Array[Dictionary]) -> void:
 		var icon_path := str(card.get("icon_path", ""))
 		_icon_nodes[index].texture = load(icon_path if not icon_path.is_empty() else FALLBACK_ICON_PATH) as Texture2D
 		_title_nodes[index].text = str(card.get("title", "VIGIL")).to_upper()
+		var projected_rank := maxi(1, int(card.get("rank", 1)))
+		_rank_nodes[index].text = ("UNLOCK  •  RANK %d" % projected_rank) if bool(card.get("newly_unlocked", false)) else ("NEXT RANK  •  %d" % projected_rank)
 		_consequence_nodes[index].text = str(card.get("consequence", "Shape the next exchange."))
 		_rebuild_stat_rows(index, _decision_changes(card.get("changes", [])))
 		buttons[index].disabled = not bool(card.get("available", true))
@@ -321,6 +324,13 @@ func _build_card_content(button: Button) -> void:
 	title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(title_label)
 	_title_nodes.append(title_label)
+	var rank_label := Label.new()
+	rank_label.custom_minimum_size = Vector2(0, 17)
+	rank_label.add_theme_font_size_override("font_size", 10)
+	rank_label.add_theme_color_override("font_color", Color(0.58, 0.66, 0.79))
+	rank_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(rank_label)
+	_rank_nodes.append(rank_label)
 	var consequence := Label.new()
 	consequence.custom_minimum_size = Vector2(0, 34)
 	consequence.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
