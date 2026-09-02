@@ -96,6 +96,13 @@ func choose(index: int, inventory: WeaponInventory, health: WardenHealth, warden
 	var choice := projection.duplicate(true)
 	choice["application"] = application
 	selected.append(choice)
+	# The authoritative offer is a transient transaction payload. Retire it as
+	# soon as the choice commits so runtime snapshots cannot report a stale,
+	# still-actionable draft while the run has already resumed. The selected
+	# projection above remains the durable build receipt for Result and retry
+	# handoff.
+	offered.clear()
+	offer_slots.clear()
 	draft_closed.emit(choice)
 	return choice
 

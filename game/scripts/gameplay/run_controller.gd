@@ -1170,11 +1170,18 @@ func _open_upgrade_draft() -> void:
 	}
 	if opened.is_empty():
 		# Never leave an authoritative pause behind when the catalog cannot
-		# produce the required three eligible choices.
+		# produce the required three eligible choices. Preserve the encounter
+		# owner when this happens during wave five; dropping back to ordinary
+		# active here would silently disable Bellkeeper timing and make a
+		# malformed/exhausted catalog strand the run in the wrong state.
 		get_tree().paused = false
-		_transition("active")
+		var wave_snapshot := wave_director.get_snapshot()
+		var resume_state := "boss" if is_instance_valid(boss) or int(wave_snapshot.get("wave", 0)) == 5 else "active"
+		_transition(resume_state)
 		_pending_levelup_transactions = maxi(0, _pending_levelup_transactions - 1)
 		upgrade_transaction_receipt["phase"] = "rejected_no_eligible_choices"
+		upgrade_transaction_receipt["resume_state"] = resume_state
+		upgrade_transaction_receipt["pause_owner_cleared"] = not get_tree().paused
 		upgrade_transaction_receipt["pending_levelup_transactions"] = _pending_levelup_transactions
 
 func _on_draft_opened(cards: Array[Dictionary]) -> void:
