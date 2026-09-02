@@ -1,6 +1,8 @@
 class_name UpgradeDraftView
 extends Control
 
+const UPGRADE_CATALOG: MournlightUpgradeCatalog = preload("res://resources/upgrades/mournlight_upgrade_catalog.tres")
+
 signal choice_requested(index: int)
 signal cancel_requested
 
@@ -166,7 +168,15 @@ func _normalize_card(value: Variant) -> Dictionary:
 	var icon_candidate := str(normalized.get("icon_path", ""))
 	normalized["icon_path"] = icon_candidate if not icon_candidate.is_empty() else FALLBACK_ICON_PATH
 	normalized["consequence"] = str(normalized.get("consequence", "Shape the next exchange."))
-	normalized["available"] = bool(normalized.get("available", true)) and normalized["id"] != "invalid_offer"
+	# The presenter is a render boundary, not an eligibility authority. Still,
+	# unknown ids must never look actionable when a malformed/test payload bypasses
+	# UpgradeDraftController and reaches `present()` directly. Cross-check the
+	# authoritative catalog here while preserving the controller's explicit
+	# `available=false` decision for maxed or incompatible offers.
+	var catalog_id := StringName(normalized["id"])
+	var catalog_entry := UPGRADE_CATALOG.get_by_id(catalog_id)
+	var catalog_known := catalog_entry != null
+	normalized["available"] = bool(normalized.get("available", true)) and normalized["id"] != "invalid_offer" and catalog_known
 	normalized["changes"] = normalized.get("changes", []) if normalized.get("changes", []) is Array else []
 	# Keep the serialized presenter payload truthful as well as the rendered rows.
 	# Older catalog entries carried UNOWNED/NEW tokens in concrete_change and
