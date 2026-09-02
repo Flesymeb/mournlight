@@ -102,6 +102,12 @@ static func contract() -> Dictionary:
 		},
 		"release_export_available": false,
 		"cycle_protocol": ["prepare", "advance", "reset"],
+		"idempotency": {
+			"prepare": "reject_while_prepared_or_sampling_until_reset",
+			"advance": "exactly_once_per_prepare_until_reset",
+			"reset": "repeat_returns_existing_isolation_receipt",
+			"delayed_callbacks": "must_not_replace_cycle_identity_or_run_serial",
+		},
 		"host_sequence": "tester_dense_prepare -> tester_dense_advance -> tester_dense_reset (serial, once per cycle)",
 		"self_audit_id": "mournlight.dense_receipt_self_audit.v1",
 		"cycle_aggregation": {

@@ -1753,6 +1753,8 @@ func _prepare_final_profile() -> void:
 	# private entrypoint.
 	if not DenseWaveProfileClass.tester_guard():
 		return
+	if _profile_active or (bool(validation_profile_receipt.get("setup_valid", false)) and bool(validation_profile_receipt.get("preparation_paused", false)) and not bool(validation_profile_receipt.get("reset", false))):
+		return
 	if run_state not in ["active", "boss"]:
 		_record_profile_control_rejection("tester_dense_prepare", "ordinary_run_required:%s" % run_state)
 		return
@@ -1875,6 +1877,12 @@ func _prepare_final_profile() -> void:
 func tester_dense_prepare() -> Dictionary:
 	if not DenseWaveProfileClass.tester_guard():
 		return {"accepted":false,"status":"release_disabled","phase":"prepare"}
+	# Prepare owns the cycle boundary. A delayed duplicate must never tear down
+	# an active sampling window or silently replace its setup generation.
+	if _profile_active or (bool(validation_profile_receipt.get("setup_valid", false)) and bool(validation_profile_receipt.get("preparation_paused", false)) and not bool(validation_profile_receipt.get("reset", false))):
+		var active_receipt := validation_profile_receipt.duplicate(true)
+		active_receipt["control_rejection"] = "prepare_already_active_idempotent"
+		return active_receipt
 	_prepare_final_profile()
 	return validation_profile_receipt.duplicate(true)
 
@@ -1882,17 +1890,29 @@ func tester_dense_advance() -> Dictionary:
 	if not DenseWaveProfileClass.tester_guard():
 		return {"accepted":false,"status":"release_disabled","phase":"advance"}
 	if _profile_active:
-		_record_profile_control_rejection("tester_dense_advance", "advance_already_active_timeout_safe")
-		validation_profile_receipt["status"] = DenseWaveProfileClass.UNKNOWN_STATUS
-		validation_profile_receipt["phase"] = "advance_pending"
-		validation_profile_receipt["timeout_safe"] = true
-		return validation_profile_receipt.duplicate(true)
+		var sampling_receipt := validation_profile_sample.duplicate(true)
+		sampling_receipt["control_rejection"] = "advance_already_active_timeout_safe"
+		sampling_receipt["timeout_safe"] = true
+		return sampling_receipt
+	# Exactly one advance is admitted for each prepare/reset cycle. Once the
+	# window has completed, a late duplicate is rejected until reset archives it.
+	if String(validation_profile_sample.get("status", "")) == "complete" or String(validation_profile_receipt.get("phase", "")) == "advance_complete":
+		var completed_receipt := validation_profile_sample.duplicate(true)
+		completed_receipt["control_rejection"] = "advance_already_complete_reset_required"
+		return completed_receipt
 	_advance_final_profile()
 	return validation_profile_sample.duplicate(true)
 
 func tester_dense_reset() -> Dictionary:
 	if not DenseWaveProfileClass.tester_guard():
 		return {"accepted":false,"status":"release_disabled","phase":"reset"}
+	# Reset is idempotent across delayed collector callbacks. The first reset
+	# already restores an ordinary run and publishes its isolation receipt;
+	# repeating it must not create another run serial or teardown generation.
+	if bool(validation_profile_receipt.get("reset", false)) and not _profile_active:
+		var reset_receipt := validation_profile_receipt.duplicate(true)
+		reset_receipt["control_rejection"] = "reset_already_complete_idempotent"
+		return reset_receipt
 	_reset_final_profile()
 	return validation_profile_receipt.duplicate(true)
 
@@ -1903,10 +1923,8 @@ func _advance_final_profile() -> void:
 		# A second advance can arrive while the host collector is still waiting on
 		# the first window. Keep the original sampling owner intact and publish a
 		# bounded pending receipt instead of replaying an outcome-unknown edge.
-		_record_profile_control_rejection("tester_dense_advance", "advance_already_active_timeout_safe")
-		validation_profile_receipt["status"] = DenseWaveProfileClass.UNKNOWN_STATUS
-		validation_profile_receipt["phase"] = "advance_pending"
-		validation_profile_receipt["timeout_safe"] = true
+		return
+	if String(validation_profile_sample.get("status", "")) == "complete" or String(validation_profile_receipt.get("phase", "")) == "advance_complete":
 		return
 	# Do not suppress sampling merely because the preflight renderer was marked
 	# software/unknown. The collector must observe real entities and frame
@@ -2391,6 +2409,8 @@ func _advance_profile_sample(delta: float) -> void:
 
 func _reset_final_profile() -> void:
 	if not DenseWaveProfileClass.tester_guard():
+		return
+	if bool(validation_profile_receipt.get("reset", false)) and not _profile_active:
 		return
 	var source_run_serial := run_serial
 	var source_sample := validation_profile_sample.duplicate(true)
