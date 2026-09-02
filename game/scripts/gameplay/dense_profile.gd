@@ -219,6 +219,24 @@ static func renderer_status(classification: String, hardware_eligible: bool) -> 
 		return SOFTWARE_STATUS
 	return UNKNOWN_STATUS
 
+## Explicit renderer gate shared by the live collector and host receipts.
+## Sampling remains enabled on every adapter, while only a complete native
+## identity can advance qualification. Software markers therefore remain
+## visible as rejected evidence instead of being converted into a pass.
+static func renderer_guard(renderer: Dictionary) -> Dictionary:
+	var classification := String(renderer.get("classification", "unknown"))
+	var hardware_eligible := bool(renderer.get("hardware_qualification_eligible", false))
+	var status := renderer_status(classification, hardware_eligible)
+	return {
+		"classification":classification,
+		"hardware_qualification_eligible":hardware_eligible,
+		"status":status,
+		"native_qualification_allowed":status == NATIVE_STATUS,
+		"sampling_allowed":true,
+		"software_rejected":status == SOFTWARE_STATUS,
+		"reason":"native_identity_verified" if status == NATIVE_STATUS else ("software_renderer_detected" if status == SOFTWARE_STATUS else "native_identity_pending"),
+	}
+
 static func qualification_contract() -> Dictionary:
 	return {
 		"contract_id": CONTRACT_ID,
@@ -273,6 +291,9 @@ static func self_audit() -> Dictionary:
 	var required_metrics: Array[String] = []
 	for metric in contract().get("metrics", []):
 		required_metrics.append(String(metric))
+	var native_guard := renderer_guard({"classification":"hardware", "hardware_qualification_eligible":true})
+	var software_guard := renderer_guard({"classification":"software", "hardware_qualification_eligible":false})
+	var unknown_guard := renderer_guard({"classification":"unknown", "hardware_qualification_eligible":false})
 	var checks := {
 		"valid_cycle_complete":bool(valid.get("complete", false)),
 		"duplicate_cycle_rejected":String(duplicate.get("status", "")) == "rejected" and duplicate.get("reasons", []).has("duplicate_phase"),
@@ -280,6 +301,9 @@ static func self_audit() -> Dictionary:
 		"timeout_bounded_pending":String(timeout.get("status", "")) == "pending" and timeout.get("reasons", []).has("timeout"),
 		"reset_isolation_failure_rejected":String(reset_failure.get("status", "")) == "rejected" and reset_failure.get("reasons", []).has("reset_isolation_false"),
 		"required_metric_names_present":required_metrics.size() >= 10 and required_metrics.has("frame_ms") and required_metrics.has("physics_ms") and required_metrics.has("render_ms") and required_metrics.has("allocation_bytes") and required_metrics.has("subsystem_samples") and required_metrics.has("lifecycle_deltas") and required_metrics.has("runtime_error_count"),
+		"renderer_guard_native_pass":bool(native_guard.get("native_qualification_allowed", false)) and native_guard.get("status", "") == NATIVE_STATUS,
+		"renderer_guard_software_rejected":bool(software_guard.get("software_rejected", false)) and not bool(software_guard.get("native_qualification_allowed", true)),
+		"renderer_guard_unknown_pending":unknown_guard.get("status", "") == UNKNOWN_STATUS and not bool(unknown_guard.get("native_qualification_allowed", true)),
 	}
 	var all_pass := true
 	for value in checks.values():
@@ -298,6 +322,7 @@ static func self_audit() -> Dictionary:
 		"bounded_history_cap":SAMPLE_HISTORY_CAP,
 		"fixtures":{"valid":valid,"duplicate":duplicate,"incomplete":incomplete,"timeout":timeout,"reset_isolation_failure":reset_failure},
 		"checks":checks,
+		"renderer_guard": {"native":native_guard, "software":software_guard, "unknown":unknown_guard},
 		"all_checks_pass":all_pass,
 	}
 

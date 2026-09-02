@@ -972,6 +972,18 @@ func _mcp_state() -> Dictionary:
 		"primary_camera_cull_mask":cull_mask,
 		"source_visual_count":_coverage_occluder_visual_bindings.size(),
 		"visibility_strategy":"single_primary_camera_package_bound_visual_aabb_with_selective_reversible_landmark_fade",
+		# Host/Tester can bind the spatial claim to the same shipped-camera owner
+		# without inferring it from a screenshot.  The phases are deliberately
+		# explicit so spawn, approach, near-contact, departure, and cardinal street
+		# replays remain separate observations; whole-landmark hiding is forbidden.
+		"landmark_visibility_contract": {
+			"required_phases":["spawn","approach","near_contact","departure","cardinal_north","cardinal_east","cardinal_south","cardinal_west"],
+			"camera_owner":"ArenaCamera",
+			"collision_owner":"CemeterySpatialContract",
+			"hard_hide_disabled":true,
+			"external_depth_required":true,
+			"status":"bound_runtime_camera",
+		},
 		"dense_render_budget": {
 			"secondary_render_pass":false,
 			"secondary_camera_count":0,

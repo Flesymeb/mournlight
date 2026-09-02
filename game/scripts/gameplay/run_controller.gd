@@ -3518,10 +3518,28 @@ func _first_run_guidance_snapshot() -> Dictionary:
 		"confirm":input_router.binding_label([&"context_confirm"] if input_router.active_device == "gamepad" else [&"ui_accept"], 2),
 		"help":input_router.binding_label([&"guidance_help"], 2),
 	}
+	# Keep the tutorial predicates auditable without making the HUD a debug form.
+	# These flags are derived from authoritative movement, dash, attack, drop,
+	# attraction, collection, and draft receipts; no wall-clock timer can advance
+	# the sequence or claim a milestone early.
+	var attraction_seen := not _reward_attraction_receipt.is_empty()
+	var collection_seen := not _reward_collection_receipt.is_empty() and pickup_collected_total > 0
+	var drop_seen := pickup_spawned_total > 0 and not _reward_spawn_receipt.is_empty()
+	var upgrade_seen := _first_run_guidance_completed or not _first_run_guidance_completion.is_empty()
+	var milestones := {
+		"movement":_guidance_movement_observed,
+		"dash":_guidance_dash_observed,
+		"automatic_attack":_guidance_attack_observed,
+		"death_position_drop":drop_seen,
+		"attraction":attraction_seen,
+		"collection":collection_seen,
+		"first_upgrade":upgrade_seen,
+	}
+	var drop_position: Variant = _reward_spawn_receipt.get("position", null) if drop_seen else null
 	if _first_run_guidance_completed:
-		return {"visible":false,"stage":"complete","completed":true,"completion":_first_run_guidance_completion.duplicate(true),"bindings":bindings,"help_surface":"pause_controls_and_help","device":input_router.active_device,"reset":_guidance_reset_receipt.duplicate(true)}
+		return {"visible":false,"stage":"complete","completed":true,"completion":_first_run_guidance_completion.duplicate(true),"bindings":bindings,"help_surface":"pause_controls_and_help","device":input_router.active_device,"milestones":milestones,"drop_position":drop_position,"reset":_guidance_reset_receipt.duplicate(true)}
 	if run_route_kind != "ordinary" or run_state not in ["active", "draft"]:
-		return {"visible":false,"stage":"inactive","completed":false,"bindings":bindings,"help_surface":"pause_controls_and_help","device":input_router.active_device,"reset":_guidance_reset_receipt.duplicate(true)}
+		return {"visible":false,"stage":"inactive","completed":false,"bindings":bindings,"help_surface":"pause_controls_and_help","device":input_router.active_device,"milestones":milestones,"drop_position":drop_position,"reset":_guidance_reset_receipt.duplicate(true)}
 	var stage := "movement"
 	var title := "KEEPER'S FIRST VIGIL"
 	var prompt := "MOVE TO KEEP AN ESCAPE LANE"
@@ -3537,10 +3555,15 @@ func _first_run_guidance_snapshot() -> Dictionary:
 		prompt = "COLLECT WISPS TO FILL THE MOON-SILVER LEVEL BAR"
 		action_label = "MOVE THROUGH THE WISP"
 		icon = "wisp"
-	elif pickup_spawned_total > 0:
+	elif pickup_spawned_total > 0 and not attraction_seen:
 		stage = "world_drop_and_attraction"
-		prompt = "MOVE CLOSE; FALLEN WISPS ACCELERATE TOWARD YOUR LANTERN"
+		prompt = "A WISP FELL WHERE THE THREAT DIED; MOVE CLOSE TO DRAW IT IN"
 		action_label = String(bindings.move)
+		icon = "wisp"
+	elif attraction_seen and not collection_seen:
+		stage = "collection_progress"
+		prompt = "KEEP MOVING THROUGH THE ATTRACTING WISP TO COLLECT ITS EXPERIENCE"
+		action_label = "MOVE THROUGH THE WISP"
 		icon = "wisp"
 	elif _guidance_progress_stage < 1 and not _guidance_movement_observed:
 		stage = "movement"
@@ -3562,7 +3585,7 @@ func _first_run_guidance_snapshot() -> Dictionary:
 		prompt = "FACE THE THREAT; THE WARDEN LANTERN ATTACKS AUTOMATICALLY"
 		action_label = "NO FIRE BUTTON"
 		icon = "lantern"
-	return {"visible":not _first_run_guidance_dismissed,"stage":stage,"progress_stage":_guidance_progress_stage,"title":title,"prompt":prompt,"action_label":action_label,"icon":icon,"completed":false,"bindings":bindings,"inputmap_bound":true,"device":input_router.active_device,"device_generation":input_router.device_generation,"dismissal":"toggle_guidance_help_action","dismissed":_first_run_guidance_dismissed,"persists_across_retry_after_completion":true,"help_surface":"pause_controls_and_help","illustration":"res://assets/ui/guidance/first_run_gameplay.png","reset":_guidance_reset_receipt.duplicate(true)}
+	return {"visible":not _first_run_guidance_dismissed,"stage":stage,"progress_stage":_guidance_progress_stage,"title":title,"prompt":prompt,"action_label":action_label,"icon":icon,"completed":false,"bindings":bindings,"inputmap_bound":true,"device":input_router.active_device,"device_generation":input_router.device_generation,"dismissal":"toggle_guidance_help_action","dismissed":_first_run_guidance_dismissed,"persists_across_retry_after_completion":true,"help_surface":"pause_controls_and_help","illustration":"res://assets/ui/guidance/first_run_gameplay.png","milestones":milestones,"drop_position":drop_position,"reset":_guidance_reset_receipt.duplicate(true)}
 
 func _qa_reset_first_run_guidance() -> void:
 	if not OS.has_feature("editor"):

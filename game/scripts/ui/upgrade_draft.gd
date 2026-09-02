@@ -43,6 +43,7 @@ const CARD_SIZE := Vector2(328, 522)
 const CARD_OFFSETS := [0.0, 346.0, 692.0]
 const MAX_DECISION_DELTAS := 3
 const SURFACE_CONTRACT_REVISION := "upgrade_draft_icon_led_v3"
+const DRAFT_AFFORDANCE_REVISION := "upgrade_draft_focus_affordance_v4"
 
 @onready var title_label: Label = $Title
 @onready var subtitle_label: Label = $Subtitle
@@ -50,6 +51,12 @@ const SURFACE_CONTRACT_REVISION := "upgrade_draft_icon_led_v3"
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Keep the decision surface self-explanatory in the shipped page.  This is
+	# authored UI copy (not telemetry): every draft exposes the same concise
+	# confirm path while the live device-specific tooltip below remains bound to
+	# the active input context.
+	footer_label.text = "CHOOSE ONE VIGIL  ·  ENTER / SOUTH BUTTON  ·  POINTER CLICK  ·  ESC TO CANCEL"
+	footer_label.set_meta("surface_revision", DRAFT_AFFORDANCE_REVISION)
 	_apply_surface_contract()
 	cards_container.pivot_offset = Vector2(510, 261)
 	for index in buttons.size():

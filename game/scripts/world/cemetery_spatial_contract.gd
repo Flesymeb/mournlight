@@ -11,7 +11,10 @@ extends Node3D
 ## perimeter camera views retain cemetery depth instead of exposing an abrupt
 ## edge. This datum is consumed by perimeter, spawn, and route binding.
 @export var authored_playable_inset := 9.0
-@export var landmark_collision_margin := 0.35
+## A slightly wider additive shell keeps the authored mausoleum/tree footprints
+## aligned with their rendered bounds during near-contact movement replays.
+## This is product-owned collision datum; imported child meshes remain intact.
+@export var landmark_collision_margin := 0.4
 ## Reference locomotion speed used only for spatial receipts.  This keeps the
 ## expanded-world contract measurable (time-to-cross and perimeter loop) while
 ## leaving the Warden's authoritative movement owner unchanged.
@@ -49,7 +52,7 @@ func _ready() -> void:
 	# Candidate-owned release receipt: the intact cemetery package, its native
 	# transform-space datum, and additive collision/navigation anchors are bound
 	# as one spatial contract for runtime inspection.
-	set_meta("release_spatial_binding_revision", "release_convergence_native_datum_v3")
+	set_meta("release_spatial_binding_revision", "release_convergence_native_datum_v4")
 	if is_instance_valid(external_depth):
 		external_depth.set_meta("non_playable", true)
 		external_depth.set_meta("collision_enabled", false)
