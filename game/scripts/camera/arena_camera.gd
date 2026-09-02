@@ -3,8 +3,8 @@ extends Camera3D
 
 @export var target: Node3D
 @export var arena_contract: CemeterySpatialContract
-@export var follow_height := 28.0
-@export var follow_distance := 28.0
+@export var follow_height := 25.0
+@export var follow_distance := 25.0
 ## Fixed three-quarter azimuth keeps the Warden out of the mausoleum's stair
 ## silhouette while retaining a high-angle escape-lane read.  The rig still
 ## follows the player; this is only the authored lateral offset of that rig.
@@ -134,8 +134,12 @@ func _ready() -> void:
 	# 28 m rig rendered the Warden as a thumbnail and weakened threat reads.
 	# A 22 m high-angle orbit still exposes the mausoleum, bell and an escape
 	# lane while giving the player silhouette enough pixels for ordinary play.
-	follow_height = 30.0
-	follow_distance = 30.0
+	# Keep the high-angle context, but use a closer authored orbit so the Warden,
+	# nearby drops, and attack telegraphs occupy a readable share of the shipped
+	# frame.  Landmark coverage remains protected by the damped framing target
+	# and the camera's bounded FOV correction below.
+	follow_height = 25.0
+	follow_distance = 25.0
 	follow_lateral = 0.0
 	# Aim a little farther up the authored north route so the mausoleum and bell
 	# remain fully framed from spawn; the closer 22 m rig keeps the Warden in the

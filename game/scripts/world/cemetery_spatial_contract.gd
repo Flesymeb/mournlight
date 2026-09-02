@@ -883,7 +883,11 @@ func get_snapshot() -> Dictionary:
 			"warm_anchor":"OuterDatum/KeeperLanternPostAnchor/WarmLandmarkLight",
 			"cool_fills":["OuterDatum/RouteMoonFill","OuterDatum/WestMoonRim","OuterDatum/EastMoonRim","OuterDatum/SmallMausoleumAnchor/MausoleumMoonLift"],
 			"escape_lane_policy":"native_street_network_preserved",
-				"camera_profile":{"fov":82.0,"follow_height":46.0,"follow_distance":46.0,"follow_lateral":0.0,"framing_bias":Vector3(0.0,0.0,-2.0),"landmark_blend":0.18,"visibility_collision_mask":camera_visibility_collision_mask},
+				# Mirror the shipped ArenaCamera datum in the spatial receipt.  The
+				# previous 46 m / 82 degree legacy values described a superseded
+				# overview rig and contradicted the live camera evidence even though
+				# collision and landmark bindings were correct.
+				"camera_profile":{"fov":78.0,"follow_height":25.0,"follow_distance":25.0,"follow_lateral":0.0,"framing_bias":Vector3(0.0,0.0,-6.0),"landmark_blend":0.18,"visibility_collision_mask":camera_visibility_collision_mask},
 			"proxy_geometry_count":0,
 		},
 		"external_world":{"source":"intact_authored_package_plus_candidate_authored_distant_silhouette_ring", "procedural_scenery":false, "primitive_meshes":0, "external_dressing_nodes":6, "opaque":true, "non_playable_depth_beyond_all_edges":is_instance_valid(external_depth), "collision_enabled":false, "fog_depth_bound":true},
