@@ -44,7 +44,7 @@ const CARD_OFFSETS := [0.0, 346.0, 692.0]
 const MAX_DECISION_DELTAS := 3
 const SURFACE_CONTRACT_REVISION := "upgrade_draft_icon_led_v4"
 const DRAFT_AFFORDANCE_REVISION := "upgrade_draft_focus_affordance_v5"
-const FOCUS_VISUAL_CONTRACT_REVISION := "upgrade_draft_focus_visual_v6"
+const FOCUS_VISUAL_CONTRACT_REVISION := "upgrade_draft_focus_visual_v7"
 
 @onready var title_label: Label = $Title
 @onready var subtitle_label: Label = $Subtitle
@@ -624,7 +624,12 @@ func _apply_card_style(index: int, state: String) -> void:
 	if state.begins_with("SELECTED"):
 		style.border_color = Color(1.0, 0.76, 0.31, 1.0)
 		style.bg_color = Color(0.105, 0.072, 0.035, 0.97)
-	elif "FOCUS" in state or "HOVER" in state or state.begins_with("PRESSED"):
+	elif "FOCUS" in state:
+		# Keyboard/gamepad focus uses a moon-silver outline so it is visibly
+		# distinct from pointer hover while preserving the fixed card geometry.
+		style.border_color = Color(0.88, 0.91, 0.78, 1.0)
+		style.bg_color = Color(0.045, 0.06, 0.075, 0.98)
+	elif "HOVER" in state or state.begins_with("PRESSED"):
 		style.border_color = Color(0.43, 0.96, 0.86, 1.0)
 		style.bg_color = Color(0.035, 0.065, 0.072, 0.97)
 	elif state == "NEW WEAPON":
@@ -640,7 +645,9 @@ func _card_style(state: String, emphasized: bool) -> StyleBoxFlat:
 	style.border_color = Color(0.42, 0.31, 0.18, 0.85)
 	if state.begins_with("SELECTED"):
 		style.border_color = Color(1.0, 0.76, 0.31, 1.0); style.bg_color = Color(0.105, 0.072, 0.035, 0.97)
-	elif "FOCUS" in state or "HOVER" in state or state.begins_with("PRESSED") or emphasized:
+	elif "FOCUS" in state or emphasized:
+		style.border_color = Color(0.88, 0.91, 0.78, 1.0); style.bg_color = Color(0.045, 0.06, 0.075, 0.98)
+	elif "HOVER" in state or state.begins_with("PRESSED"):
 		style.border_color = Color(0.43, 0.96, 0.86, 1.0); style.bg_color = Color(0.035, 0.065, 0.072, 0.97)
 	elif state == "NEW WEAPON": style.border_color = Color(0.72, 0.57, 0.95, 0.95)
 	elif state in ["UNAVAILABLE", "CHOICE LOCKED"]: style.border_color = Color(0.32, 0.34, 0.4, 0.7)

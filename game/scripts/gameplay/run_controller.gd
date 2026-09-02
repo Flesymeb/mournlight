@@ -3842,15 +3842,22 @@ func _boss_two_phase_history_truthful() -> bool:
 
 func _record_retry_baseline(reason: String) -> void:
 	_retry_baseline_generation += 1
+	var route_receipt := wave_director.get_route_contract_receipt()
+	var reset_invariants := _terminal_reset_invariants("retry" if reason == "retry" else "fresh_start")
 	var receipt := {
 		"run_serial":run_serial, "baseline_generation":_retry_baseline_generation,
 		"source":reason,
 		"tree_paused":get_tree().paused, "run_state":run_state,
+		"route_id":String(route_receipt.get("contract_id", "")),
+		"route_progress":route_receipt.get("observed_wave_ids", []).duplicate(),
+		"route_spatial":world.arena_contract.get_route_spatial_receipt() if world.arena_contract.has_method("get_route_spatial_receipt") else {},
+		"reset_generation":input_router.reset_generation,
 		"counts":_profile_counts(),
 		"warden_animation":warden.animation_binding.get_snapshot() if warden.animation_binding else {},
-		"reset_invariants":_terminal_reset_invariants("retry" if reason == "retry" else "fresh_start"),
+		"reset_invariants":reset_invariants,
 		"world_active":world.session_active,
 		"teardown_generation":teardown_receipt.get("completion_generation",0),
+		"stale_actor_timer_audio_cleanup":bool(reset_invariants.get("complete", false)),
 	}
 	validation_retry_baselines.append(receipt)
 	if validation_retry_baselines.size() > 3:
@@ -4278,6 +4285,7 @@ func _mcp_state() -> Dictionary:
 			"pending":validation_profile_receipt.get("next_frame_isolation_pending", false),
 		},
 		"ordinary_wave_ids":wave_state.get("ordinary_route_wave_ids", []),
+		"authored_route_spatial":world.arena_contract.get_route_spatial_receipt() if world.arena_contract.has_method("get_route_spatial_receipt") else {},
 		"ordinary_diagnostic_jumps":wave_state.get("diagnostic_jump_count", 0),
 		"ordinary_natural_progression_truthful":_ordinary_progression_truthful(),
 		"ordinary_boss_two_phase_truthful":_boss_two_phase_history_truthful(),

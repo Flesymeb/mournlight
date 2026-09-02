@@ -129,4 +129,5 @@ func _mcp_state() -> Dictionary:
 		"last_drop_event": last_drop_event,
 		"build": inventory.get_snapshot() if inventory else {},
 		"arena_spatial_contract": arena_contract.get_snapshot() if arena_contract else {},
+		"route_spatial_receipt": arena_contract.get_route_spatial_receipt() if arena_contract and arena_contract.has_method("get_route_spatial_receipt") else {},
 	}

@@ -652,6 +652,42 @@ func get_route_checkpoints() -> Array[Dictionary]:
 	checkpoints.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return String(a.id) < String(b.id))
 	return checkpoints
 
+## Candidate-bound spatial receipt for ordinary route evidence.  The rendered
+## CemeteryGarden package remains the sole visual authority; this read-only
+## view binds the player spawn, checkpoint ring, and playable perimeter to the
+## same measured AABB so retry baselines cannot silently fall back to the old
+## camera-sized datum.
+func get_route_spatial_receipt() -> Dictionary:
+	var visual := get_authored_visual_rect()
+	var playable := get_playable_rect()
+	var spawn := get_player_spawn()
+	var checkpoints := get_route_checkpoints()
+	var checkpoints_inside := 0
+	for checkpoint in checkpoints:
+		var point: Vector3 = checkpoint.get("position", Vector3.ZERO)
+		if playable.has_point(Vector2(point.x, point.z)):
+			checkpoints_inside += 1
+	return {
+		"revision": ROUTE_REBIND_REVISION,
+		"authoritative_instance": "AuthoredCemeteryPackage",
+		"transform_space": "authored_package_world",
+		"visual_rect": visual,
+		"playable_rect": playable,
+		"player_spawn": spawn,
+		"player_spawn_inside_playable": playable.has_point(Vector2(spawn.x, spawn.z)),
+		"checkpoint_count": checkpoints.size(),
+		"checkpoints_inside_playable": checkpoints_inside,
+		"all_checkpoints_inside_playable": checkpoints.size() > 0 and checkpoints_inside == checkpoints.size(),
+		"perimeter_collision": {
+			"north": is_instance_valid(north_boundary),
+			"south": is_instance_valid(south_boundary),
+			"east": is_instance_valid(east_boundary),
+			"west": is_instance_valid(west_boundary),
+		},
+		"external_depth_bound": not external_depth == null and is_instance_valid(external_depth),
+		"imported_children_modified": false,
+	}
+
 func get_playable_rect() -> Rect2:
 	var west_shape := _first_shape(west_boundary)
 	var east_shape := _first_shape(east_boundary)
