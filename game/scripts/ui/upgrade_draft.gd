@@ -398,11 +398,53 @@ func _build_stat_header() -> Control:
 	return row
 
 func _rebuild_stat_rows(index: int, changes: Array) -> void:
+	# Final render-sink guard: callers may bypass `present()`/`_normalize_card`
+	# (for example, a diagnostic fixture or a future presenter path).  Always
+	# sanitize and cap the rows at the point where Controls are created so a
+	# malformed projection can never inflate a card beyond the authored
+	# three-delta hierarchy.
+	if index < 0 or index >= _stat_bodies.size():
+		return
 	var body := _stat_bodies[index]
 	for child in body.get_children():
 		child.queue_free()
-	for change_value in changes:
-		body.add_child(_build_stat_row(change_value as Dictionary))
+	var bounded_changes: Array[Dictionary] = _decision_changes(changes)
+	# Keep this invariant explicit even if the filtering helper is changed later.
+	if bounded_changes.size() > MAX_DECISION_DELTAS:
+		bounded_changes = bounded_changes.slice(0, MAX_DECISION_DELTAS)
+	for change in bounded_changes:
+		body.add_child(_build_stat_row(change))
+
+## Editor-only fixture used by focused release-convergence checks.  It feeds
+## the render sink directly (without `present()` normalization) with an
+## over-cap projection containing placeholder, unchanged, new-weapon, and
+## concrete rows.  The returned count is the actual number of instantiated
+## row Controls, proving the sink—not scene metadata—owns the three-row cap.
+func tester_upgrade_sink_fixture() -> Dictionary:
+	if not OS.has_feature("editor") or _stat_bodies.is_empty():
+		return {"available":false, "reason":"editor_only_or_not_ready"}
+	var fixture: Array[Dictionary] = [
+		{"field":"damage", "label":"DAMAGE", "current":"NEW", "result":12.0},
+		{"field":"cooldown", "label":"COOLDOWN", "current":1.0, "result":1.0},
+		{"field":"range", "label":"RANGE", "current":null, "result":6.0},
+		{"field":"area", "label":"AREA", "current":2.0, "result":3.0},
+		{"field":"count", "label":"COUNT", "current":1, "result":2},
+	]
+	_rebuild_stat_rows(0, fixture)
+	var rendered_rows := _stat_bodies[0].get_child_count()
+	var bounded := _decision_changes(fixture)
+	_rebuild_stat_rows(0, [])
+	return {
+		"available":true,
+		"input_count":fixture.size(),
+		"decision_count":bounded.size(),
+		"rendered_rows":rendered_rows,
+		"maximum":MAX_DECISION_DELTAS,
+		"placeholder_filtered":not bounded.any(func(change: Dictionary) -> bool: return _is_placeholder_value(change.get("current")) or _is_placeholder_value(change.get("result"))),
+		"unchanged_filtered":not bounded.any(func(change: Dictionary) -> bool: return _display_values_equal(change.get("current"), change.get("result"))),
+		"new_weapon_current_empty":bounded.any(func(change: Dictionary) -> bool: return change.get("current") == null),
+		"pass":rendered_rows <= MAX_DECISION_DELTAS and bounded.size() <= MAX_DECISION_DELTAS,
+	}
 
 func _build_stat_row(change: Dictionary) -> Control:
 	var row := HBoxContainer.new()
