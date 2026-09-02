@@ -29,6 +29,10 @@ var boss_entry_elapsed := 0.0
 var intermission_remaining := 0.0
 var terminated := false
 var terminal_transition_count := 0
+var terminal_outcome := ""
+var terminal_rejected_count := 0
+var terminal_rejection_reason := ""
+var terminal_transition_receipt: Dictionary = {}
 var ordinary_route_wave_ids: Array[String] = []
 var diagnostic_jump_count := 0
 var transition_serial := 0
@@ -56,6 +60,10 @@ func reset() -> void:
 	intermission_remaining = 0.0
 	terminated = false
 	terminal_transition_count = 0
+	terminal_outcome = ""
+	terminal_rejected_count = 0
+	terminal_rejection_reason = ""
+	terminal_transition_receipt.clear()
 	ordinary_route_wave_ids.clear()
 	diagnostic_jump_count = 0
 	transition_serial = 0
@@ -78,9 +86,22 @@ func terminate(outcome: String) -> void:
 	# do not emit duplicate phase transitions into the run controller.
 	if terminated:
 		return
+	var requested_outcome := outcome.strip_edges()
+	if requested_outcome.is_empty():
+		terminal_rejected_count += 1
+		terminal_rejection_reason = "empty_outcome"
+		return
 	terminated = true
 	terminal_transition_count += 1
-	phase = outcome
+	terminal_outcome = requested_outcome
+	phase = requested_outcome
+	terminal_transition_receipt = {
+		"transition_count":terminal_transition_count,
+		"outcome":terminal_outcome,
+		"phase":phase,
+		"transition_serial":transition_serial,
+		"elapsed":total_elapsed,
+	}
 	set_process(false)
 	_emit()
 
@@ -220,8 +241,9 @@ func get_snapshot() -> Dictionary:
 		"active_enemies":int(encounter.get("live", 0)),
 		"enemy_cap":int(encounter.get("cap", definition.get("cap", 0))),
 		"boss_state":"absent" if not boss_spawned else ("requested" if boss_request_count > 0 else "pending"),
-		"terminal_predicate": {"terminated":terminated,"terminal_transition_count":terminal_transition_count,"spawning_allowed":not terminated and phase == "active"},
-		"terminated":terminated,"definition":definition,
+		"terminal_predicate": {"terminated":terminated,"terminal_transition_count":terminal_transition_count,"spawning_allowed":not terminated and phase == "active","outcome":terminal_outcome,"rejected_count":terminal_rejected_count},
+		"terminated":terminated,"terminal_outcome":terminal_outcome,"terminal_transition_receipt":terminal_transition_receipt.duplicate(true),
+		"terminal_rejected_count":terminal_rejected_count,"terminal_rejection_reason":terminal_rejection_reason,"definition":definition,
 		"expected_route_wave_ids":Array(expected_ids),
 		"ordinary_route_wave_ids":ordinary_route_wave_ids.duplicate(),
 		"ordinary_transition_times":ordinary_transition_times.duplicate(),
@@ -287,6 +309,8 @@ func get_route_contract_receipt() -> Dictionary:
 		"boss_request_count": int(snapshot.get("boss_request_count", 0)),
 		"boss_requested_exactly_once": bool(snapshot.get("boss_requested_exactly_once", false)),
 		"stale_transition_rejection_count": int(snapshot.get("stale_transition_rejection_count", 0)),
+		"terminal_outcome": String(snapshot.get("terminal_outcome", "")),
+		"terminal_transition_receipt": (snapshot.get("terminal_transition_receipt", {}) as Dictionary).duplicate(true),
 		"terminal": (snapshot.get("terminal_predicate", {}) as Dictionary).duplicate(true),
 	}
 
