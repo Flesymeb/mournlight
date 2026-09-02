@@ -53,6 +53,7 @@ const AUTHORED_LOCAL_MIN := Vector2(-12.143, -11.415)
 const AUTHORED_LOCAL_MAX := Vector2(12.149, 11.418)
 const OBJECTIVE_ANCHOR_IDS := [&"TargetAnchorA", &"TargetAnchorB"]
 const ROUTE_REBIND_REVISION := "cemetery_authored_route_rebind_v8"
+const PUBLICATION_SPATIAL_REVISION := "release_convergence_authored_datum_v7"
 
 func _ready() -> void:
 	set_meta("camera_visibility_collision_mask", camera_visibility_collision_mask)
@@ -64,6 +65,7 @@ func _ready() -> void:
 	set_meta("release_spatial_binding_revision", "release_convergence_native_datum_v6")
 	set_meta("route_spatial_revision", "release_convergence_native_route_v6")
 	set_meta("route_rebind_revision", ROUTE_REBIND_REVISION)
+	set_meta("publication_spatial_revision", PUBLICATION_SPATIAL_REVISION)
 	set_meta("landmark_sight_lane_margin", landmark_sight_lane_margin)
 	set_meta("landmark_collision_contract", {
 		"source": "AuthoredCemeteryPackage",

@@ -17,6 +17,7 @@ metadata/presentation_contract = "authored_icon_led_current_to_new_v2"
 metadata/decision_delta_limit = 3
 metadata/surface_contract_revision = "upgrade_draft_icon_led_v4"
 metadata/route_transaction_binding = "ordinary_first_upgrade_pause_commit_resume_v2"
+metadata/publication_surface_revision = "release_convergence_icon_led_cards_v5"
 
 [node name="Shade" type="ColorRect" parent="."]
 layout_mode = 1
@@ -25,7 +26,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.005,0.008,0.025,0.92)
+color = Color(0.005,0.008,0.025,0.90)
 mouse_filter = 1
 
 [node name="Title" type="Label" parent="."]

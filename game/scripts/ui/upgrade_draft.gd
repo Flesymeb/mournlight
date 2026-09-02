@@ -45,6 +45,7 @@ const MAX_DECISION_DELTAS := 3
 const SURFACE_CONTRACT_REVISION := "upgrade_draft_icon_led_v4"
 const DRAFT_AFFORDANCE_REVISION := "upgrade_draft_focus_affordance_v5"
 const FOCUS_VISUAL_CONTRACT_REVISION := "upgrade_draft_focus_visual_v7"
+const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v5"
 
 @onready var title_label: Label = $Title
 @onready var subtitle_label: Label = $Subtitle
@@ -58,6 +59,7 @@ func _ready() -> void:
 	# the active input context.
 	footer_label.text = "CHOOSE ONE VIGIL  ·  ENTER / SOUTH BUTTON  ·  POINTER CLICK  ·  ESC TO CANCEL"
 	footer_label.set_meta("surface_revision", DRAFT_AFFORDANCE_REVISION)
+	set_meta("publication_surface_revision", PUBLICATION_SURFACE_REVISION)
 	_apply_surface_contract()
 	cards_container.pivot_offset = Vector2(510, 261)
 	for index in buttons.size():

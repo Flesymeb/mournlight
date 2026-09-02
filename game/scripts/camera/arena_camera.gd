@@ -144,8 +144,12 @@ func _ready() -> void:
 	# nearby drops, and attack telegraphs occupy a readable share of the shipped
 	# frame.  Landmark coverage remains protected by the damped framing target
 	# and the camera's bounded FOV correction below.
-	follow_height = 25.0
-	follow_distance = 25.0
+	# The expanded authored datum no longer needs the old 25 m lens.  Bringing
+	# the rig in keeps the Warden, nearby threats, drops, and telegraphs readable
+	# at the shipped 1280/1920 widths while the arena clamp still preserves an
+	# escape lane and landmark context.
+	follow_height = 21.5
+	follow_distance = 21.5
 	follow_lateral = -4.0
 	# Aim a little farther up the authored north route so the mausoleum and bell
 	# remain fully framed from spawn; the closer 22 m rig keeps the Warden in the
