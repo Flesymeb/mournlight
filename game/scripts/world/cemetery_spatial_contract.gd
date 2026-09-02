@@ -7,7 +7,10 @@ extends Node3D
 @export var spawn_clearance := 0.6
 @export var native_map_scale := 1.95
 @export var authored_wrapper_scale_multiplier := 2.36
-@export var authored_playable_inset := 8.5
+## Keep a measurable non-playable world band around the authored streets so
+## perimeter camera views retain cemetery depth instead of exposing an abrupt
+## edge. This datum is consumed by perimeter, spawn, and route binding.
+@export var authored_playable_inset := 9.0
 @export var landmark_collision_margin := 0.35
 ## Reference locomotion speed used only for spatial receipts.  This keeps the
 ## expanded-world contract measurable (time-to-cross and perimeter loop) while

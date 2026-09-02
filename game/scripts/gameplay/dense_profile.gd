@@ -110,6 +110,10 @@ static func contract() -> Dictionary:
 			"aggregation_owner":"RunController",
 			"software_sessions":"retained_as_rejected_evidence",
 		},
+		# This is a transport handoff, not a qualification verdict. Runtime/Tester
+		# can use one stable payload to recapture the exact three-cycle protocol on
+		# native hardware while preserving this candidate's software evidence.
+		"host_handoff": host_handoff_contract(),
 		"ordinary_balance_untouched": true,
 		"sample_availability_policy": "record_nonzero_samples_when_frames_run; renderer_gate_does_not_suppress_measurement",
 		"preflight": {
@@ -120,6 +124,23 @@ static func contract() -> Dictionary:
 			"native_renderer_required_for_qualification": true,
 		},
 }
+
+static func host_handoff_contract() -> Dictionary:
+	return {
+		"id":"mournlight.native_dense_host_handoff.v1",
+		"owner":"GameLoop Runtime + Tester",
+		"status":"pending_native_recapture",
+		"qualification_owner":"Tester",
+		"native_capture_required":true,
+		"renderer_gate":"hardware_qualification_eligible == true",
+		"target_viewport":{"width":1920,"height":1080},
+		"required_cycles":3,
+		"serial_protocol":["tester_dense_prepare","tester_dense_advance","tester_dense_reset"],
+		"cycle_identity":["cycle_id","cycle_index","run_serial","setup_generation","advance_generation"],
+		"required_receipts":["renderer","preflight","sample_distributions","lifecycle_deltas","reset_isolation","next_frame_input_context"],
+		"software_evidence_policy":"retain_as_rejected_software_renderer",
+		"release_export_available":false,
+	}
 
 static func tester_guard() -> bool:
 	return OS.has_feature("editor") and not OS.has_feature("release")
@@ -211,6 +232,7 @@ static func qualification_contract() -> Dictionary:
 			"software_evidence_policy": "retain_as_rejected_software_renderer; do_not_qualify",
 		},
 		"reset_isolation_required":true,
+		"host_handoff":host_handoff_contract(),
 	}
 
 ## Deterministic, side-effect-free contract fixtures used by the release guard.

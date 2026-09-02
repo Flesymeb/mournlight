@@ -39,6 +39,7 @@ var _presentation_serial := 0
 
 const CARD_SIZE := Vector2(328, 522)
 const CARD_OFFSETS := [0.0, 346.0, 692.0]
+const MAX_DECISION_DELTAS := 3
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -241,7 +242,7 @@ func _decision_changes(source_changes: Variant) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	var source_array: Array = source_changes if source_changes is Array else []
 	for value in source_array:
-		if result.size() >= 3:
+		if result.size() >= MAX_DECISION_DELTAS:
 			break
 		if not value is Dictionary:
 			continue
@@ -520,7 +521,7 @@ func _mcp_state() -> Dictionary:
 	for index in mini(cards.size(), buttons.size()):
 		var card: Dictionary = cards[index]
 		var changes := _decision_changes(card.get("changes", []))
-		hierarchy_ok = hierarchy_ok and not str(card.get("icon_path", "")).is_empty() and changes.size() <= 3
+		hierarchy_ok = hierarchy_ok and not str(card.get("icon_path", "")).is_empty() and changes.size() <= MAX_DECISION_DELTAS
 		for change in changes:
 			truthful_values = truthful_values and not _is_placeholder_value(change.get("current")) and not _is_placeholder_value(change.get("result"))
 		visible_cards.append({"id":str(card.get("id", "")), "title":str(card.get("title", "")), "icon_path":str(card.get("icon_path", FALLBACK_ICON_PATH)), "changes":changes, "decision_delta_count":changes.size(), "silhouette_first":not str(card.get("icon_path", "")).is_empty(), "consequence":str(card.get("consequence", "")), "interaction_state":_state_nodes[index].text})
