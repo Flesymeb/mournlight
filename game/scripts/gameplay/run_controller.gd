@@ -826,8 +826,6 @@ func _on_reward_pickup_collected(event: Dictionary) -> void:
 		expected_experience -= expected_threshold
 		expected_level += 1
 		expected_threshold = 5 + (expected_level - 1) * 2
-	if _pending_levelup_transactions > 0:
-		_open_upgrade_draft()
 	_reward_collection_receipt = event.duplicate(true)
 	_reward_collection_receipt.merge({
 		"accepted":true, "phase":"collected", "resolved_drop_ids":accepted_ids,
@@ -845,7 +843,14 @@ func _on_reward_pickup_collected(event: Dictionary) -> void:
 		"expected_threshold":expected_threshold,
 		"hud_interpolation_requested":true,
 	}
+	# Publish the completed drop -> collection -> experience handoff before the
+	# modal owns pause.  The previous ordering opened the draft first, so the
+	# snapshot emitted during `present()` could still contain the prior pickup
+	# receipt; a tester (or the HUD) then saw a level-up with no causal pickup
+	# feedback.  Receipts are now authoritative before the draft transition.
 	reward_collected.emit(_reward_collection_receipt.duplicate(true))
+	if _pending_levelup_transactions > 0:
+		_open_upgrade_draft()
 	_emit_snapshot()
 
 func _on_reward_attraction_started(event: Dictionary) -> void:
@@ -1766,7 +1771,7 @@ func _prepare_final_profile() -> void:
 	# private entrypoint.
 	if not DenseWaveProfileClass.tester_guard():
 		return
-	if _profile_active or (bool(validation_profile_receipt.get("setup_valid", false)) and bool(validation_profile_receipt.get("preparation_paused", false)) and not bool(validation_profile_receipt.get("reset", false))):
+	if _profile_active or _dense_cycle_requires_reset():
 		return
 	if run_state not in ["active", "boss"]:
 		_record_profile_control_rejection("tester_dense_prepare", "ordinary_run_required:%s" % run_state)
@@ -1893,9 +1898,9 @@ func tester_dense_prepare() -> Dictionary:
 		return {"accepted":false,"status":"release_disabled","phase":"prepare"}
 	# Prepare owns the cycle boundary. A delayed duplicate must never tear down
 	# an active sampling window or silently replace its setup generation.
-	if _profile_active or (bool(validation_profile_receipt.get("setup_valid", false)) and bool(validation_profile_receipt.get("preparation_paused", false)) and not bool(validation_profile_receipt.get("reset", false))):
+	if _profile_active or _dense_cycle_requires_reset():
 		var active_receipt := validation_profile_receipt.duplicate(true)
-		active_receipt["control_rejection"] = "prepare_already_active_idempotent"
+		active_receipt["control_rejection"] = "prepare_requires_reset" if not _profile_active else "prepare_already_active_idempotent"
 		return active_receipt
 	_prepare_final_profile()
 	return validation_profile_receipt.duplicate(true)
@@ -1929,6 +1934,17 @@ func tester_dense_reset() -> Dictionary:
 		return reset_receipt
 	_reset_final_profile()
 	return validation_profile_receipt.duplicate(true)
+
+func _dense_cycle_requires_reset() -> bool:
+	"""A completed prepare/advance cycle must be retired before re-preparing."""
+	if bool(validation_profile_receipt.get("reset", false)):
+		return false
+	if bool(validation_profile_receipt.get("setup_valid", false)) and bool(validation_profile_receipt.get("preparation_paused", false)):
+		return true
+	if String(validation_profile_receipt.get("phase", "")) == "advance_complete":
+		return true
+	var sample_status := String(validation_profile_sample.get("status", ""))
+	return sample_status in ["sampling", "complete"]
 
 func _advance_final_profile() -> void:
 	if not DenseWaveProfileClass.tester_guard():

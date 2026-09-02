@@ -54,6 +54,13 @@ func _ready() -> void:
 	# as one spatial contract for runtime inspection.
 	set_meta("release_spatial_binding_revision", "release_convergence_native_datum_v5")
 	set_meta("route_spatial_revision", "release_convergence_native_route_v5")
+	set_meta("landmark_collision_contract", {
+		"source": "AuthoredCemeteryPackage",
+		"collision_layer": 2,
+		"gameplay_mask": 7,
+		"camera_query_mask": camera_visibility_collision_mask,
+		"perimeter_bound_to_visual_aabb": true,
+	})
 	if is_instance_valid(external_depth):
 		external_depth.set_meta("non_playable", true)
 		external_depth.set_meta("collision_enabled", false)

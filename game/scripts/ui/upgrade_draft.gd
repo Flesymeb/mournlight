@@ -100,6 +100,11 @@ func _apply_surface_contract() -> void:
 		# Keep the authored icon-led card as the sole actionable surface while
 		# exposing the same confirm affordance used by keyboard/gamepad focus.
 		buttons[index].tooltip_text = "Select vigil %d  •  ENTER / SOUTH BUTTON" % (index + 1)
+		# Bind the visual reading order to each actionable card so focus-state
+		# presentation and assistive inspection share the same icon-first
+		# hierarchy as the shipped draft surface.
+		buttons[index].set_meta("choice_hierarchy", ["icon", "title", "rank", "decision_deltas", "consequence"])
+		buttons[index].set_meta("surface_revision", SURFACE_CONTRACT_REVISION)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED and is_instance_valid(cards_container):
