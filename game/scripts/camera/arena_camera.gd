@@ -169,7 +169,13 @@ func _ready() -> void:
 	# centre while the enlarged keeper post and cracked bell silhouettes remain
 	# in the same high-angle spawn composition. Mouse look still owns optional
 	# bounded yaw after this authored baseline.
-	mouse_yaw_degrees = 34.0
+	# Place the shipped high-angle rig on the north sight lane.  The authored
+	# mausoleum sits south of the keeper/bell anchors; the previous south-east
+	# orbit put the tall crypt between the camera and all three landmarks,
+	# yielding an all-occluded coverage receipt and a visually dominant facade.
+	# A north-west three-quarter orbit keeps the Warden in the lower safe lane
+	# while the keeper post, bell, and mausoleum silhouettes separate in depth.
+	mouse_yaw_degrees = 270.0
 	obstruction_lateral_bypass = 0.0
 	current = true
 	normal_fov = 78.0
@@ -472,7 +478,12 @@ func _compose_arena_target(requested_target: Vector3, subjects: Array[Node3D]) -
 		# prevents the mausoleum from being pulled into the optical centre at the
 		# south spawn while preserving keeper/bell silhouettes in the upper safe
 		# lane and leaving a readable escape route around the central stair.
-		composed = composed.lerp(landmark_target, 0.18)
+	# Reserve a substantial but bounded look-ahead for the authored landmark
+	# cluster. At the south spawn the player is far from the crypt; the former
+	# 18% blend left the mausoleum centered and hid the keeper/bell silhouettes.
+	# 42% keeps all three landmarks in one readable band while nearby threats
+	# remain the primary safe-lane subject.
+		composed = composed.lerp(landmark_target, 0.42)
 	_coverage_obstructed_count = 0
 	_coverage_obstructing_path = ""
 	_coverage_obstructing_paths.clear()
@@ -802,7 +813,7 @@ func reset_view() -> void:
 	# The release datum is a three-quarter azimuth so the central mausoleum does
 	# not swallow the keeper post/bell sight lane at spawn. Subsequent mouse-look
 	# remains bounded around this authored baseline.
-	mouse_yaw_degrees = 34.0
+	mouse_yaw_degrees = 270.0
 	mouse_pitch_degrees = 49.0
 	_mouse_look_receipt.clear()
 	var router := get_node_or_null("../../InputContextRouter")
