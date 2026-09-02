@@ -169,6 +169,7 @@ func present(next_cards: Array[Dictionary]) -> void:
 		buttons[0].grab_focus()
 	else:
 		_focus_first_available()
+	_update_focus_affordance()
 
 func _normalize_card(value: Variant) -> Dictionary:
 	if not value is Dictionary:
@@ -554,6 +555,23 @@ func _on_card_focus_changed(index: int) -> void:
 	# Focus exit and enter each deliver an indexed signal, so both participants
 	# refresh without rebuilding the untouched sibling's canvas item.
 	_refresh_card_state(index)
+	_update_focus_affordance()
+
+func _update_focus_affordance() -> void:
+	# Keep the decision surface's footer truthful to the focused card. This is
+	# player-facing UI state (and an assistive cue), not controller telemetry:
+	# keyboard/gamepad users can identify the pending choice before confirming,
+	# while mouse users retain the stable click affordance.
+	if not is_instance_valid(footer_label):
+		return
+	var focus_owner := get_viewport().gui_get_focus_owner()
+	var focus_index := buttons.find(focus_owner)
+	if focus_index < 0 or focus_index >= cards.size() or buttons[focus_index].disabled:
+		footer_label.text = "CHOOSE ONE VIGIL  ·  ENTER / SOUTH BUTTON  ·  POINTER CLICK  ·  ESC TO CANCEL"
+		return
+	var focused_title := str(cards[focus_index].get("title", "VIGIL")).to_upper()
+	var delta_count := mini(int(cards[focus_index].get("decision_delta_count", 0)), MAX_DECISION_DELTAS)
+	footer_label.text = "%s  ·  %d STAT %s  ·  ENTER / SOUTH BUTTON  ·  ESC TO CANCEL" % [focused_title, delta_count, "DELTA" if delta_count == 1 else "DELTAS"]
 
 func _refresh_card_state(index: int) -> void:
 	if index < 0 or index >= buttons.size() or index >= _state_nodes.size(): return

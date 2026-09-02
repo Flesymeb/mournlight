@@ -19,6 +19,10 @@ extends Node3D
 ## expanded-world contract measurable (time-to-cross and perimeter loop) while
 ## leaving the Warden's authoritative movement owner unchanged.
 @export var reference_traversal_speed := 5.8
+## Extra authored approach clearance around the central mausoleum.  Objective
+## and route markers use this lane so the visible landmark, its gameplay
+## collision, and the traversable street remain in the same world-space frame.
+@export var landmark_sight_lane_margin := 3.0
 ## Visibility probes intentionally use the perimeter/landmark layer only.  The
 ## gameplay layer stays authoritative for Warden/enemy collision, while this
 ## separate mask prevents GroundCollision and MausoleumCollision from becoming
@@ -54,6 +58,7 @@ func _ready() -> void:
 	# as one spatial contract for runtime inspection.
 	set_meta("release_spatial_binding_revision", "release_convergence_native_datum_v5")
 	set_meta("route_spatial_revision", "release_convergence_native_route_v5")
+	set_meta("landmark_sight_lane_margin", landmark_sight_lane_margin)
 	set_meta("landmark_collision_contract", {
 		"source": "AuthoredCemeteryPackage",
 		"collision_layer": 2,
@@ -290,9 +295,10 @@ func _bind_objective_anchors(playable: Rect2, crypt_bounds: AABB) -> void:
 	# Keep the first objective on the keeper approach and the second on the
 	# north/bell approach. The mausoleum footprint remains collision-authoritative
 	# and is used only to keep the route outside its visible bounds.
+	var approach_offset := maxf(2.6, landmark_sight_lane_margin)
 	var positions := [
-		Vector3(keeper_pos.x, 0.05, keeper_pos.z + 2.6),
-		Vector3(bell_pos.x, 0.05, bell_pos.z + 2.6),
+		Vector3(keeper_pos.x, 0.05, keeper_pos.z + approach_offset),
+		Vector3(bell_pos.x, 0.05, bell_pos.z + approach_offset),
 	]
 	for index in OBJECTIVE_ANCHOR_IDS.size():
 		var marker := get_node_or_null("OuterDatum/%s" % OBJECTIVE_ANCHOR_IDS[index]) as Marker3D
@@ -303,7 +309,7 @@ func _bind_objective_anchors(playable: Rect2, crypt_bounds: AABB) -> void:
 			# Avoid placing the keeper objective inside the central mausoleum's
 			# expanded footprint when an imported package shifts its facade.
 			if Rect2(crypt_bounds.position.x, crypt_bounds.position.z, crypt_bounds.size.x, crypt_bounds.size.z).has_point(Vector2(objective.x, objective.z)):
-				objective.x = crypt_bounds.end.x + 3.5
+				objective.x = crypt_bounds.end.x + landmark_sight_lane_margin + 0.5
 		objective.x = clampf(objective.x, playable.position.x + 1.5, playable.end.x - 1.5)
 		objective.z = clampf(objective.z, playable.position.y + 1.5, playable.end.y - 1.5)
 		marker.global_position = objective

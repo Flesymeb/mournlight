@@ -376,9 +376,37 @@ func _unhandled_input(event: InputEvent) -> void:
 	# fallback out of _unhandled_input preserves one activation per transaction.
 
 func start_run() -> void:
+	# A Play action from the title is an intentional fresh onboarding session.
+	# Retry calls _begin_run() directly and must retain completed guidance, while
+	# returning to title and choosing Play should expose the first-run sequence
+	# again so a new player can rediscover movement, drops, and upgrades.
+	if run_state == "title":
+		_reset_first_run_guidance_for_fresh_title_start()
 	_next_baseline_reason = "fresh_start"
 	_teardown_run("fresh_start", "defensive_start_cleanup")
 	_begin_run()
+
+func _reset_first_run_guidance_for_fresh_title_start() -> void:
+	_first_run_guidance_completed = false
+	_first_run_guidance_completion.clear()
+	_first_run_guidance_dismissed = false
+	_guidance_movement_observed = false
+	_guidance_dash_observed = false
+	_guidance_attack_observed = false
+	_guidance_progress_stage = 0
+	_guidance_attack_baseline = world.attack_runtime.authorized_count
+	_guidance_reset_generation += 1
+	_guidance_reset_receipt = {
+		"requested":true,
+		"resolved":true,
+		"generation":_guidance_reset_generation,
+		"editor_only":false,
+		"reason":"fresh_title_play",
+		"physical_binding_count":0,
+		"release_action_exposed":false,
+		"run_serial":run_serial,
+		"reset_isolated_to_guidance":true,
+	}
 
 func _begin_run() -> void:
 	get_tree().paused = false
@@ -426,6 +454,8 @@ func _begin_run() -> void:
 		_first_run_guidance_dismissed = false
 	_transition("initializing")
 	run_serial += 1
+	if String(_guidance_reset_receipt.get("reason", "")) == "fresh_title_play":
+		_guidance_reset_receipt["run_serial"] = run_serial
 	complete_run_ledger.begin_run(run_serial, "ordinary", "retry" if _next_baseline_reason == "retry" else "title_play")
 	run_elapsed = 0.0
 	experience = 0
@@ -778,6 +808,11 @@ func _on_reward_dropped(event: Dictionary) -> void:
 		_emit_snapshot()
 		return
 	_known_reward_ids[drop_id] = true
+	# Keep the tutorial's authoritative milestone cursor monotonic with the
+	# actual reward chain.  The HUD still derives copy from the live drop and
+	# attraction receipts below, but this cursor makes QA resets/replays able to
+	# assert that death-position drops were observed without relying on timing.
+	_guidance_progress_stage = maxi(_guidance_progress_stage, 4)
 	_reward_spawn_receipt = {
 		"accepted":true, "phase":"spawned", "drop_id":drop_id,
 		"position":event.get("position", Vector3.ZERO),
@@ -800,6 +835,7 @@ func _on_reward_pickup_collected(event: Dictionary) -> void:
 		_reward_duplicate_rejections += 1
 		return
 	pickup_collected_total += 1
+	_guidance_progress_stage = maxi(_guidance_progress_stage, 6)
 	var base_reward := maxi(1, int(event.get("reward_value", 1)))
 	var resolved_reward := maxi(1, int(round(float(base_reward) * warden.experience_yield_multiplier)))
 	var experience_before := experience
@@ -854,6 +890,7 @@ func _on_reward_pickup_collected(event: Dictionary) -> void:
 	_emit_snapshot()
 
 func _on_reward_attraction_started(event: Dictionary) -> void:
+	_guidance_progress_stage = maxi(_guidance_progress_stage, 5)
 	_reward_attraction_receipt = event.duplicate(true)
 	_reward_attraction_receipt["run_serial"] = run_serial
 	_emit_snapshot()
