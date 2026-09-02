@@ -238,6 +238,13 @@ func _choose(index: int) -> void:
 	if latched or index < 0 or index >= cards.size() or buttons[index].disabled:
 		return
 	var commit_serial := _presentation_serial
+	# Latch before any visual/state work or the confirmation delay.  The
+	# previous presenter only disabled sibling buttons, leaving the selected
+	# button actionable and allowing a held keyboard/gamepad confirm to queue
+	# multiple choice_requested signals (or none, because the commit guard
+	# required latched=true).  This is the authoritative UI-side debounce;
+	# RunController still validates the transaction on receipt.
+	latched = true
 	selected_index = index
 	for card_index in buttons.size():
 		buttons[card_index].disabled = card_index != index

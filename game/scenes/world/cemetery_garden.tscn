@@ -83,28 +83,29 @@ metadata/spatial_binding_version = 2
 [node name="ExternalDepth" type="Node3D" parent="." unique_id=227997052 groups=["external_world_depth"]]
 metadata/non_playable = true
 metadata/spatial_role = "distant_cemetery_silhouette"
+metadata/spatial_revision = "release_convergence_external_depth_band_v3"
 
 [node name="WestHill" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997053]
 position = Vector3(-48, -1.8, 0)
-scale = Vector3(9, 3.2, 14)
+scale = Vector3(10, 3.2, 15)
 mesh = SubResource("ExternalHillMesh")
 material_override = SubResource("ExternalHillMaterial")
 
 [node name="EastHill" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997054]
 position = Vector3(48, -1.8, -2)
-scale = Vector3(9, 3.0, 14)
+scale = Vector3(10, 3.0, 15)
 mesh = SubResource("ExternalHillMesh")
 material_override = SubResource("ExternalHillMaterial")
 
 [node name="NorthHill" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997055]
 position = Vector3(0, -1.8, -48)
-scale = Vector3(14, 3.4, 8)
+scale = Vector3(15, 3.4, 9)
 mesh = SubResource("ExternalHillMesh")
 material_override = SubResource("ExternalHillMaterial")
 
 [node name="SouthHill" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997056]
 position = Vector3(0, -1.8, 48)
-scale = Vector3(14, 2.8, 8)
+scale = Vector3(15, 2.8, 9)
 mesh = SubResource("ExternalHillMesh")
 material_override = SubResource("ExternalHillMaterial")
 

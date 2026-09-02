@@ -179,8 +179,16 @@ func _project_dash(projection: Dictionary, warden: WardenController) -> void:
 
 func _project_recovery(projection: Dictionary, health: WardenHealth) -> void:
 	projection["current"] = {"health":health.current_health, "health_maximum":health.maximum_health}
-	projection["result"] = {"health":minf(health.maximum_health, health.current_health + 20.0), "health_maximum":health.maximum_health}
+	# Recovery must remain a real, decision-relevant modifier even when the
+	# Warden is currently full.  In that case the heal would clamp to the
+	# existing maximum and render an inert card, so grant the same +20 reserve
+	# as maximum health and fill it.  When damaged, only the current-health
+	# restoration changes; both paths stay authoritative and bounded.
+	var next_maximum := maxf(health.maximum_health, health.current_health + 20.0)
+	projection["result"] = {"health":minf(next_maximum, health.current_health + 20.0), "health_maximum":next_maximum}
 	projection["changes"] = [{"field":"health", "label":"HEALTH", "current":health.current_health, "result":projection.result.health}]
+	if not is_equal_approx(next_maximum, health.maximum_health):
+		projection["changes"].append({"field":"health_maximum", "label":"MAX HEALTH", "current":health.maximum_health, "result":next_maximum})
 
 func _project_pickup_economy(projection: Dictionary, warden: WardenController) -> void:
 	projection["current"] = {
