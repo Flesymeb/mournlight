@@ -12,6 +12,8 @@ extends Resource
 
 const STAT_FIELDS := ["damage", "cooldown", "range", "area", "count", "duration", "hit_interval"]
 const STAT_LABELS := {"damage":"DAMAGE", "cooldown":"COOLDOWN", "range":"RANGE", "area":"AREA", "count":"COUNT", "duration":"DURATION", "hit_interval":"HIT INTERVAL"}
+const MAX_DECISION_DELTAS := 3
+const PLACEHOLDER_VALUES := ["NEW", "LOCKED", "UNAVAILABLE", "UNKNOWN", "N/A", "NA"]
 
 func is_eligible(current_upgrade_rank: int, inventory: WeaponInventory) -> bool:
 	if current_upgrade_rank >= max_rank:
@@ -36,12 +38,61 @@ func project(current_upgrade_rank: int, inventory: WeaponInventory, health: Ward
 		"recovery": _project_recovery(projection, health)
 		"pickup_economy": _project_pickup_economy(projection, warden)
 		"risk_reward": _project_risk_reward(projection, inventory, health)
+	# The projection is the authoritative decision payload consumed by both the
+	# presenter and the transaction receipt.  Sanitize it here, before effect
+	# lines or UI rows are built, so a future catalog entry cannot reintroduce an
+	# exhaustive/debug-style stat stack or leak eligibility placeholders.
+	projection["changes"] = _decision_changes(projection.get("changes", []))
 	projection["effect_lines"] = _effect_lines(projection.changes)
 	projection["concrete_change"] = " | ".join(projection.effect_lines)
 	projection["consequence"] = _consequence_line(projection)
 	projection["available"] = true
 	projection["newly_unlocked"] = action == "weapon_rank" and int((projection.get("current", {}) as Dictionary).get("rank", 0)) == 0
+	projection["decision_delta_count"] = projection.changes.size()
+	projection["silhouette_first"] = not String(projection.get("icon_path", "")).is_empty()
 	return projection
+
+func _decision_changes(source_changes: Variant) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var source_array: Array = source_changes if source_changes is Array else []
+	for value in source_array:
+		if result.size() >= MAX_DECISION_DELTAS:
+			break
+		if not value is Dictionary:
+			continue
+		var change: Dictionary = value
+		if change.is_empty() or not change.has("field") or not change.has("result"):
+			continue
+		var current = change.get("current")
+		var next = change.get("result")
+		if _is_placeholder(current):
+			current = null
+		if _is_placeholder(next):
+			continue
+		# A null-to-zero row is an unlock bookkeeping artifact, not a meaningful
+		# tradeoff. The authored icon/state header carries the new identity.
+		if current == null and (next is int or next is float) and is_zero_approx(float(next)):
+			continue
+		if _values_equal(current, next):
+			continue
+		var normalized := change.duplicate(true)
+		normalized["current"] = current
+		normalized["result"] = next
+		result.append(normalized)
+	return result
+
+func _is_placeholder(value: Variant) -> bool:
+	if not value is String:
+		return false
+	var normalized := String(value).strip_edges().to_upper()
+	return normalized in PLACEHOLDER_VALUES or normalized.contains("NEW") or normalized.contains("LOCKED") or normalized.contains("UNAVAILABLE") or normalized.contains("UNKNOWN")
+
+func _values_equal(a: Variant, b: Variant) -> bool:
+	if a == null or b == null:
+		return a == b
+	if a is float or b is float or a is int or b is int:
+		return is_equal_approx(float(a), float(b))
+	return a == b
 
 func apply_projection(projection: Dictionary, inventory: WeaponInventory, health: WardenHealth, warden: WardenController) -> Dictionary:
 	var before := _authoritative_state(inventory, health, warden)
@@ -205,13 +256,6 @@ func _format_value(value, field: String) -> String:
 	if field == "pickup_collection_radius":
 		return "%.2fm" % float(value)
 	return "%.1f" % float(value) if not is_equal_approx(float(value), roundf(float(value))) else str(int(roundf(float(value))))
-
-func _values_equal(a, b) -> bool:
-	if a == null or b == null:
-		return a == b
-	if a is float or b is float:
-		return is_equal_approx(float(a), float(b))
-	return a == b
 
 func _authoritative_state(inventory: WeaponInventory, health: WardenHealth, warden: WardenController) -> Dictionary:
 	return {

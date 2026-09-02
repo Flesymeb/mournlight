@@ -154,6 +154,9 @@ func _normalize_card(value: Variant) -> Dictionary:
 	# effect_lines for new weapons; those are eligibility metadata, not values a
 	# player can compare. Rebuild both summaries from the normalized deltas.
 	var decision_changes := _decision_changes(normalized["changes"])
+	normalized["changes"] = decision_changes
+	normalized["decision_delta_count"] = decision_changes.size()
+	normalized["silhouette_first"] = not str(normalized.get("icon_path", "")).is_empty()
 	var summary_lines: Array[String] = []
 	for change in decision_changes:
 		var field_label := str(change.get("label", str(change.get("field", "STAT")).to_upper()))
