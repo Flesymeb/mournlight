@@ -146,7 +146,7 @@ func _ready() -> void:
 	# and the camera's bounded FOV correction below.
 	follow_height = 25.0
 	follow_distance = 25.0
-	follow_lateral = 0.0
+	follow_lateral = -4.0
 	# Aim a little farther up the authored north route so the mausoleum and bell
 	# remain fully framed from spawn; the closer 22 m rig keeps the Warden in the
 	# lower safe lane despite this landmark-forward bias.
@@ -160,7 +160,12 @@ func _ready() -> void:
 	# though their collision/anchor bindings were valid.  A modest north bias
 	# preserves the Warden in the lower safe lane while keeping both landmarks
 	# fully readable; it does not move authored geometry.
-	framing_bias = Vector3(0.0, 0.0, -6.0)
+	framing_bias = Vector3(0.0, 0.0, -2.0)
+	# A fixed three-quarter release azimuth keeps the mausoleum off the optical
+	# centre while the enlarged keeper post and cracked bell silhouettes remain
+	# in the same high-angle spawn composition. Mouse look still owns optional
+	# bounded yaw after this authored baseline.
+	mouse_yaw_degrees = 34.0
 	obstruction_lateral_bypass = 0.0
 	current = true
 	normal_fov = 78.0
@@ -790,7 +795,10 @@ func reset_occlusion_response() -> void:
 
 func reset_view() -> void:
 	"""Return the optional aim bias to the authored high-angle release datum."""
-	mouse_yaw_degrees = 0.0
+	# The release datum is a three-quarter azimuth so the central mausoleum does
+	# not swallow the keeper post/bell sight lane at spawn. Subsequent mouse-look
+	# remains bounded around this authored baseline.
+	mouse_yaw_degrees = 34.0
 	mouse_pitch_degrees = 49.0
 	_mouse_look_receipt.clear()
 	var router := get_node_or_null("../../InputContextRouter")

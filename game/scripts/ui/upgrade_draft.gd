@@ -39,7 +39,7 @@ var _presentation_serial := 0
 @onready var cards_container: Control = $Cards
 @onready var shade: ColorRect = $Shade
 
-const CARD_SIZE := Vector2(328, 522)
+const CARD_SIZE := Vector2(328, 430)
 const CARD_OFFSETS := [0.0, 346.0, 692.0]
 const MAX_DECISION_DELTAS := 3
 const SURFACE_CONTRACT_REVISION := "upgrade_draft_icon_led_v4"
@@ -126,7 +126,7 @@ func _layout_cards() -> void:
 	# Keep the authored three-card hierarchy intact while fitting the full
 	# choice family inside narrow windowed modes and high UI scales.
 	var width_ratio := (size.x - 48.0) / 1056.0
-	var height_ratio := (size.y - 190.0) / 522.0
+	var height_ratio := (size.y - 190.0) / 430.0
 	var fit := clampf(minf(width_ratio, height_ratio), 0.58, 1.0)
 	cards_container.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	# The pivot is the visual center of the fixed 1020x522 canvas.  Position it
@@ -135,7 +135,7 @@ func _layout_cards() -> void:
 	# first card while CardB/CardC remain visible.  Scaling still happens around
 	# this centered pivot, so every fixed slot stays inside the same viewport.
 	cards_container.position = size * 0.5 - cards_container.pivot_offset
-	cards_container.size = Vector2(1020, 522)
+	cards_container.size = Vector2(1020, 430)
 	cards_container.scale = Vector2.ONE * fit
 	# Each card owns one fixed render slot. A focused state label or style can
 	# change only pixels inside that slot; it can no longer renegotiate a shared
@@ -418,7 +418,9 @@ func _build_card_content(button: Button) -> void:
 	column.add_child(_build_stat_header())
 	var stat_body := VBoxContainer.new()
 	stat_body.add_theme_constant_override("separation", 1)
-	stat_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# Keep the card compact and let the authored rows hug their content instead
+	# of expanding a large blank lower panel at native resolution.
+	stat_body.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	stat_body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(stat_body)
 	_stat_bodies.append(stat_body)

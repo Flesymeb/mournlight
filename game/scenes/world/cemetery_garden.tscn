@@ -26,11 +26,11 @@ height = 3.2
 radius = 1.05
 
 [sub_resource type="CylinderShape3D" id="KeeperPostShape"]
-height = 2.6
-radius = 0.2
+height = 3.4
+radius = 0.32
 
 [sub_resource type="BoxShape3D" id="CrackedBellShape"]
-size = Vector3(1.8, 2, 1.8)
+size = Vector3(2.6, 2.8, 2.6)
 
 [sub_resource type="BoxShape3D" id="StandingCoffinShape"]
 size = Vector3(1.7, 2.8, 1.6)
@@ -239,7 +239,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.7, 0.05, 0.0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.8, 0, 1.8)
 
 [node name="KeeperPostAsset" parent="OuterDatum/KeeperLanternPostAnchor" unique_id=1640642097 groups=["keeper_post_landmark"] instance=ExtResource("2_keeper_post")]
-transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 0, 0, 0)
+transform = Transform3D(0.52, 0, 0, 0, 0.52, 0, 0, 0, 0.52, 0, 0, 0)
+metadata/landmark_readability = "spawn_visible_lantern_post"
 
 [node name="KeeperPostCollision" type="StaticBody3D" parent="OuterDatum/KeeperLanternPostAnchor" unique_id=1253139806]
 collision_layer = 2
@@ -308,7 +309,8 @@ omni_range = 13.0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.9, 0, -2.6)
 
 [node name="CrackedBellAsset" parent="OuterDatum/CrackedMoonBellAnchor" unique_id=1563090568 groups=["cracked_bell_landmark"] instance=ExtResource("3_cracked_bell")]
-transform = Transform3D(-1.8248768, -0.8184283, -2.9627022e-06, 0, -7.2399803e-06, 2, -0.8184283, 1.8248768, 6.606036e-06, 0, 0, 0)
+transform = Transform3D(-2.55, -1.1458, -4.15e-06, 0, -1.01e-05, 2.8, -1.1458, 2.55, 9.25e-06, 0, 0, 0)
+metadata/landmark_readability = "spawn_visible_cracked_moon_bell"
 
 [node name="CrackedBellCollision" type="StaticBody3D" parent="OuterDatum/CrackedMoonBellAnchor" unique_id=787450712]
 collision_layer = 2
