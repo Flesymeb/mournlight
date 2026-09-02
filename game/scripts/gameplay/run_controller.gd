@@ -2618,6 +2618,15 @@ func _record_profile_cycle(phase: String, receipt: Dictionary) -> void:
 	var provenance: Dictionary = entry.get("cycle_provenance", {})
 	entry["cycle_index"] = int(provenance.get("cycle_index", entry.get("cycle_index", _dense_cycle_index)))
 	entry["cycle_id"] = String(provenance.get("cycle_id", entry.get("cycle_id", "")))
+	# Keep the qualification protocol explicitly bounded to the three cycles
+	# required by the release contract. Later diagnostic retries remain visible
+	# as non-qualifying history instead of silently extending the authoritative
+	# qualification window.
+	entry["qualification_cycle_budget"] = {
+		"required": DenseWaveProfileClass.REQUIRED_QUALIFICATION_CYCLES,
+		"maximum": DenseWaveProfileClass.MAX_QUALIFICATION_CYCLES,
+		"eligible": entry["cycle_index"] <= DenseWaveProfileClass.MAX_QUALIFICATION_CYCLES,
+	}
 	validation_profile_cycles.append(entry)
 	while validation_profile_cycles.size() > 16:
 		validation_profile_cycles.pop_front()

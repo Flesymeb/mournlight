@@ -237,7 +237,6 @@ func close() -> void:
 func _choose(index: int) -> void:
 	if latched or index < 0 or index >= cards.size() or buttons[index].disabled:
 		return
-	latched = true
 	var commit_serial := _presentation_serial
 	selected_index = index
 	for card_index in buttons.size():

@@ -29,6 +29,8 @@ const NATIVE_STATUS := "qualified"
 const SOFTWARE_STATUS := "rejected_software_renderer"
 const UNKNOWN_STATUS := "pending_native_renderer"
 const QUALIFICATION_MODE := "native_renderer_three_cycle"
+const REQUIRED_QUALIFICATION_CYCLES := 3
+const MAX_QUALIFICATION_CYCLES := 3
 const PREFLIGHT_ID := "mournlight.native_dense_preflight.v1"
 ## Qualification controls are intentionally editor-only.  Keeping the guard in
 ## the profile contract gives host tooling one authoritative predicate instead
@@ -51,6 +53,7 @@ static func contract() -> Dictionary:
 		"release_presentation_impact": "none_when_disabled",
 		"renderer_gate": "hardware_qualification_eligible == true",
 		"qualification_mode": QUALIFICATION_MODE,
+		"cycle_budget": {"required": REQUIRED_QUALIFICATION_CYCLES, "maximum": MAX_QUALIFICATION_CYCLES, "bounded": true},
 		"qualification_statuses": {
 			"hardware": NATIVE_STATUS,
 			"software": SOFTWARE_STATUS,
@@ -140,7 +143,7 @@ static func host_handoff_contract() -> Dictionary:
 		"native_capture_required":true,
 		"renderer_gate":"hardware_qualification_eligible == true",
 		"target_viewport":{"width":1920,"height":1080},
-		"required_cycles":3,
+		"required_cycles":REQUIRED_QUALIFICATION_CYCLES,
 		"serial_protocol":["tester_dense_prepare","tester_dense_advance","tester_dense_reset"],
 		"cycle_identity":["cycle_id","cycle_index","run_serial","setup_generation","advance_generation"],
 		"required_receipts":["renderer","preflight","sample_distributions","lifecycle_deltas","reset_isolation","next_frame_input_context"],
@@ -224,7 +227,7 @@ static func qualification_contract() -> Dictionary:
 		"mode": QUALIFICATION_MODE,
 		"renderer_policy":"native_hardware_only",
 		"software_policy":"reject_and_surface_status",
-		"required_cycles":3,
+		"required_cycles":REQUIRED_QUALIFICATION_CYCLES,
 		"target_resolution":Vector2i(1920, 1080),
 		"target_viewport":{"width":1920,"height":1080},
 		"target_density":TARGET_ENEMIES,
@@ -290,7 +293,7 @@ static func self_audit() -> Dictionary:
 		"enemy_range":{"minimum":MIN_ENEMIES,"maximum":MAX_ENEMIES,"target":TARGET_ENEMIES},
 		"target_viewport":{"width":1920,"height":1080},
 		"required_metrics":required_metrics,
-		"required_cycles":3,
+		"required_cycles":REQUIRED_QUALIFICATION_CYCLES,
 		"cycle_protocol":["prepare","advance","reset"],
 		"bounded_history_cap":SAMPLE_HISTORY_CAP,
 		"fixtures":{"valid":valid,"duplicate":duplicate,"incomplete":incomplete,"timeout":timeout,"reset_isolation_failure":reset_failure},

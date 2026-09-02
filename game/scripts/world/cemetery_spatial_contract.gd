@@ -97,7 +97,10 @@ func _ready() -> void:
 			landmark.collision_layer = 2
 			landmark.collision_mask = 1
 			landmark.set_meta("gameplay_collision", true)
-			landmark.set_meta("camera_visibility_blocker", false)
+			# Trees may cross a sight lane and are eligible for the camera's
+			# bounded reversible fade.  Keeper/bell collision remains solid but is
+			# never treated as a blocker because it is the landmark being read.
+			landmark.set_meta("camera_visibility_blocker", path.contains("Tree"))
 	# The complete cemetery is authored with a native local datum.  Rebase the
 	# instance once at runtime so nested scene overrides cannot regress the
 	# release framing back to the old camera-sized pad.

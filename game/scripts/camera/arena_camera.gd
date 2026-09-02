@@ -67,6 +67,12 @@ extends Camera3D
 @export var coverage_settle_seconds := 0.28
 @export var tall_occluders: Array[NodePath] = []
 @export var direct_sight_volume_radius := 0.9
+## Only bodies explicitly marked as camera sight-lane blockers may participate
+## in the selective fade.  Gameplay collision bodies (including the broad
+## mausoleum footprint) stay solid for traversal but can never become a
+## whole-landmark occluder merely because an inherited scene override restores
+## a default collision layer.
+@export var require_camera_visibility_blocker_meta := true
 
 ## Multi-subject projection is the most expensive camera-side query during a
 ## dense wave (each subject projects an 8-corner actor volume twice per frame).
@@ -181,7 +187,8 @@ func _normalize_occluder_bindings() -> void:
 	# never fade the landmark that actually crossed the Warden sightline.  This
 	# rebase is runtime-only and does not touch the intact imported package.
 	var pairs := [
-		[NodePath("../CemeteryGarden/OuterDatum/MausoleumCollision"), NodePath("../CemeteryGarden/PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/Crypt")],
+		# MausoleumCollision is intentionally omitted: it remains authoritative
+		# gameplay geometry, never a camera sight-lane blocker.
 		[NodePath("../CemeteryGarden/OuterDatum/NortheastTreeCollision"), NodePath("../CemeteryGarden/PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/DeadTree3")],
 		[NodePath("../CemeteryGarden/OuterDatum/NorthwestTreeCollision"), NodePath("../CemeteryGarden/PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/DeadTree")],
 		[NodePath("../CemeteryGarden/OuterDatum/SoutheastTreeCollision"), NodePath("../CemeteryGarden/PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/DeadTree2")],
@@ -525,6 +532,8 @@ func _find_registered_subject_occluder(subject: Node3D) -> String:
 		# probing is intentionally isolated to its own physics mask.  Bodies on
 		# the gameplay layer must never classify as camera occluders.
 		var body := binding.get("body") as CollisionObject3D
+		if require_camera_visibility_blocker_meta and (not is_instance_valid(body) or not bool(body.get_meta("camera_visibility_blocker", false))):
+			continue
 		if is_instance_valid(body) and (int(body.collision_layer) & camera_visibility_collision_mask) == 0:
 			continue
 		var visual_bounds: AABB = binding.get("visual_bounds", AABB())
