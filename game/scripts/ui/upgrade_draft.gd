@@ -44,6 +44,7 @@ const CARD_OFFSETS := [0.0, 346.0, 692.0]
 const MAX_DECISION_DELTAS := 3
 const SURFACE_CONTRACT_REVISION := "upgrade_draft_icon_led_v4"
 const DRAFT_AFFORDANCE_REVISION := "upgrade_draft_focus_affordance_v5"
+const FOCUS_VISUAL_CONTRACT_REVISION := "upgrade_draft_focus_visual_v6"
 
 @onready var title_label: Label = $Title
 @onready var subtitle_label: Label = $Subtitle
@@ -100,6 +101,15 @@ func _apply_surface_contract() -> void:
 		# Keep the authored icon-led card as the sole actionable surface while
 		# exposing the same confirm affordance used by keyboard/gamepad focus.
 		buttons[index].tooltip_text = "Select vigil %d  •  ENTER / SOUTH BUTTON" % (index + 1)
+		# Keep keyboard/gamepad focus visibly distinct from hover and pressed
+		# states without changing the authored card dimensions or hierarchy.
+		buttons[index].add_theme_color_override("font_focus_color", Color("f8e8b0"))
+		buttons[index].set_meta("focus_visual_contract", {
+			"revision": FOCUS_VISUAL_CONTRACT_REVISION,
+			"focus_state": "moon_silver_outline",
+			"hover_state": "lantern_gold_tint",
+			"pressed_state": "selected_violet_tint",
+		})
 		# Bind the visual reading order to each actionable card so focus-state
 		# presentation and assistive inspection share the same icon-first
 		# hierarchy as the shipped draft surface.

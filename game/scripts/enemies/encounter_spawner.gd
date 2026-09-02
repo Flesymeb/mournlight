@@ -114,11 +114,17 @@ func _ready() -> void:
 		actor.vitality_bar.visibility_state_changed.connect(_on_vitality_visibility_changed)
 		_pool.append(actor)
 	set_process(false)
+	_sync_playable_datum()
 
 func _exit_tree() -> void:
 	_clear_retirement_tweens()
 
 func begin_encounter() -> void:
+	# The cemetery contract is rebound from the intact authored package after
+	# import. Keep the spawner's exposed datum in that same world space instead
+	# of leaving serialized fallback bounds in runtime snapshots or fallback
+	# validation paths.
+	_sync_playable_datum()
 	reset_encounter(true)
 	active = true
 	encounter_id += 1
@@ -129,6 +135,7 @@ func begin_encounter() -> void:
 	_emit_snapshot()
 
 func configure_pressure(definition: Dictionary) -> void:
+	_sync_playable_datum()
 	var next_wave_id := String(definition.get("id", "wave"))
 	if next_wave_id != _wave_id:
 		_wave_id = next_wave_id
@@ -150,6 +157,27 @@ func configure_pressure(definition: Dictionary) -> void:
 	_spawn_cooldown = minf(_spawn_cooldown, cadence)
 	set_meta("spawn_cadence", cadence)
 	set_meta("initial_spawn_count", clampi(int(definition.get("initial_spawns", 6)), 1, live_cap))
+
+func _sync_playable_datum() -> void:
+	if not is_instance_valid(arena_contract):
+		return
+	var rect := arena_contract.get_playable_rect()
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	playable_min = rect.position
+	playable_max = rect.end
+	playable_half_extents = rect.size * 0.5
+	minimum_player_safe_radius = arena_contract.minimum_player_safe_radius
+	protected_camera_half_extents = arena_contract.protected_camera_half_extents
+	set_meta("spatial_datum_binding", {
+		"source":"CemeterySpatialContract",
+		"transform_space":"authored_package_world",
+		"playable_min":playable_min,
+		"playable_max":playable_max,
+		"playable_half_extents":playable_half_extents,
+		"minimum_player_safe_radius":minimum_player_safe_radius,
+		"protected_camera_half_extents":protected_camera_half_extents,
+	})
 
 func stop_encounter() -> void:
 	end_validation_profile_cohort("encounter_stopped")
