@@ -40,9 +40,15 @@ var _presentation_serial := 0
 const CARD_SIZE := Vector2(328, 522)
 const CARD_OFFSETS := [0.0, 346.0, 692.0]
 const MAX_DECISION_DELTAS := 3
+const SURFACE_CONTRACT_REVISION := "upgrade_draft_icon_led_v3"
+
+@onready var title_label: Label = $Title
+@onready var subtitle_label: Label = $Subtitle
+@onready var footer_label: Label = $Footer
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_apply_surface_contract()
 	cards_container.pivot_offset = Vector2(510, 261)
 	for index in buttons.size():
 		_build_card_content(buttons[index])
@@ -70,6 +76,19 @@ func _ready() -> void:
 		buttons[index].button_up.connect(_set_pressed.bind(index, false))
 	visible = false
 	_layout_cards()
+
+func _apply_surface_contract() -> void:
+	# Keep the authored page hierarchy explicit at runtime: the explanatory
+	# labels never intercept card input, while each fixed card remains the sole
+	# focusable/hoverable choice surface.  This is intentionally applied by the
+	# presenter so scene reloads and UI-scale changes retain the same contract.
+	title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	subtitle_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	footer_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cards_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cards_container.clip_contents = false
+	for index in buttons.size():
+		buttons[index].tooltip_text = "Select vigil %d" % (index + 1)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED and is_instance_valid(cards_container):

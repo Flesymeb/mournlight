@@ -35,9 +35,12 @@ extends Node3D
 @onready var external_depth: Node3D = $ExternalDepth
 var uv_binding_receipt: Dictionary = {}
 var datum_binding_receipt: Dictionary = {}
+var _deferred_rebind_requested := false
+var _late_rebind_attempted := false
 
 const AUTHORED_LOCAL_MIN := Vector2(-12.143, -11.415)
 const AUTHORED_LOCAL_MAX := Vector2(12.149, 11.418)
+const OBJECTIVE_ANCHOR_IDS := [&"TargetAnchorA", &"TargetAnchorB"]
 
 func _ready() -> void:
 	set_meta("camera_visibility_collision_mask", camera_visibility_collision_mask)
@@ -124,6 +127,11 @@ func _ready() -> void:
 	# immutable instance; only candidate-owned collision, navigation metadata,
 	# spawn/route markers, and perimeter bodies are authored from its world AABBs.
 	_bind_outer_datum_to_authored_package()
+	# Imported GLB children can finish instantiating one frame after this node's
+	# _ready(). Re-run the same authoritative datum bind once meshes are present;
+	# this prevents objective/spawn/perimeter markers from staying on the small
+	# serialized fallback pad while the rendered package has already expanded.
+	call_deferred("_deferred_spatial_rebind")
 	# Expose the measured traversal envelope as immutable runtime metadata so
 	# host evidence can bind movement distance and time-to-cross without parsing
 	# presentation-only text or inferring scale from a screenshot.
@@ -152,6 +160,19 @@ func _ready() -> void:
 			"runtime_binding":"AuthoredCemeteryPackage",
 			"integration_repair":"none",
 		}
+
+func _process(_delta: float) -> void:
+	# A streamed/imported GLB may expose its MeshInstance3D children only after
+	# the first process tick. If the initial fallback datum was too small, bind
+	# once as soon as the rendered AABB is available so objective anchors and the
+	# perimeter never remain on serialized pre-expansion coordinates.
+	if _late_rebind_attempted:
+		return
+	var visual_rect := get_authored_visual_rect()
+	if visual_rect.size.x <= authored_playable_inset * 2.0 or visual_rect.size.y <= authored_playable_inset * 2.0:
+		return
+	_late_rebind_attempted = true
+	_bind_outer_datum_to_authored_package()
 
 func _calibrate_authored_visibility() -> void:
 	# The bound GLB carries zero-sized imported custom AABBs on several meshes.
@@ -200,6 +221,7 @@ func _bind_outer_datum_to_authored_package() -> void:
 		tree_receipts[key] = _bind_tree_collision_to_visual(String(tree_bodies[key]), tree_bounds)
 	var spawn_z := minf(playable.end.y - 5.0, maxf(visual_rect.get_center().y + 6.0, crypt_bounds.end.z + 10.0 if crypt_bound else visual_rect.get_center().y + 7.0))
 	player_spawn.global_position = Vector3(visual_rect.get_center().x, 0.05, spawn_z)
+	_bind_objective_anchors(playable, crypt_bounds)
 	_bind_route_checkpoints(playable, crypt_bounds)
 	var navigation := get_node_or_null("OuterDatum/NativeNavigationRegion") as NavigationRegion3D
 	if is_instance_valid(navigation):
@@ -213,12 +235,80 @@ func _bind_outer_datum_to_authored_package() -> void:
 		"playable_rect":playable,
 		"external_depth":authored_playable_inset,
 		"player_spawn":player_spawn.global_position,
+		"objective_anchors":get_objective_anchors(),
 		"mausoleum":{"visual_path":crypt_path,"bounds":crypt_bounds,"collision_bound":crypt_bound},
 		"trees":tree_receipts,
 		"perimeter_bound":true,
 		"navigation_metadata_bound":is_instance_valid(navigation),
 		"imported_children_modified":false,
 	}
+
+func _deferred_spatial_rebind() -> void:
+	if _deferred_rebind_requested:
+		return
+	_deferred_rebind_requested = true
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if _late_rebind_attempted:
+		return
+	var visual_rect := get_authored_visual_rect()
+	if visual_rect.size.x <= authored_playable_inset * 2.0 or visual_rect.size.y <= authored_playable_inset * 2.0:
+		return
+	# The bind is idempotent and only updates candidate-owned datum/collision
+	# markers; the intact imported package remains a single authoritative node.
+	_bind_outer_datum_to_authored_package()
+	set_meta("deferred_rebind", {"performed":true, "visual_rect":visual_rect})
+
+func _bind_objective_anchors(playable: Rect2, crypt_bounds: AABB) -> void:
+	# Objective markers are candidate-owned traversal datums. Rebase them beside
+	# the authored keeper/bell landmarks after the intact package wrapper is
+	# resolved, so host movement evidence can follow one transform space instead
+	# of stale scene-local coordinates from the pre-expansion combat pad.
+	var center := playable.get_center()
+	var keeper := get_node_or_null("OuterDatum/KeeperLanternPostAnchor") as Node3D
+	var bell := get_node_or_null("OuterDatum/CrackedMoonBellAnchor") as Node3D
+	var keeper_pos := keeper.global_position if is_instance_valid(keeper) else Vector3(center.x - playable.size.x * 0.28, 0.05, center.y)
+	var bell_pos := bell.global_position if is_instance_valid(bell) else Vector3(center.x + playable.size.x * 0.28, 0.05, playable.position.y + playable.size.y * 0.18)
+	# Keep the first objective on the keeper approach and the second on the
+	# north/bell approach. The mausoleum footprint remains collision-authoritative
+	# and is used only to keep the route outside its visible bounds.
+	var positions := [
+		Vector3(keeper_pos.x, 0.05, keeper_pos.z + 2.6),
+		Vector3(bell_pos.x, 0.05, bell_pos.z + 2.6),
+	]
+	for index in OBJECTIVE_ANCHOR_IDS.size():
+		var marker := get_node_or_null("OuterDatum/%s" % OBJECTIVE_ANCHOR_IDS[index]) as Marker3D
+		if not is_instance_valid(marker):
+			continue
+		var objective: Vector3 = positions[index] as Vector3
+		if crypt_bounds.size.length_squared() > 0.001 and index == 0:
+			# Avoid placing the keeper objective inside the central mausoleum's
+			# expanded footprint when an imported package shifts its facade.
+			if Rect2(crypt_bounds.position.x, crypt_bounds.position.z, crypt_bounds.size.x, crypt_bounds.size.z).has_point(Vector2(objective.x, objective.z)):
+				objective.x = crypt_bounds.end.x + 3.5
+		objective.x = clampf(objective.x, playable.position.x + 1.5, playable.end.x - 1.5)
+		objective.z = clampf(objective.z, playable.position.y + 1.5, playable.end.y - 1.5)
+		marker.global_position = objective
+
+func get_objective_anchors() -> Array[Dictionary]:
+	var playable := get_playable_rect()
+	var result: Array[Dictionary] = []
+	for anchor_id in OBJECTIVE_ANCHOR_IDS:
+		var marker := get_node_or_null("OuterDatum/%s" % anchor_id) as Marker3D
+		if not is_instance_valid(marker):
+			result.append({"id":String(anchor_id), "bound":false, "inside_playable":false})
+			continue
+		var position := marker.global_position
+		result.append({
+			"id":String(anchor_id),
+			"path":"OuterDatum/%s" % anchor_id,
+			"position":position,
+			"bound":true,
+			"inside_playable":playable.has_point(Vector2(position.x, position.z)),
+			"distance_from_spawn":position.distance_to(player_spawn.global_position),
+			"transform_space":"authored_package_world",
+		})
+	return result
 
 func _bind_perimeter_to_world_rect(playable: Rect2) -> void:
 	var center := playable.get_center()
@@ -719,6 +809,7 @@ func get_snapshot() -> Dictionary:
 	var external_visual := get_visual_subtree_aabb("ExternalDepth")
 	var fill := get_camera_fill_rect()
 	var landmark_alignment := _landmark_alignment_receipt()
+	var objective_anchors := get_objective_anchors()
 	var playable_inside_authored := playable.position.x > visual.position.x and playable.end.x < visual.end.x and playable.position.y > visual.position.y and playable.end.y < visual.end.y
 	var perimeter_present := is_instance_valid(north_boundary) and is_instance_valid(south_boundary) and is_instance_valid(east_boundary) and is_instance_valid(west_boundary)
 	var landmarks_aligned := true
@@ -769,6 +860,14 @@ func get_snapshot() -> Dictionary:
 		"external_depth_bounds":external_visual,
 		"external_depth_node":"ExternalDepth",
 		"spawn_lane_count":get_spawn_lanes().size(),
+		"objective_anchors":objective_anchors,
+		"objective_binding":{
+			"anchor_count":objective_anchors.size(),
+			"all_bound":objective_anchors.size() == OBJECTIVE_ANCHOR_IDS.size() and objective_anchors.all(func(anchor: Dictionary) -> bool: return bool(anchor.get("bound", false))),
+			"all_inside_playable":objective_anchors.size() == OBJECTIVE_ANCHOR_IDS.size() and objective_anchors.all(func(anchor: Dictionary) -> bool: return bool(anchor.get("inside_playable", false))),
+			"transform_space":"authored_package_world",
+			"source":"candidate_owned_objective_markers",
+		},
 		"route_checkpoints":get_route_checkpoints(),
 		"route_checkpoint_count":get_route_checkpoints().size(),
 		"protected_camera_half_extents":protected_camera_half_extents,
