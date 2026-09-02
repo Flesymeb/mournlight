@@ -126,4 +126,14 @@ func _selection_digest() -> Dictionary:
 			if String(weapon.get("weapon_id", "")) == String(card.weapon):
 				post_weapon = weapon
 				break
-	return {"id":card.id, "current":card.current, "advertised_result":card.result, "effect_lines":card.effect_lines, "application_accepted":application.get("accepted", false), "matches_projection":application.get("matches_projection", false), "post_weapon":post_weapon}
+	return {
+		"id":card.id,
+		"rank":int(card.get("rank", 0)),
+		"current":card.current,
+		"advertised_result":card.result,
+		"effect_lines":card.effect_lines,
+		"applied_modifier":card.get("changes", []),
+		"application_accepted":application.get("accepted", false),
+		"matches_projection":application.get("matches_projection", false),
+		"post_weapon":post_weapon,
+	}

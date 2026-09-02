@@ -37,6 +37,7 @@ func begin_run(run_serial: int, route_kind: String, started_from: String) -> voi
 		"boss_events":[],
 		"diagnostic_jump_count":0,
 		"terminal":{},
+		"terminal_commit_count":0,
 		"result_presented":false,
 		"retry_observed":false,
 		"title_return_observed":false,
@@ -87,6 +88,13 @@ func record_terminal(terminal: Dictionary, wave_snapshot: Dictionary) -> void:
 	if not current_run.is_empty() and not (current_run.get("terminal", {}) as Dictionary).is_empty():
 		_record_diagnostic("terminal_commit_duplicate", float(terminal.get("elapsed", 0.0)), {"run_serial":terminal.get("commit_run_serial", -1),"commit_count":terminal.get("commit_count", 0)})
 		return
+	# Deferred result callbacks must never write a terminal snapshot into a newer
+	# retry/title run. Treat a mismatched commit serial as diagnostic evidence and
+	# leave the authoritative current run untouched.
+	var commit_serial := int(terminal.get("commit_run_serial", current_run.get("run_serial", -1)))
+	if not current_run.is_empty() and commit_serial != int(current_run.get("run_serial", -1)):
+		_record_diagnostic("terminal_commit_stale_run", float(terminal.get("elapsed", 0.0)), {"commit_run_serial":commit_serial,"current_run_serial":current_run.get("run_serial", -1)})
+		return
 	var route_kind := String(terminal.get("route_kind", ""))
 	var diagnostic_jumps := int(wave_snapshot.get("diagnostic_jump_count", 0))
 	if route_kind != "ordinary" or diagnostic_jumps != 0:
@@ -102,7 +110,9 @@ func record_terminal(terminal: Dictionary, wave_snapshot: Dictionary) -> void:
 	truthful["ordinary_failure_eligible"] = _ordinary_failure_eligible(truthful)
 	truthful["ordinary_victory_eligible"] = _ordinary_victory_eligible(truthful)
 	truthful["ordinary_build_eligible"] = _ordinary_build_eligible(truthful)
+	truthful["terminal_commit_count"] = int(terminal.get("commit_count", 1))
 	current_run["terminal"] = truthful
+	current_run["terminal_commit_count"] = truthful["terminal_commit_count"]
 	current_run["wave_ids"] = truthful["ordered_wave_ids"]
 	(current_run["milestones"] as Array).append(_milestone("terminal_commit", float(terminal.get("elapsed", 0.0)), {"outcome":terminal.get("outcome", ""),"commit_count":terminal.get("commit_count",0)}))
 	_append_completed_row()

@@ -67,9 +67,10 @@ func _ready() -> void:
 	set_meta("landmark_sight_lane_margin", landmark_sight_lane_margin)
 	set_meta("landmark_collision_contract", {
 		"source": "AuthoredCemeteryPackage",
-		"collision_layer": 2,
+		"collision_layer": 4,
 		"gameplay_mask": 7,
 		"camera_query_mask": camera_visibility_collision_mask,
+		"camera_query_blockers": "trees_only",
 		"perimeter_bound_to_visual_aabb": true,
 	})
 	if is_instance_valid(external_depth):
@@ -117,16 +118,18 @@ func _ready() -> void:
 		mausoleum_collision.collision_mask = 1
 		mausoleum_collision.set_meta("gameplay_collision", true)
 		mausoleum_collision.set_meta("camera_visibility_blocker", false)
-	for path in ["OuterDatum/NortheastTreeCollision", "OuterDatum/NorthwestTreeCollision", "OuterDatum/SoutheastTreeCollision", "OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision", "OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision"]:
+	# Only tall trees are camera sight-lane occluders. Keeper/bell collision is
+	# gameplay-solid but must not self-occlude the landmark being inspected.
+	for path in ["OuterDatum/NortheastTreeCollision", "OuterDatum/NorthwestTreeCollision", "OuterDatum/SoutheastTreeCollision"]:
 		var landmark := get_node_or_null(path) as StaticBody3D
 		if is_instance_valid(landmark):
 			landmark.collision_layer = 2
 			landmark.collision_mask = 1
 			landmark.set_meta("gameplay_collision", true)
 			# Trees may cross a sight lane and are eligible for the camera's
-			# bounded reversible fade.  Keeper/bell collision remains solid but is
-			# never treated as a blocker because it is the landmark being read.
-			landmark.set_meta("camera_visibility_blocker", path.contains("Tree"))
+			# bounded reversible fade. Their layer-2 shapes are excluded from normal
+			# landmark geometry; keeper/bell bodies remain on gameplay layer 4.
+			landmark.set_meta("camera_visibility_blocker", true)
 	# The complete cemetery is authored with a native local datum.  Rebase the
 	# instance once at runtime so nested scene overrides cannot regress the
 	# release framing back to the old camera-sized pad.
@@ -865,8 +868,9 @@ func _landmark_alignment_receipt() -> Dictionary:
 			"visual_collision_offset":offset,
 			"footprint":_shape_world_half_extents(shape),
 			"visual_reference_path":"PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/Crypt" if key == "mausoleum" else "OuterDatum/%s" % pair[2],
-			"visual_reference_bound":is_instance_valid(get_node_or_null("PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/Crypt")) if key == "mausoleum" else is_instance_valid(visual),
-			"aligned":is_instance_valid(anchor) and is_instance_valid(body) and is_instance_valid(shape) and is_instance_valid(visual) and body_offset <= 0.05 and offset <= 0.1,
+				"visual_reference_bound":is_instance_valid(get_node_or_null("PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/Crypt")) if key == "mausoleum" else is_instance_valid(visual),
+				"camera_visibility_blocker":false,
+				"aligned":is_instance_valid(anchor) and is_instance_valid(body) and is_instance_valid(shape) and is_instance_valid(visual) and body_offset <= 0.05 and offset <= 0.1,
 		}
 	return result
 
@@ -905,7 +909,7 @@ func get_snapshot() -> Dictionary:
 		# enemy masks include this layer, while camera coverage mask 2 audits only
 		# explicit boundary markers without treating the gameplay shell as a
 		# central building as a physics occluder.
-		"collision_layers":{"ground":4,"perimeter":4,"landmarks":2,"mausoleum_gameplay":4,"camera_query_excluded":camera_visibility_collision_mask,"navigation":0},
+		"collision_layers":{"ground":4,"perimeter":4,"landmarks":4,"camera_visibility_blockers":2,"mausoleum_gameplay":4,"camera_query_excluded":camera_visibility_collision_mask,"navigation":0},
 		"navigation_region":{"path":"OuterDatum/NativeNavigationRegion","layers":1,"source":"native_authored_streets","enabled":is_instance_valid(get_node_or_null("OuterDatum/NativeNavigationRegion"))},
 		"playable_rect":playable,
 		"playable_area":playable.size.x * playable.size.y,

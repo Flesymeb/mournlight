@@ -632,8 +632,16 @@ func _apply_card_style(index: int, state: String) -> void:
 		style.border_color = Color(0.88, 0.91, 0.78, 1.0)
 		style.bg_color = Color(0.045, 0.06, 0.075, 0.98)
 	elif "HOVER" in state or state.begins_with("PRESSED"):
-		style.border_color = Color(0.43, 0.96, 0.86, 1.0)
-		style.bg_color = Color(0.035, 0.065, 0.072, 0.97)
+		if state.begins_with("PRESSED"):
+			# Pressed is a transient confirmation affordance, not a second hover
+			# state. Keep the card dimensions fixed while giving the release edge a
+			# warm inset treatment that remains distinct from pointer and focus.
+			style.border_color = Color(0.98, 0.67, 0.28, 1.0)
+			style.bg_color = Color(0.12, 0.055, 0.035, 0.98)
+		else:
+			# Pointer hover remains cool teal and does not impersonate a commit.
+			style.border_color = Color(0.43, 0.96, 0.86, 1.0)
+			style.bg_color = Color(0.035, 0.065, 0.072, 0.97)
 	elif state == "NEW WEAPON":
 		style.border_color = Color(0.72, 0.57, 0.95, 0.95)
 	elif state in ["UNAVAILABLE", "CHOICE LOCKED"]:
