@@ -67,6 +67,8 @@ roughness = 0.9
 
 [node name="CemeteryGarden" type="Node3D" unique_id=220135597 groups=["authored_environment", "mcp_watch"]]
 script = ExtResource("4_spatial_contract")
+metadata/spatial_binding = "single_authored_package_plus_additive_outer_datum_v2"
+metadata/outer_datum_source = "rendered_package_aabb"
 
 [node name="PackageTransform" type="Node3D" parent="." unique_id=1533547498]
 transform = Transform3D(4.602, 0, 0, 0, 4.602, 0, 0, 0, 4.602, 0.28, 0.02, 0)
@@ -75,6 +77,7 @@ transform = Transform3D(4.602, 0, 0, 0, 4.602, 0, 0, 0, 4.602, 0.28, 0.02, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -66.8727)
 
 [node name="OuterDatum" type="Node3D" parent="." unique_id=227997051]
+metadata/spatial_binding_version = 2
 
 [node name="ExternalDepth" type="Node3D" parent="." unique_id=227997052 groups=["external_world_depth"]]
 metadata/non_playable = true

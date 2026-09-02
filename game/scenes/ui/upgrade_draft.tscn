@@ -13,6 +13,8 @@ grow_horizontal = 2
 grow_vertical = 2
 theme = ExtResource("2")
 script = ExtResource("1")
+metadata/presentation_contract = "authored_icon_led_current_to_new_v2"
+metadata/decision_delta_limit = 3
 
 [node name="Shade" type="ColorRect" parent="."]
 layout_mode = 1
@@ -32,7 +34,7 @@ offset_top = 75.0
 offset_bottom = 128.0
 text = "CHOOSE A VIGIL"
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 34
+theme_override_font_sizes/font_size = 35
 
 [node name="Subtitle" type="Label" parent="."]
 layout_mode = 1

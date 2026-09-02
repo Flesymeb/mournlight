@@ -295,7 +295,7 @@ func _definition(index: int) -> Dictionary:
 		return {}
 	var ids: PackedStringArray = _meta_string_array("wave_ids", PackedStringArray(["first_toll", "crossing_shadows", "gravewind", "long_procession", "bellkeeper"]))
 	var titles: PackedStringArray = _meta_string_array("wave_titles", PackedStringArray(["The First Toll", "Crossing Shadows", "Gravewind", "The Long Procession", "The Bellkeeper"]))
-	var durations: PackedFloat32Array = _meta_float_array("durations", PackedFloat32Array([20.0, 70.0, 100.0, 110.0, 120.0]))
+	var durations: PackedFloat32Array = _meta_float_array("durations", PackedFloat32Array([30.0, 85.0, 130.0, 165.0, 120.0]))
 	var caps: PackedInt32Array = _meta_int_array("live_caps", PackedInt32Array([6, 14, 18, 36, 32]))
 	var cadences: PackedFloat32Array = _meta_float_array("cadences", PackedFloat32Array([1.9, 1.15, 0.98, 0.58, 0.48]))
 	var budgets: PackedInt32Array = _meta_int_array("spawn_budgets", PackedInt32Array([22, 46, 60, 120, 128]))
