@@ -117,6 +117,9 @@ func _apply_surface_contract() -> void:
 		# hierarchy as the shipped draft surface.
 		buttons[index].set_meta("choice_hierarchy", ["icon", "title", "rank", "decision_deltas", "consequence"])
 		buttons[index].set_meta("surface_revision", SURFACE_CONTRACT_REVISION)
+		# Keep the authored card contract discoverable to accessibility and
+		# runtime evidence consumers without adding extra decision rows.
+		buttons[index].set_meta("decision_delta_cap", MAX_DECISION_DELTAS)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED and is_instance_valid(cards_container):

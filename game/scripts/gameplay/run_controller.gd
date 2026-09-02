@@ -1249,6 +1249,10 @@ func _open_upgrade_draft() -> void:
 		var wave_snapshot := wave_director.get_snapshot()
 		var resume_state := "boss" if is_instance_valid(boss) or int(wave_snapshot.get("wave", 0)) == 5 else "active"
 		_transition(resume_state)
+		# Keep the authoritative router state aligned even when a tester invokes
+		# the transaction boundary while the tree is frozen (there is no process
+		# tick available to perform the usual deferred context sync).
+		input_router._sync_context()
 		_pending_levelup_transactions = maxi(0, _pending_levelup_transactions - 1)
 		upgrade_transaction_receipt["phase"] = "rejected_no_eligible_choices"
 		upgrade_transaction_receipt["resume_state"] = resume_state
@@ -1302,6 +1306,10 @@ func _on_draft_choice(index: int) -> void:
 	# after the selected upgrade is committed.
 	var resume_state := "boss" if is_instance_valid(boss) or int(wave_state.get("wave", 0)) == 5 else "active"
 	_transition(resume_state)
+	# The draft owns a paused tree, so synchronize immediately before emitting
+	# the resolved receipt; this makes the selected upgrade and active input
+	# context observable in the same authoritative frame for tester recapture.
+	input_router._sync_context()
 	upgrade_transaction_receipt["phase"] = "resolved"
 	upgrade_transaction_receipt["resolved"] = true
 	upgrade_transaction_receipt["applied_upgrade_id"] = String(choice.get("id", ""))

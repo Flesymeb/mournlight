@@ -66,6 +66,9 @@ func _ready() -> void:
 	set_meta("route_spatial_revision", "release_convergence_native_route_v6")
 	set_meta("route_rebind_revision", ROUTE_REBIND_REVISION)
 	set_meta("publication_spatial_revision", PUBLICATION_SPATIAL_REVISION)
+	# Publish the authored traversal landmarks as one stable route contract so
+	# camera coverage and movement replay bind to the same world-space anchors.
+	set_meta("route_landmark_ids", ["KeeperLanternPost", "SmallMausoleum", "CrackedMoonBell"])
 	set_meta("landmark_sight_lane_margin", landmark_sight_lane_margin)
 	set_meta("landmark_collision_contract", {
 		"source": "AuthoredCemeteryPackage",
