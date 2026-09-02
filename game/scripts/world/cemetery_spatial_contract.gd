@@ -6,7 +6,11 @@ extends Node3D
 @export var minimum_player_safe_radius := 10.5
 @export var spawn_clearance := 0.6
 @export var native_map_scale := 1.95
-@export var authored_wrapper_scale_multiplier := 2.36
+## Keep the complete authored package's external depth visibly continuous at
+## the shipped high-angle perimeter views. This wrapper datum is intentionally
+## product-owned; the imported cemetery remains one intact instance and the
+## additive collision/navigation shell is rebound from its resulting bounds.
+@export var authored_wrapper_scale_multiplier := 2.4
 ## Keep a measurable non-playable world band around the authored streets so
 ## perimeter camera views retain cemetery depth instead of exposing an abrupt
 ## edge. This datum is consumed by perimeter, spawn, and route binding.
@@ -48,7 +52,7 @@ var _late_rebind_attempted := false
 const AUTHORED_LOCAL_MIN := Vector2(-12.143, -11.415)
 const AUTHORED_LOCAL_MAX := Vector2(12.149, 11.418)
 const OBJECTIVE_ANCHOR_IDS := [&"TargetAnchorA", &"TargetAnchorB"]
-const ROUTE_REBIND_REVISION := "cemetery_authored_route_rebind_v7"
+const ROUTE_REBIND_REVISION := "cemetery_authored_route_rebind_v8"
 
 func _ready() -> void:
 	set_meta("camera_visibility_collision_mask", camera_visibility_collision_mask)

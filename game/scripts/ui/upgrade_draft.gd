@@ -383,6 +383,12 @@ func _build_card_content(button: Button) -> void:
 	_icon_nodes.append(icon)
 	var title_label := Label.new()
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	# Keep long authored upgrade names inside the fixed card slot at native and
+	# windowed scales. Wrapping is preferable to clipping or renegotiating the
+	# sibling card widths, and the two-line budget preserves the icon-led order.
+	title_label.custom_minimum_size = Vector2(0, 42)
+	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title_label.max_lines_visible = 2
 	title_label.add_theme_font_size_override("font_size", 20)
 	title_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.48))
 	title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -595,6 +601,10 @@ func _refresh_card_state(index: int) -> void:
 	elif input_device == "mouse" and _hovered[index]: state = "MOUSE HOVER  •  CLICK TO CHOOSE"
 	elif buttons[index].has_focus() and input_device in ["keyboard", "gamepad"]: state = ("GAMEPAD FOCUS" if input_device == "gamepad" else "KEYBOARD FOCUS") + "  •  CONFIRM TO CHOOSE"
 	elif _hovered[index]: state = "MOUSE HOVER  •  CLICK TO CHOOSE"
+	# Newly unlocked cards keep a distinct eligibility state when they are idle.
+	# This branch must precede the generic AVAILABLE fallback so the authored
+	# silhouette/header can communicate an unlock without relying on a hidden
+	# controller flag or placeholder numeric value.
 	elif newly_unlocked: state = "NEW WEAPON"
 	_state_nodes[index].text = state
 	_apply_card_style(index, state)
