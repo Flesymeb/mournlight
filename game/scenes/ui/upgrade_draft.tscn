@@ -38,6 +38,7 @@ offset_top = 75.0
 offset_bottom = 128.0
 text = "CHOOSE A VIGIL"
 horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.96,0.91,0.72,1)
 theme_override_font_sizes/font_size = 35
 
 [node name="Subtitle" type="Label" parent="."]
@@ -48,6 +49,7 @@ offset_top = 130.0
 offset_bottom = 164.0
 text = "THE NIGHT HOLDS ITS BREATH"
 horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.69,0.55,0.92,1)
 
 [node name="Cards" type="Control" parent="."]
 layout_mode = 1

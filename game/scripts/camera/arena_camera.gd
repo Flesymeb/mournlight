@@ -5,8 +5,8 @@ extends Camera3D
 @export var arena_contract: CemeterySpatialContract
 @export var follow_height := 25.0
 @export var follow_distance := 25.0
-## Fixed three-quarter azimuth keeps the Warden out of the mausoleum's stair
-## silhouette while retaining a high-angle escape-lane read.  The rig still
+## Fixed south-lane azimuth keeps the Warden out of the mausoleum's stair
+## silhouette while retaining a high-angle escape-lane read. The rig still
 ## follows the player; this is only the authored lateral offset of that rig.
 @export var follow_lateral := 5.0
 @export var follow_damping := 8.5
@@ -165,17 +165,12 @@ func _ready() -> void:
 	# preserves the Warden in the lower safe lane while keeping both landmarks
 	# fully readable; it does not move authored geometry.
 	framing_bias = Vector3(0.0, 0.0, -2.0)
-	# A fixed three-quarter release azimuth keeps the mausoleum off the optical
-	# centre while the enlarged keeper post and cracked bell silhouettes remain
-	# in the same high-angle spawn composition. Mouse look still owns optional
-	# bounded yaw after this authored baseline.
-	# Place the shipped high-angle rig on the north sight lane.  The authored
-	# mausoleum sits south of the keeper/bell anchors; the previous south-east
-	# orbit put the tall crypt between the camera and all three landmarks,
-	# yielding an all-occluded coverage receipt and a visually dominant facade.
-	# A north-west three-quarter orbit keeps the Warden in the lower safe lane
-	# while the keeper post, bell, and mausoleum silhouettes separate in depth.
-	mouse_yaw_degrees = 270.0
+	# Place the shipped high-angle rig on the south sight lane. The previous
+	# west/east orbits put the tall crypt directly between the camera and the
+	# keeper/bell route, so the live frame read as a wall even though diagnostic
+	# coverage reported anchor markers visible. The south lane separates all
+	# three landmark silhouettes in the actual gameplay framebuffer.
+	mouse_yaw_degrees = 0.0
 	obstruction_lateral_bypass = 0.0
 	current = true
 	normal_fov = 78.0
@@ -810,10 +805,10 @@ func reset_occlusion_response() -> void:
 
 func reset_view() -> void:
 	"""Return the optional aim bias to the authored high-angle release datum."""
-	# The release datum is a three-quarter azimuth so the central mausoleum does
-	# not swallow the keeper post/bell sight lane at spawn. Subsequent mouse-look
+	# The release datum is a south-lane azimuth so the central mausoleum does not
+	# swallow the keeper post/bell sight lane at spawn. Subsequent mouse-look
 	# remains bounded around this authored baseline.
-	mouse_yaw_degrees = 270.0
+	mouse_yaw_degrees = 0.0
 	mouse_pitch_degrees = 49.0
 	_mouse_look_receipt.clear()
 	var router := get_node_or_null("../../InputContextRouter")

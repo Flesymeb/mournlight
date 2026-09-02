@@ -328,8 +328,8 @@ shape = SubResource("CrackedBellShape")
 [node name="BellLanternLight" type="OmniLight3D" parent="OuterDatum/CrackedMoonBellAnchor" unique_id=1665137444]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1, 0)
 light_color = Color(0.82, 0.25, 0.66, 1)
-light_energy = 1.65
-omni_range = 5.2
+light_energy = 3.0
+omni_range = 7.5
 
 [node name="StandingCoffinCollision" type="StaticBody3D" parent="OuterDatum" unique_id=1320701132]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.83, 1.4, -8.72)

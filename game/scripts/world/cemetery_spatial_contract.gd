@@ -56,6 +56,14 @@ const ROUTE_REBIND_REVISION := "cemetery_authored_route_rebind_v8"
 const PUBLICATION_SPATIAL_REVISION := "release_convergence_authored_datum_v8"
 
 func _ready() -> void:
+	# The cracked-bell package carries a large native-export offset inside its
+	# instanced root.  Rebind that root once so the rendered bell sits on the
+	# same authored anchor as its collision/light; scene-instance transform
+	# overrides are ignored by Godot for this packed landmark, so this is the
+	# candidate-owned integration datum rather than source-asset surgery.
+	var bell_asset := get_node_or_null("OuterDatum/CrackedMoonBellAnchor/CrackedBellAsset") as Node3D
+	if is_instance_valid(bell_asset):
+		bell_asset.position = Vector3(7.43, 0.0, -2.54)
 	set_meta("camera_visibility_collision_mask", camera_visibility_collision_mask)
 	set_meta("gameplay_collision_layer", 4)
 	set_meta("spatial_binding_strategy", "single_authored_package_plus_additive_outer_datum")
@@ -964,7 +972,7 @@ func get_snapshot() -> Dictionary:
 				# previous 46 m / 82 degree legacy values described a superseded
 				# overview rig and contradicted the live camera evidence even though
 				# collision and landmark bindings were correct.
-				"camera_profile":{"fov":78.0,"follow_height":25.0,"follow_distance":25.0,"follow_lateral":-4.0,"framing_bias":Vector3(0.0,0.0,-2.0),"yaw_degrees":34.0,"landmark_blend":0.18,"visibility_collision_mask":camera_visibility_collision_mask},
+				"camera_profile":{"fov":78.0,"follow_height":21.5,"follow_distance":21.5,"follow_lateral":-4.0,"framing_bias":Vector3(0.0,0.0,-2.0),"yaw_degrees":0.0,"landmark_blend":0.42,"visibility_collision_mask":camera_visibility_collision_mask},
 			"proxy_geometry_count":0,
 		},
 		"external_world":{"source":"intact_authored_package_plus_candidate_authored_distant_silhouette_ring", "procedural_scenery":false, "primitive_meshes":0, "external_dressing_nodes":6, "opaque":true, "non_playable_depth_beyond_all_edges":is_instance_valid(external_depth), "collision_enabled":false, "fog_depth_bound":true},
