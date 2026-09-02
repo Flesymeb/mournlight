@@ -104,7 +104,11 @@ func _process(delta: float) -> void:
 	if wave_index == _boss_wave_index() and not boss_spawned:
 		boss_entry_elapsed += delta
 		last_transition_receipt["boss_entry_elapsed"] = boss_entry_elapsed
-	var boss_route_ready := diagnostic_jump_count > 0 or _ordinary_route_complete()
+	# Natural Bellkeeper entry is gated by immutable completion receipts for the
+	# preceding pressure bands. This keeps a deferred/intermission callback from
+	# exposing the boss on a partially traversed ordinary route while diagnostics
+	# remain explicitly bypassable and ineligible for release qualification.
+	var boss_route_ready := diagnostic_jump_count > 0 or _ordinary_boss_entry_ready()
 	if wave_index == _boss_wave_index() and not boss_spawned and boss_request_count == 0 and boss_entry_elapsed >= BOSS_ENTRY_DELAY_SECONDS and boss_route_ready:
 		boss_spawned = true
 		boss_request_count += 1
@@ -225,6 +229,7 @@ func get_snapshot() -> Dictionary:
 		"ordinary_route_next_wave_id":next_wave_id,
 		"ordinary_route_contiguous":route_contiguous,
 		"ordinary_route_complete":route_complete,
+		"ordinary_boss_entry_ready":_ordinary_boss_entry_ready() or diagnostic_jump_count > 0,
 		"ordinary_route_eligible":route_complete and diagnostic_jump_count == 0,
 		"diagnostic_jump_count":diagnostic_jump_count,
 		"stale_transition_rejection_count":stale_transition_rejection_count,
@@ -251,6 +256,19 @@ func _ordinary_route_complete() -> bool:
 			return false
 	return true
 
+func _ordinary_boss_entry_ready() -> bool:
+	if not _ordinary_route_complete():
+		return false
+	var completed_ids: Dictionary = {}
+	for receipt_value in wave_completion_receipts:
+		var receipt: Dictionary = receipt_value
+		if bool(receipt.get("ordinary_progression", false)):
+			completed_ids[String(receipt.get("wave_id", ""))] = true
+	for required_id in ["first_toll", "crossing_shadows", "gravewind", "long_procession"]:
+		if not completed_ids.has(required_id):
+			return false
+	return wave_index == _boss_wave_index() and phase == "active"
+
 ## Compact, read-only receipt used by focused route checks and runtime probes.
 ## It reports the contiguous sequence, cap/budget ownership, and single boss
 ## request predicate without mutating director state.
@@ -263,6 +281,7 @@ func get_route_contract_receipt() -> Dictionary:
 		"contiguous": bool(snapshot.get("ordinary_route_contiguous", false)),
 		"complete": bool(snapshot.get("ordinary_route_complete", false)),
 		"eligible": bool(snapshot.get("ordinary_route_eligible", false)),
+		"boss_entry_ready": bool(snapshot.get("ordinary_boss_entry_ready", false)),
 		"live_cap": int(snapshot.get("enemy_cap", 0)),
 		"spawn_budget_remaining": int(snapshot.get("spawn_budget_remaining", 0)),
 		"boss_request_count": int(snapshot.get("boss_request_count", 0)),
