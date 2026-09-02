@@ -52,7 +52,8 @@ func _ready() -> void:
 	# Candidate-owned release receipt: the intact cemetery package, its native
 	# transform-space datum, and additive collision/navigation anchors are bound
 	# as one spatial contract for runtime inspection.
-	set_meta("release_spatial_binding_revision", "release_convergence_native_datum_v4")
+	set_meta("release_spatial_binding_revision", "release_convergence_native_datum_v5")
+	set_meta("route_spatial_revision", "release_convergence_native_route_v5")
 	if is_instance_valid(external_depth):
 		external_depth.set_meta("non_playable", true)
 		external_depth.set_meta("collision_enabled", false)

@@ -163,6 +163,32 @@ func clear_movement_latch(reason := "reset") -> void:
 	}
 	last_receipt = last_reset_receipt.duplicate(true)
 
+func clear_transaction_latches(reason := "reset") -> void:
+	"""Retire stale physical ownership at an explicit editor fixture boundary."""
+	var retired := active_transactions.size()
+	for physical in active_transactions.keys():
+		var transaction: Dictionary = active_transactions[physical].duplicate(true)
+		transaction["phase"] = "cancelled_at_boundary"
+		transaction["accepted"] = false
+		transaction["resolved_destination"] = "boundary_reset"
+		transaction["boundary_reset_reason"] = reason
+		transaction["physical_release_observed"] = false
+		completed_transactions.append(transaction)
+	active_transactions.clear()
+	if completed_transactions.size() > 12:
+		completed_transactions = completed_transactions.slice(completed_transactions.size() - 12)
+	confirm_dispatch = &""
+	back_dispatch = &""
+	last_reset_receipt = {
+		"phase":"transaction_reset", "reason":reason,
+		"retired_transactions":retired,
+		"active_transactions_preserved":0,
+		"context":context, "context_generation":context_generation,
+		"reset_generation":reset_generation,
+		"process_frame":Engine.get_process_frames(),
+	}
+	last_receipt = last_reset_receipt.duplicate(true)
+
 func _observe_device(event: InputEvent) -> void:
 	var next_device := active_device
 	if event is InputEventJoypadButton:

@@ -1771,6 +1771,7 @@ func _prepare_final_profile() -> void:
 	if run_state not in ["active", "boss"]:
 		_record_profile_control_rejection("tester_dense_prepare", "ordinary_run_required:%s" % run_state)
 		return
+	input_router.clear_transaction_latches("tester_dense_prepare")
 	_dense_cycle_index += 1
 	_profile_active = false
 	_profile_paused = false
@@ -2425,6 +2426,7 @@ func _reset_final_profile() -> void:
 		return
 	if bool(validation_profile_receipt.get("reset", false)) and not _profile_active:
 		return
+	input_router.clear_transaction_latches("tester_dense_reset")
 	var source_run_serial := run_serial
 	var source_sample := validation_profile_sample.duplicate(true)
 	var source_provenance: Dictionary = source_sample.get("cycle_provenance", {})
@@ -3789,6 +3791,7 @@ func _prepare_validation_wave(index: int) -> void:
 func _prepare_validation_density_checkpoint(target_live: int) -> void:
 	if not OS.has_feature("editor") or run_state not in ["active", "boss"]:
 		return
+	input_router.clear_transaction_latches("validation_density_prepare")
 	run_route_kind = "diagnostic_prepared"
 	health.maximum_health = 5000.0
 	health.reset_warden_health()
@@ -3896,6 +3899,7 @@ func _advance_validation_density_checkpoint() -> void:
 func _reset_validation_density() -> void:
 	if not OS.has_feature("editor") or run_state not in ["active", "boss"]:
 		return
+	input_router.clear_transaction_latches("validation_density_reset")
 	_profile_active = false
 	_profile_paused = false
 	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), false)
@@ -3926,6 +3930,7 @@ func _reset_validation_density() -> void:
 func _prepare_tester_victory() -> void:
 	if not OS.has_feature("editor") or run_state not in ["active", "boss"] or result_committed or _victory_transaction_active:
 		return
+	input_router.clear_transaction_latches("tester_victory_prepare")
 	_victory_fixture_commit_held = false
 	_victory_fixture_hold_generation = -1
 	run_route_kind = "diagnostic_prepared"

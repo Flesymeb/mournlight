@@ -70,6 +70,7 @@ script = ExtResource("4_spatial_contract")
 metadata/spatial_binding = "single_authored_package_plus_additive_outer_datum_v2"
 metadata/outer_datum_source = "rendered_package_aabb"
 metadata/external_depth_contract = "9m_non_playable_band_bound_to_authored_aabb"
+metadata/route_spatial_revision = "release_convergence_native_route_v5"
 
 [node name="PackageTransform" type="Node3D" parent="." unique_id=1533547498]
 transform = Transform3D(4.602, 0, 0, 0, 4.602, 0, 0, 0, 4.602, 0.28, 0.02, 0)

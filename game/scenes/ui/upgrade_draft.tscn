@@ -15,7 +15,8 @@ theme = ExtResource("2")
 script = ExtResource("1")
 metadata/presentation_contract = "authored_icon_led_current_to_new_v2"
 metadata/decision_delta_limit = 3
-metadata/surface_contract_revision = "upgrade_draft_icon_led_v3"
+metadata/surface_contract_revision = "upgrade_draft_icon_led_v4"
+metadata/route_transaction_binding = "ordinary_first_upgrade_pause_commit_resume_v2"
 
 [node name="Shade" type="ColorRect" parent="."]
 layout_mode = 1
