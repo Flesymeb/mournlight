@@ -1473,9 +1473,22 @@ func _commit_terminal_snapshot(terminal_outcome: String) -> void:
 	# Carry the renderer/build guards into the immutable terminal receipt.  The
 	# ledger can then reject llvmpipe/software rows without treating an ordinary
 	# run with no dense-profile sample as failed evidence.
+	# Ordinary runs often finish without an active dense window.  In that case
+	# the terminal receipt still needs the live renderer identity; otherwise the
+	# ledger sees an empty/unknown renderer and could accidentally admit a
+	# software-rendered victory as a release-qualified build row.  Reuse the
+	# authoritative renderer probe when no profile sample owns the field.
 	var renderer_receipt: Dictionary = validation_profile_sample.get("renderer", {})
+	if renderer_receipt.is_empty():
+		renderer_receipt = _profile_renderer_receipt()
 	terminal_snapshot["renderer_classification"] = String(renderer_receipt.get("classification", validation_profile_sample.get("renderer_classification", "unknown")))
-	terminal_snapshot["renderer_gate_status"] = String(validation_profile_sample.get("renderer_gate_status", validation_profile_receipt.get("renderer_gate_status", "pending_native_renderer")))
+	var renderer_gate_status := String(validation_profile_sample.get("renderer_gate_status", validation_profile_receipt.get("renderer_gate_status", "")))
+	if renderer_gate_status.is_empty() or renderer_gate_status == DenseWaveProfileClass.UNKNOWN_STATUS:
+		renderer_gate_status = DenseWaveProfileClass.renderer_status(
+			String(renderer_receipt.get("classification", "unknown")),
+			bool(renderer_receipt.get("hardware_qualification_eligible", false))
+		)
+	terminal_snapshot["renderer_gate_status"] = renderer_gate_status
 	terminal_snapshot["release_build_guard"] = run_route_kind == "ordinary" and int(wave_director.get_snapshot().get("diagnostic_jump_count", 0)) == 0
 	if terminal_outcome == "victory":
 		terminal_snapshot["victory_transaction"] = ordinary_victory_receipt.duplicate(true)

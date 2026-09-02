@@ -90,7 +90,9 @@ func _apply_surface_contract() -> void:
 	cards_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cards_container.clip_contents = false
 	for index in buttons.size():
-		buttons[index].tooltip_text = "Select vigil %d" % (index + 1)
+		# Keep the authored icon-led card as the sole actionable surface while
+		# exposing the same confirm affordance used by keyboard/gamepad focus.
+		buttons[index].tooltip_text = "Select vigil %d  •  ENTER / SOUTH BUTTON" % (index + 1)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED and is_instance_valid(cards_container):

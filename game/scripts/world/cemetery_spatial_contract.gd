@@ -46,6 +46,10 @@ func _ready() -> void:
 	set_meta("camera_visibility_collision_mask", camera_visibility_collision_mask)
 	set_meta("gameplay_collision_layer", 4)
 	set_meta("spatial_binding_strategy", "single_authored_package_plus_additive_outer_datum")
+	# Candidate-owned release receipt: the intact cemetery package, its native
+	# transform-space datum, and additive collision/navigation anchors are bound
+	# as one spatial contract for runtime inspection.
+	set_meta("release_spatial_binding_revision", "release_convergence_native_datum_v3")
 	if is_instance_valid(external_depth):
 		external_depth.set_meta("non_playable", true)
 		external_depth.set_meta("collision_enabled", false)
