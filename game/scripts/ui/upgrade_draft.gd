@@ -45,7 +45,7 @@ const MAX_DECISION_DELTAS := 3
 const SURFACE_CONTRACT_REVISION := "upgrade_draft_icon_led_v4"
 const DRAFT_AFFORDANCE_REVISION := "upgrade_draft_focus_affordance_v5"
 const FOCUS_VISUAL_CONTRACT_REVISION := "upgrade_draft_focus_visual_v7"
-const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v6"
+const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v7"
 ## Candidate-owned release diff marker.  Keep this on the real presenter so
 ## publication tooling can distinguish the authored card surface from an
 ## unchanged shell-only revision.
@@ -61,7 +61,7 @@ func _ready() -> void:
 	# authored UI copy (not telemetry): every draft exposes the same concise
 	# confirm path while the live device-specific tooltip below remains bound to
 	# the active input context.
-	footer_label.text = "CHOOSE ONE VIGIL  ·  ENTER / SOUTH BUTTON  ·  CLICK TO CONFIRM  ·  ESC TO CANCEL"
+	footer_label.text = "CHOOSE ONE VIGIL  ·  ARROWS / ENTER / SOUTH  ·  CLICK TO CONFIRM  ·  ESC TO CANCEL"
 	footer_label.set_meta("surface_revision", DRAFT_AFFORDANCE_REVISION)
 	set_meta("publication_surface_revision", PUBLICATION_SURFACE_REVISION)
 	set_meta("release_convergence_ui_diff", RELEASE_CONVERGENCE_UI_DIFF)
@@ -70,7 +70,7 @@ func _ready() -> void:
 		"decision_delta_cap": MAX_DECISION_DELTAS,
 		"focus_states_dimensionally_stable": true,
 	})
-	set_meta("authored_ui_diff", "icon_first_focusable_cards_truthful_deltas_v2")
+	set_meta("authored_ui_diff", "icon_first_focusable_cards_truthful_deltas_v3")
 	_apply_surface_contract()
 	cards_container.pivot_offset = Vector2(510, 261)
 	for index in buttons.size():
@@ -113,7 +113,7 @@ func _apply_surface_contract() -> void:
 	for index in buttons.size():
 		# Keep the authored icon-led card as the sole actionable surface while
 		# exposing the same confirm affordance used by keyboard/gamepad focus.
-		buttons[index].tooltip_text = "Select vigil %d  •  ENTER / SOUTH BUTTON" % (index + 1)
+		buttons[index].tooltip_text = "Select vigil %d  •  ARROWS / ENTER / SOUTH" % (index + 1)
 		# Keep keyboard/gamepad focus visibly distinct from hover and pressed
 		# states without changing the authored card dimensions or hierarchy.
 		buttons[index].add_theme_color_override("font_focus_color", Color("f8e8b0"))
@@ -606,11 +606,11 @@ func _update_focus_affordance() -> void:
 	var focus_owner := get_viewport().gui_get_focus_owner()
 	var focus_index := buttons.find(focus_owner)
 	if focus_index < 0 or focus_index >= cards.size() or buttons[focus_index].disabled:
-		footer_label.text = "CHOOSE ONE VIGIL  ·  ENTER / SOUTH BUTTON  ·  POINTER CLICK  ·  ESC TO CANCEL"
+		footer_label.text = "CHOOSE ONE VIGIL  ·  ARROWS / ENTER / SOUTH  ·  POINTER CLICK  ·  ESC TO CANCEL"
 		return
 	var focused_title := str(cards[focus_index].get("title", "VIGIL")).to_upper()
 	var delta_count := mini(int(cards[focus_index].get("decision_delta_count", 0)), MAX_DECISION_DELTAS)
-	footer_label.text = "%s  ·  %d STAT %s  ·  ENTER / SOUTH BUTTON  ·  ESC TO CANCEL" % [focused_title, delta_count, "DELTA" if delta_count == 1 else "DELTAS"]
+	footer_label.text = "%s  ·  %d STAT %s  ·  ARROWS / ENTER / SOUTH  ·  ESC TO CANCEL" % [focused_title, delta_count, "DELTA" if delta_count == 1 else "DELTAS"]
 
 func _refresh_card_state(index: int) -> void:
 	if index < 0 or index >= buttons.size() or index >= _state_nodes.size(): return

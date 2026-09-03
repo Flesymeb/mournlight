@@ -148,9 +148,9 @@ func _ready() -> void:
 	# the rig in keeps the Warden, nearby threats, drops, and telegraphs readable
 	# at the shipped 1280/1920 widths while the arena clamp still preserves an
 	# escape lane and landmark context.
-	follow_height = 21.5
-	follow_distance = 21.5
-	follow_lateral = -4.0
+	follow_height = 16.5
+	follow_distance = 16.5
+	follow_lateral = -2.5
 	# Aim a little farther up the authored north route so the mausoleum and bell
 	# remain fully framed from spawn; the closer 22 m rig keeps the Warden in the
 	# lower safe lane despite this landmark-forward bias.
@@ -164,20 +164,20 @@ func _ready() -> void:
 	# though their collision/anchor bindings were valid.  A modest north bias
 	# preserves the Warden in the lower safe lane while keeping both landmarks
 	# fully readable; it does not move authored geometry.
-	framing_bias = Vector3(3.2, 0.0, -2.0)
+	framing_bias = Vector3(1.2, 0.0, -2.4)
 	# Place the shipped high-angle rig on the south sight lane. The previous
 	# west/east orbits put the tall crypt directly between the camera and the
 	# keeper/bell route, so the live frame read as a wall even though diagnostic
 	# coverage reported anchor markers visible. The south lane separates all
 	# three landmark silhouettes in the actual gameplay framebuffer.
-	mouse_yaw_degrees = 0.0
+	mouse_yaw_degrees = 32.0
 	obstruction_lateral_bypass = 0.0
 	current = true
 	# The eastern bell landmark sat just beyond the shipped frustum at the
 	# native spawn lane. A modestly wider lens preserves the readable Warden and
 	# mausoleum silhouettes while bringing the bell and its approach lane into
 	# the same ordinary gameplay frame (without moving authored geometry).
-	normal_fov = 88.0
+	normal_fov = 84.0
 	fov = normal_fov
 	# Keep the shipped camera's visibility query bound to the same dedicated
 	# landmark layer as CemeterySpatialContract.  The scene resource historically
@@ -482,7 +482,7 @@ func _compose_arena_target(requested_target: Vector3, subjects: Array[Node3D]) -
 	# 18% blend left the mausoleum centered and hid the keeper/bell silhouettes.
 	# 42% keeps all three landmarks in one readable band while nearby threats
 	# remain the primary safe-lane subject.
-		composed = composed.lerp(landmark_target, 0.42)
+		composed = composed.lerp(landmark_target, 0.28)
 	_coverage_obstructed_count = 0
 	_coverage_obstructing_path = ""
 	_coverage_obstructing_paths.clear()
@@ -812,7 +812,7 @@ func reset_view() -> void:
 	# The release datum is a south-lane azimuth so the central mausoleum does not
 	# swallow the keeper post/bell sight lane at spawn. Subsequent mouse-look
 	# remains bounded around this authored baseline.
-	mouse_yaw_degrees = 0.0
+	mouse_yaw_degrees = -45.0
 	mouse_pitch_degrees = 49.0
 	_mouse_look_receipt.clear()
 	var router := get_node_or_null("../../InputContextRouter")

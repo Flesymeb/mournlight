@@ -924,6 +924,47 @@ func _landmark_alignment_receipt() -> Dictionary:
 		}
 	return result
 
+## Deterministic ordinary-movement probe for the cracked bell.  Tester can use
+## these world-space approach points to walk in from each cardinal side and
+## compare the before/near-contact/after states without relying on a hidden
+## editor-only fixture or a hand-authored coordinate that drifts with wrapper
+## scaling.  The points are derived from the final rendered AABB and the
+## candidate-owned collision shape after deferred binding.
+func get_cracked_bell_near_contact_probe() -> Dictionary:
+	var bounds := get_visual_subtree_aabb("OuterDatum/CrackedMoonBellAnchor/CrackedBellAsset")
+	var bell_body := get_node_or_null("OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision") as StaticBody3D
+	var shape := _first_shape(bell_body) if is_instance_valid(bell_body) else null
+	if bounds.size.length_squared() <= 0.001:
+		return {"ready":false,"reason":"rendered_bell_bounds_unavailable"}
+	var center := bounds.get_center()
+	var radius := maxf(bounds.size.x, bounds.size.z) * 0.5 + 1.25
+	var y := maxf(0.05, center.y - bounds.size.y * 0.5)
+	var approach := {
+		"north":Vector3(center.x, y, bounds.position.z - radius),
+		"south":Vector3(center.x, y, bounds.end.z + radius),
+		"west":Vector3(bounds.position.x - radius, y, center.z),
+		"east":Vector3(bounds.end.x + radius, y, center.z),
+	}
+	var contact := {
+		"north":Vector3(center.x, y, bounds.position.z - 0.35),
+		"south":Vector3(center.x, y, bounds.end.z + 0.35),
+		"west":Vector3(bounds.position.x - 0.35, y, center.z),
+		"east":Vector3(bounds.end.x + 0.35, y, center.z),
+	}
+	return {
+		"ready":is_instance_valid(bell_body) and is_instance_valid(shape) and not shape.disabled,
+		"landmark":"CrackedMoonBell",
+		"visual_path":"OuterDatum/CrackedMoonBellAnchor/CrackedBellAsset",
+		"collision_path":"OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision/Shape",
+		"collision_layer":int(bell_body.collision_layer) if is_instance_valid(bell_body) else 0,
+		"collision_mask":int(bell_body.collision_mask) if is_instance_valid(bell_body) else 0,
+		"bounds":bounds,
+		"approach_points":approach,
+		"near_contact_points":contact,
+		"radius":radius,
+		"binding_revision":ROUTE_REBIND_REVISION,
+	}
+
 func get_snapshot() -> Dictionary:
 	var playable := get_playable_rect()
 	var visual := get_authored_visual_rect()
@@ -1008,7 +1049,7 @@ func get_snapshot() -> Dictionary:
 				# previous 46 m / 82 degree legacy values described a superseded
 				# overview rig and contradicted the live camera evidence even though
 				# collision and landmark bindings were correct.
-				"camera_profile":{"fov":78.0,"follow_height":21.5,"follow_distance":21.5,"follow_lateral":-4.0,"framing_bias":Vector3(0.0,0.0,-2.0),"yaw_degrees":0.0,"landmark_blend":0.42,"visibility_collision_mask":camera_visibility_collision_mask},
+				"camera_profile":{"fov":84.0,"follow_height":16.5,"follow_distance":16.5,"follow_lateral":-2.5,"framing_bias":Vector3(1.2,0.0,-2.4),"yaw_degrees":-45.0,"landmark_blend":0.28,"visibility_collision_mask":camera_visibility_collision_mask},
 			"proxy_geometry_count":0,
 		},
 		"external_world":{"source":"intact_authored_package_plus_candidate_authored_distant_silhouette_ring", "procedural_scenery":false, "primitive_meshes":0, "external_dressing_nodes":6, "opaque":true, "non_playable_depth_beyond_all_edges":is_instance_valid(external_depth), "collision_enabled":false, "fog_depth_bound":true},
@@ -1016,6 +1057,7 @@ func get_snapshot() -> Dictionary:
 		"uv_binding":uv_binding_receipt.duplicate(true),
 		"landmark_collision":{"keeper_post":is_instance_valid(get_node_or_null("OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision")), "small_mausoleum":is_instance_valid(get_node_or_null("OuterDatum/MausoleumCollision")), "cracked_bell":is_instance_valid(get_node_or_null("OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision"))},
 		"landmark_collision_alignment":_landmark_alignment_receipt(),
+		"cracked_bell_near_contact_probe":get_cracked_bell_near_contact_probe(),
 		"perimeter_collision":{"north":is_instance_valid(north_boundary), "south":is_instance_valid(south_boundary), "east":is_instance_valid(east_boundary), "west":is_instance_valid(west_boundary)},
 		"boundary_visibility_alignment":{
 			"perimeter_bodies_present":perimeter_present,

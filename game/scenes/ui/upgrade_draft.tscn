@@ -17,7 +17,7 @@ metadata/presentation_contract = "authored_icon_led_current_to_new_v3"
 metadata/decision_delta_limit = 3
 metadata/surface_contract_revision = "upgrade_draft_icon_led_v4"
 metadata/route_transaction_binding = "ordinary_first_upgrade_pause_commit_resume_v2"
-metadata/publication_surface_revision = "release_convergence_icon_led_cards_v6"
+metadata/publication_surface_revision = "release_convergence_icon_led_cards_v7"
 metadata/authored_ui_diff = "icon_first_focusable_cards_truthful_deltas_v3"
 
 [node name="Shade" type="ColorRect" parent="."]
@@ -49,7 +49,7 @@ offset_top = 130.0
 offset_bottom = 164.0
 text = "THE NIGHT HOLDS ITS BREATH  ·  CHOOSE YOUR VIGIL"
 horizontal_alignment = 1
-theme_override_colors/font_color = Color(0.69,0.55,0.92,1)
+theme_override_colors/font_color = Color(0.75,0.62,0.96,1)
 
 [node name="Cards" type="Control" parent="."]
 layout_mode = 1
@@ -95,7 +95,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 offset_top = -52.0
 offset_bottom = -20.0
-text = "CHOOSE ONE VIGIL  ·  ENTER / SOUTH BUTTON  ·  POINTER CLICK  ·  ESC TO CANCEL"
+text = "CHOOSE ONE VIGIL  ·  ARROWS / ENTER  ·  POINTER CLICK  ·  ESC TO CANCEL"
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.62, 0.68, 0.8, 1)
 theme_override_font_sizes/font_size = 11

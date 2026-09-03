@@ -113,16 +113,14 @@ far = 180.0
 arena_limit = Vector2(34.0, 32.0)
 # Release framing keeps the Warden in the lower-safe lane while exposing the
 # native cross-route, perimeter depth, and both landmark silhouettes.
-normal_fov = 78.0
-follow_height = 25.0
-follow_distance = 25.0
-# Keep the camera near the south sight lane. The authored crypt occupies the
-# north route; a centered lateral rebase preserves the intact package while
-# keeping the player silhouette, keeper post, bell, and escape lanes readable.
-follow_lateral = 0.0
-# Keep the player in the lower-safe lane while the authored mausoleum and bell
-# sit above the route instead of filling the camera's center sight lane.
-framing_bias = Vector3(0.0, 0, -6.0)
+normal_fov = 84.0
+follow_height = 16.5
+follow_distance = 16.5
+# The camera-aware profile keeps the Warden in the lower-safe lane while
+# bringing the native mausoleum, cracked bell, keeper post, and an escape lane
+# into one readable frame without replacing or hiding the authored package.
+follow_lateral = -2.5
+framing_bias = Vector3(1.2, 0, -2.4)
 arena_fill_limit = Vector2(33.0, 30.5)
 coverage_max_correction = 3.5
 coverage_threat_weight = 0.18
