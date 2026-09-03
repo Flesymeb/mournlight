@@ -66,6 +66,8 @@ var terminal_voice_declared_source_path := ""
 var terminal_voice_runtime_decode := "scene_resource"
 var pickup_audio_event_count := 0
 var last_pickup_audio_receipt: Dictionary = {}
+var _attack_events_bound := false
+var attack_binding_receipt: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -95,6 +97,7 @@ func _ready() -> void:
 			attack_voice.bus = &"Effects"
 			attack_voice.max_polyphony = 1
 			attack_voice.stop()
+	_bind_lantern_attack_voices()
 	for child_name in [&"FootstepVoiceA", &"FootstepVoiceB"]:
 		var movement_voice := get_node_or_null(NodePath(child_name)) as AudioStreamPlayer
 		if movement_voice:
@@ -185,18 +188,41 @@ func _process(delta: float) -> void:
 	_movement_was_active = moving
 
 func _bind_events() -> void:
+	if _attack_events_bound:
+		return
 	var controller := get_parent()
+	if not controller:
+		return
 	controller.state_changed.connect(_on_state_changed)
 	var attack := controller.get_node_or_null("World/Warden/Weapons/AttackRuntime")
 	if attack:
-		attack.attack_authorized.connect(_on_attack_authorized)
-		attack.hit_resolved.connect(_on_attack_hit)
+		# The adapter can be deferred across a scene reload; use idempotent
+		# connections so a rebind never creates a second player-report owner.
+		if not attack.attack_authorized.is_connected(_on_attack_authorized):
+			attack.attack_authorized.connect(_on_attack_authorized)
+		if not attack.hit_resolved.is_connected(_on_attack_hit):
+			attack.hit_resolved.connect(_on_attack_hit)
 		# A legal attack can still miss (target retires between selection and
 		# impact). Keep that miss on the same authoritative transaction so the
 		# Effects bus receives one bounded semantic report instead of silence.
-		attack.attack_rejected.connect(_on_attack_rejected)
+		if not attack.attack_rejected.is_connected(_on_attack_rejected):
+			attack.attack_rejected.connect(_on_attack_rejected)
 		if attack.has_signal("attack_finished"):
-			attack.attack_finished.connect(_on_attack_finished)
+			if not attack.attack_finished.is_connected(_on_attack_finished):
+				attack.attack_finished.connect(_on_attack_finished)
+		_attack_events_bound = true
+		attack_binding_receipt = {
+			"attack_runtime_path":String(attack.get_path()),
+			"authorized_connected":attack.attack_authorized.is_connected(_on_attack_authorized),
+			"hit_connected":attack.hit_resolved.is_connected(_on_attack_hit),
+			"rejected_connected":attack.attack_rejected.is_connected(_on_attack_rejected),
+			"finished_connected":attack.has_signal("attack_finished") and attack.attack_finished.is_connected(_on_attack_finished),
+			"onset_voice_path":String(lantern_onset_voice.get_path()) if lantern_onset_voice else "",
+			"impact_voice_path":String(lantern_impact_voice.get_path()) if lantern_impact_voice else "",
+			"onset_stream_path":lantern_onset_voice.stream.resource_path if lantern_onset_voice and lantern_onset_voice.stream else "",
+			"impact_stream_path":lantern_impact_voice.stream.resource_path if lantern_impact_voice and lantern_impact_voice.stream else "",
+			"bus":"Effects",
+		}
 	var health := controller.get_node_or_null("World/Warden/HealthComponent")
 	if health:
 		health.hurt.connect(func(_event: Dictionary) -> void: play_semantic("warden_hurt"))
@@ -221,6 +247,24 @@ func _bind_events() -> void:
 	if draft and draft.has_signal("choice_requested"):
 		draft.choice_requested.connect(func(_index: int) -> void: play_semantic("upgrade_confirm"))
 	_set_music("title")
+
+func _bind_lantern_attack_voices() -> void:
+	# Keep the authored scene nodes as the direct signal destination.  A stale
+	# editor instance may preserve the node but drop its stream assignment; in
+	# that case resolve the exact registered semantic stream once at the adapter
+	# boundary, never through the generic voice pool.
+	var pairs := [[lantern_onset_voice, "onset"], [lantern_impact_voice, "impact"]]
+	for pair in pairs:
+		var voice := pair[0] as AudioStreamPlayer
+		if not voice:
+			continue
+		voice.process_mode = Node.PROCESS_MODE_ALWAYS
+		voice.bus = &"Effects"
+		voice.max_polyphony = 1
+		if not voice.stream:
+			var streams := _lantern_streams_for_phase(String(pair[1]))
+			if not streams.is_empty() and streams[0] is AudioStream:
+				voice.stream = streams[0] as AudioStream
 
 func _on_attack_authorized(event: Dictionary) -> void:
 	# One bounded report belongs to each authoritative automatic attack. The
@@ -1022,6 +1066,8 @@ func _mcp_state() -> Dictionary:
 		"attack_audio_events":attack_audio_events.duplicate(true),
 		"last_attack_audio_receipt":last_attack_audio_receipt.duplicate(true),
 		"attack_audio_dedup_keys":_attack_audio_seen.keys(),
+		"attack_binding_receipt":attack_binding_receipt.duplicate(true),
+		"attack_events_bound":_attack_events_bound,
 		"lantern_attack_voice_bound":lantern_onset_voice != null and lantern_impact_voice != null,
 		"lantern_attack_active_voice_count":lantern_active,
 		"lantern_minimum_wall_msec":{"onset":LANTERN_ONSET_MIN_WALL_MSEC,"impact":LANTERN_IMPACT_MIN_WALL_MSEC},

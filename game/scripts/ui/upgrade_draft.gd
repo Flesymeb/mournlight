@@ -134,6 +134,8 @@ func _apply_surface_contract() -> void:
 		# Keep keyboard/gamepad focus visibly distinct from hover and pressed
 		# states without changing the authored card dimensions or hierarchy.
 		buttons[index].add_theme_color_override("font_focus_color", Color("f8e8b0"))
+		buttons[index].add_theme_color_override("font_hover_color", Color("ffe7a3"))
+		buttons[index].add_theme_color_override("font_pressed_color", Color("e5c7ff"))
 		buttons[index].set_meta("focus_visual_contract", {
 			"revision": FOCUS_VISUAL_CONTRACT_REVISION,
 			"focus_state": "moon_silver_outline",

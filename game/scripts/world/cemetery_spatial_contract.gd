@@ -115,6 +115,13 @@ func _ready() -> void:
 		external_depth.set_meta("non_playable", true)
 		external_depth.set_meta("collision_enabled", false)
 		external_depth.set_meta("band_margin", external_depth_band_margin)
+		# Keep the distant authored silhouette slightly wider than the playable
+		# datum so high-angle perimeter views retain continuous depth beyond the
+		# collision fence. This scales the single external-depth node only; the
+		# imported cemetery package remains one intact authoritative instance.
+		var depth_scale := 1.0 + clampf(external_depth_band_margin * 0.01, 0.0, 0.08)
+		external_depth.scale = external_depth.scale * Vector3.ONE * depth_scale
+		external_depth.set_meta("depth_scale_factor", depth_scale)
 		set_meta("external_depth_binding", "candidate_authored_cardinal_silhouette_band_v4")
 	# Reassert the single transform-space collision contract after the authored
 	# scene is instanced. Some inherited scene overrides restore StaticBody3D's
