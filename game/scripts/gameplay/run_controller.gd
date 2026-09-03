@@ -3348,6 +3348,15 @@ func _profile_counts() -> Dictionary:
 	var projectile_count := lantern_runtime.active_presentation_count + gravespade_runtime.active_presentation_count + wisps_runtime.active_wisp_count
 	var lights := _profile_static_light_count + int(encounter.get("active_lights", 0)) + _active_pickup_count + wisps_runtime.active_wisp_count + (1 if is_instance_valid(boss) else 0)
 	var audio_voices := audio_director.active_effect_voice_count()
+	var entity_caps := {
+		"enemies": int(spawner.live_cap),
+		"projectiles": int(lantern_runtime.BOLT_POOL_CAP + gravespade_runtime.SWEEP_POOL_CAP),
+		"wisps": int(wisps_runtime.WISP_POOL_CAP),
+		"pickups": MAX_ACTIVE_PICKUPS,
+		"pending_rewards": MAX_PENDING_REWARDS,
+		"telegraphs": int(spawner.telegraph_cue_cap),
+		"audio_voices": int(audio_director._mcp_state().get("voice_limit", 0)),
+	}
 	return {
 		"enemies":int(encounter.get("live",0)),
 		"pooled_enemies":int(encounter.get("pooled",0)),
@@ -3375,6 +3384,9 @@ func _profile_counts() -> Dictionary:
 		"wisp_pool_total":wisps_runtime._wisp_pool.size() + wisps_runtime.active_wisp_count,
 		"wisp_pool_cap":wisps_runtime.WISP_POOL_CAP,
 		"wisp_high_water":wisps_runtime._wisp_high_water,
+		"entity_caps":entity_caps,
+		"active_entity_total":int(encounter.get("live",0)) + projectile_count + _active_pickup_count + _active_effect_count + audio_voices,
+		"transient_caps_respected": int(encounter.get("live",0)) <= entity_caps.enemies and projectile_count <= entity_caps.projectiles + entity_caps.wisps and _active_pickup_count <= entity_caps.pickups and _pending_reward_events.size() <= entity_caps.pending_rewards and audio_voices <= entity_caps.audio_voices,
 		"presentation_pools":{
 			"lantern":{"active":lantern_runtime.active_presentation_count,"available":lantern_runtime._presentation_pool.size(),"total":lantern_runtime._bolt_total,"cap":lantern_runtime.BOLT_POOL_CAP},
 			"gravespade":{"active":gravespade_runtime.active_presentation_count,"available":gravespade_runtime._presentation_pool.size(),"total":gravespade_runtime._sweep_total,"cap":gravespade_runtime.SWEEP_POOL_CAP},
@@ -3826,6 +3838,12 @@ func _lifecycle_counters() -> Dictionary:
 		"wisp_hit_ledgers":int(counts.get("wisp_interval_targets", 0)),
 		"active_attack_ledgers":int(counts.get("active_attack_ledgers", 0)),
 		"effects":int(counts.get("effects", 0)),
+		# Mirror the compact cap receipt in lifecycle snapshots so pause/reset,
+		# death/result, and restart checkpoints can verify bounded transient state
+		# without depending on a profile window having been armed.
+		"entity_caps":(counts.get("entity_caps", {}) as Dictionary).duplicate(true),
+		"active_entity_total":int(counts.get("active_entity_total", 0)),
+		"transient_caps_respected":bool(counts.get("transient_caps_respected", false)),
 		"input_owner_count":input_router.active_transactions.size(),
 		"input_context":input_router.context,
 		"input_reset": {

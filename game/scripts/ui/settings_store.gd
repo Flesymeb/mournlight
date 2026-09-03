@@ -17,10 +17,18 @@ var last_persist_receipt: Dictionary = {}
 
 func load_settings() -> Dictionary:
 	var config := ConfigFile.new()
+	# Always begin from a clean, typed default snapshot.  ConfigFile permits
+	# partial sections (for example after a user edits the file or an older
+	# build wrote fewer keys); retaining the previous in-memory value would make
+	# a same-session reload appear to persist a setting that was never restored
+	# from disk.
+	values = DEFAULTS.duplicate(true)
+	persisted_generation = 0
 	var load_status := config.load(PATH)
 	if load_status == OK:
 		for key in DEFAULTS:
-			values[key] = config.get_value("settings", key, DEFAULTS[key])
+			var loaded: Variant = config.get_value("settings", key, DEFAULTS[key])
+			values[key] = _coerce_value(key, loaded)
 		persisted_generation = int(config.get_value("meta", "generation", 0))
 	apply()
 	last_persist_receipt = {
@@ -31,6 +39,24 @@ func load_settings() -> Dictionary:
 		"transaction":"reload_then_apply",
 	}
 	return values.duplicate(true)
+
+func _coerce_value(key: String, value: Variant) -> Variant:
+	# Keep runtime consumers deterministic even when a hand-edited config has a
+	# wrong type or an out-of-range scalar.  The persisted representation remains
+	# ordinary ConfigFile data; this is only the authoritative load boundary.
+	match key:
+		"master_volume", "music_volume", "effects_volume":
+			return clampf(float(value), 0.0, 1.0)
+		"window_mode":
+			return clampi(int(value), 0, 1)
+		"ui_scale":
+			return clampf(float(value), 0.9, 1.25)
+		"target_bias":
+			return clampi(int(value), 0, 1)
+		"screen_shake", "hit_flash", "damage_numbers", "danger_contrast":
+			return bool(value)
+		_:
+			return DEFAULTS.get(key, value)
 
 func set_value(key: String, value: Variant) -> void:
 	if not DEFAULTS.has(key):

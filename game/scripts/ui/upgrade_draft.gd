@@ -46,7 +46,7 @@ const MAX_DECISION_DELTAS := 3
 const SURFACE_CONTRACT_REVISION := "upgrade_draft_icon_led_v4"
 const DRAFT_AFFORDANCE_REVISION := "upgrade_draft_focus_affordance_v5"
 const FOCUS_VISUAL_CONTRACT_REVISION := "upgrade_draft_focus_visual_v7"
-const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v8"
+const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v9"
 ## Candidate-owned release diff marker.  Keep this on the real presenter so
 ## publication tooling can distinguish the authored card surface from an
 ## unchanged shell-only revision.
@@ -398,7 +398,9 @@ func _build_card_content(button: Button) -> void:
 	# intentionally distinct from the interaction-state line below and remains
 	# inside the fixed card slot at every supported UI scale.
 	var badge := Label.new()
-	badge.text = "VIGIL OFFER"
+	# Short authored badge keeps the visual anchor explicit at a glance and
+	# distinguishes the offer identity from the interaction-state line below.
+	badge.text = "OFFER  ·  CHOOSE ONE"
 	badge.custom_minimum_size = Vector2(0, 16)
 	badge.add_theme_font_size_override("font_size", 9)
 	badge.add_theme_color_override("font_color", Color(0.92, 0.69, 0.33))
@@ -409,7 +411,7 @@ func _build_card_content(button: Button) -> void:
 	column.add_child(badge)
 	_badge_nodes.append(badge)
 	var icon := TextureRect.new()
-	icon.custom_minimum_size = Vector2(0, 118)
+	icon.custom_minimum_size = Vector2(0, 126)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE

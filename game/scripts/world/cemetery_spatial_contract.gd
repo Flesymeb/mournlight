@@ -26,7 +26,7 @@ extends Node3D
 ## Extra authored approach clearance around the central mausoleum.  Objective
 ## and route markers use this lane so the visible landmark, its gameplay
 ## collision, and the traversable street remain in the same world-space frame.
-@export var landmark_sight_lane_margin := 3.25
+@export var landmark_sight_lane_margin := 3.5
 ## Visibility probes intentionally use the perimeter/landmark layer only.  The
 ## gameplay layer stays authoritative for Warden/enemy collision, while this
 ## separate mask prevents GroundCollision and MausoleumCollision from becoming
@@ -57,7 +57,7 @@ const PUBLICATION_SPATIAL_REVISION := "release_convergence_authored_datum_v9"
 ## Candidate-owned spatial publication marker for the release-convergence
 ## expansion: one intact authored package, an outer non-playable depth band,
 ## and collision/perimeter rebinding in the same world space.
-const RELEASE_CONVERGENCE_SPATIAL_DIFF := "cemetery_external_depth_and_landmark_binding_v3"
+const RELEASE_CONVERGENCE_SPATIAL_DIFF := "cemetery_external_depth_and_landmark_binding_v4"
 
 func _ready() -> void:
 	# The cracked-bell package carries a large native-export offset inside its
@@ -90,6 +90,13 @@ func _ready() -> void:
 	# camera coverage and movement replay bind to the same world-space anchors.
 	set_meta("route_landmark_ids", ["KeeperLanternPost", "SmallMausoleum", "CrackedMoonBell"])
 	set_meta("landmark_sight_lane_margin", landmark_sight_lane_margin)
+	set_meta("spatial_rebase_receipt", {
+		"revision": RELEASE_CONVERGENCE_SPATIAL_DIFF,
+		"native_scale": native_map_scale,
+		"wrapper_scale_multiplier": authored_wrapper_scale_multiplier,
+		"objective_lane_margin": landmark_sight_lane_margin,
+		"anchors_rebound_from_rendered_aabb": true,
+	})
 	set_meta("landmark_collision_contract", {
 		"source": "AuthoredCemeteryPackage",
 		"collision_layer": 4,
