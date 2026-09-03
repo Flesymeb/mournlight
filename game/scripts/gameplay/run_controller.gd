@@ -2392,6 +2392,7 @@ func _advance_profile_sample(delta: float) -> void:
 	var allocation_bytes := int(Performance.get_monitor(Performance.MEMORY_STATIC))
 	var orphan_nodes := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	var metric_counts := _profile_counts()
+	var attack_state := world.attack_runtime._mcp_state()
 	var workload_sample := _profile_workload_receipt(encounter_snapshot)
 	if _profile_metric_samples.size() < PROFILE_MAX_SAMPLES:
 		var cycle_provenance: Dictionary = validation_profile_sample.get("cycle_provenance", {})
@@ -2421,6 +2422,9 @@ func _advance_profile_sample(delta: float) -> void:
 			"active_audio_voices":int(metric_counts.get("audio_voices", 0)),
 			"pooled_enemies":int(metric_counts.get("pooled_enemies", 0)),
 			"pooled_pickups":int(metric_counts.get("pooled_pickups", 0)),
+			"attack_ledger_allocations":int(attack_state.get("ledger_allocations", 0)),
+			"attack_stale_target_rejections":int(attack_state.get("stale_target_rejections", 0)),
+			"attack_runtime_resets":int(attack_state.get("reset_count", 0)),
 			"spawned_total":int(encounter_snapshot.get("spawned", 0)),
 			"despawned_total":int(encounter_snapshot.get("retired", 0)),
 			# Runtime log ownership stays with the host collector. Keep the field for
@@ -3921,6 +3925,7 @@ func _lifecycle_counters() -> Dictionary:
 	owned_signal_bindings += 1 if wave_director.phase_changed.is_connected(_on_wave_phase_changed) else 0
 	owned_signal_bindings += 1 if wave_director.boss_requested.is_connected(_spawn_bellkeeper) else 0
 	var counts := _profile_counts()
+	var attack_state := world.attack_runtime._mcp_state()
 	return {
 		"scene_tree_nodes":get_tree().get_node_count(),
 		"object_count":int(Performance.get_monitor(Performance.OBJECT_COUNT)),
@@ -3939,6 +3944,9 @@ func _lifecycle_counters() -> Dictionary:
 		"light_count":int(counts.get("lights", 0)),
 		"wisp_hit_ledgers":int(counts.get("wisp_interval_targets", 0)),
 		"active_attack_ledgers":int(counts.get("active_attack_ledgers", 0)),
+		"attack_ledger_allocations":int(attack_state.get("ledger_allocations", 0)),
+		"attack_stale_target_rejections":int(attack_state.get("stale_target_rejections", 0)),
+		"attack_runtime_resets":int(attack_state.get("reset_count", 0)),
 		"effects":int(counts.get("effects", 0)),
 		# Mirror the compact cap receipt in lifecycle snapshots so pause/reset,
 		# death/result, and restart checkpoints can verify bounded transient state

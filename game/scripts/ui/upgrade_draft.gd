@@ -119,11 +119,17 @@ func _apply_surface_contract() -> void:
 	title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	subtitle_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	footer_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_label.accessibility_name = "Choose a vigil"
+	title_label.accessibility_description = "Select one of three upgrade or weapon offers."
+	footer_label.accessibility_name = "Upgrade draft controls"
+	footer_label.accessibility_description = "Use left and right to focus, Enter or south face button to confirm, and Escape to cancel."
 	cards_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cards_container.clip_contents = false
 	for index in buttons.size():
 		# Keep the authored icon-led card as the sole actionable surface while
 		# exposing the same confirm affordance used by keyboard/gamepad focus.
+		buttons[index].accessibility_name = "Vigil offer %s" % char(65 + index)
+		buttons[index].accessibility_description = "Focus to inspect the icon, rank, concise current-to-new stat changes, and consequence; activate to confirm."
 		buttons[index].tooltip_text = "Focus vigil %d  •  ICON → STATS → CONSEQUENCE  •  LEFT / RIGHT, then ENTER / SOUTH" % (index + 1)
 		# Keep keyboard/gamepad focus visibly distinct from hover and pressed
 		# states without changing the authored card dimensions or hierarchy.
@@ -201,7 +207,16 @@ func present(next_cards: Array[Dictionary]) -> void:
 		var projected_rank := maxi(1, int(card.get("rank", 1)))
 		_rank_nodes[index].text = ("UNLOCK  •  RANK %d" % projected_rank) if bool(card.get("newly_unlocked", false)) else ("NEXT RANK  •  %d" % projected_rank)
 		_consequence_nodes[index].text = str(card.get("consequence", "Shape the next exchange."))
-		_rebuild_stat_rows(index, _decision_changes(card.get("changes", [])))
+		var decision_changes := _decision_changes(card.get("changes", []))
+		_rebuild_stat_rows(index, decision_changes)
+		# Refresh the semantic label with the authoritative projection each time a
+		# draft opens.  This keeps assistive focus output truthful after ranks,
+		# unlocks, or fallback offers change between level-ups.
+		var delta_summary := []
+		for change in decision_changes:
+			delta_summary.append("%s %s to %s" % [str(change.get("label", change.get("field", "stat"))), _format_value(change.get("current"), str(change.get("field", ""))), _format_value(change.get("result"), str(change.get("field", "")))])
+		buttons[index].accessibility_name = "Vigil offer %s: %s" % [char(65 + index), _title_nodes[index].text]
+		buttons[index].accessibility_description = "Rank %d. %s. %s Activate to confirm." % [projected_rank, "; ".join(delta_summary) if not delta_summary.is_empty() else "New pattern with no numeric delta", _consequence_nodes[index].text]
 		buttons[index].disabled = not bool(card.get("available", true))
 		_refresh_card_state(index)
 	visible = true

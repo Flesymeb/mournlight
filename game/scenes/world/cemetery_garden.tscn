@@ -75,7 +75,7 @@ metadata/route_receipt_revision = "cemetery_authored_route_rebind_v9"
 metadata/publication_spatial_revision = "release_convergence_authored_datum_v10"
 metadata/authored_spatial_diff = "native_package_bounds_landmark_sight_lane"
 metadata/cracked_bell_rebase = "rendered_center_inside_playable_perimeter_v1"
-metadata/release_convergence_spatial_implementation_revision = "cemetery_authored_datum_rebind_v11"
+metadata/release_convergence_spatial_implementation_revision = "cemetery_authored_datum_rebind_v12"
 
 [node name="PackageTransform" type="Node3D" parent="." unique_id=1533547498]
 transform = Transform3D(2.925, 0, 0, 0, 2.925, 0, 0, 0, 2.925, 0.28, 0.02, 0)
@@ -92,26 +92,26 @@ metadata/spatial_role = "distant_cemetery_silhouette"
 metadata/spatial_revision = "release_convergence_external_depth_band_v4"
 
 [node name="WestHill" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997053]
-position = Vector3(-24, -3.4, 0)
-scale = Vector3(13, 3.0, 18)
+position = Vector3(-28, -3.4, 0)
+scale = Vector3(16, 3.0, 20)
 mesh = SubResource("ExternalHillMesh")
 material_override = SubResource("ExternalHillMaterial")
 
 [node name="EastHill" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997054]
-position = Vector3(24, -3.4, -1)
-scale = Vector3(13, 3.0, 18)
+position = Vector3(28, -3.4, -1)
+scale = Vector3(16, 3.0, 20)
 mesh = SubResource("ExternalHillMesh")
 material_override = SubResource("ExternalHillMaterial")
 
 [node name="NorthHill" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997055]
-position = Vector3(0, -3.4, -24)
-scale = Vector3(18, 3.2, 13)
+position = Vector3(0, -3.4, -28)
+scale = Vector3(20, 3.2, 16)
 mesh = SubResource("ExternalHillMesh")
 material_override = SubResource("ExternalHillMaterial")
 
 [node name="SouthHill" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997056]
-position = Vector3(0, -3.4, 24)
-scale = Vector3(18, 2.8, 13)
+position = Vector3(0, -3.4, 28)
+scale = Vector3(20, 2.8, 16)
 mesh = SubResource("ExternalHillMesh")
 material_override = SubResource("ExternalHillMaterial")
 

@@ -22,9 +22,16 @@ var _latest_by_weapon: Dictionary = {}
 var _latest_reward_by_weapon: Dictionary = {}
 var _event_serial := 0
 var _retirement_generation := 0
+## Bounded lifecycle counters consumed by the dense profile.  These count
+## authoritative attack-ledger churn (not engine allocations) so a host run
+## can distinguish pooled presentation work from stale combat state.
+var ledger_allocations := 0
+var stale_target_rejections := 0
+var reset_count := 0
 
 func authorize(weapon_id: StringName, target: Node3D, stats: Dictionary, hit_policy: String) -> Dictionary:
 	if not is_instance_valid(target) or not target.is_inside_tree():
+		stale_target_rejections += 1
 		return _reject(weapon_id, "invalid_or_freed_target")
 	if not target.has_method("is_legal_target") or not target.is_legal_target():
 		return _reject(weapon_id, "dead_or_illegal_target")
@@ -55,6 +62,7 @@ func authorize(weapon_id: StringName, target: Node3D, stats: Dictionary, hit_pol
 			_phase_entry("authorized", event),
 		],
 	}
+	ledger_allocations += 1
 	authorized_count += 1
 	last_event = event.duplicate(true)
 	attack_authorized.emit(event)
@@ -65,6 +73,7 @@ func resolve_hit(attack_event: Dictionary, target: Node3D) -> Dictionary:
 	if not _hit_ledgers.has(attack_id):
 		return _reject(StringName(attack_event.get("weapon_id", "unknown")), "unknown_attack")
 	if not is_instance_valid(target) or not target.is_inside_tree():
+		stale_target_rejections += 1
 		return _reject(StringName(attack_event.get("weapon_id", "unknown")), "freed_target_before_hit", {"attack_id":attack_id, "accepted":false, "hit_material":"miss"})
 	if not target.has_method("is_legal_target") or not target.is_legal_target():
 		return _reject(StringName(attack_event.get("weapon_id", "unknown")), "illegal_target_before_hit", {"attack_id": attack_id, "accepted":false, "hit_material":"miss"})
@@ -250,6 +259,9 @@ func reset_runtime() -> void:
 	authorized_count = 0
 	hit_count = 0
 	rejection_count = 0
+	ledger_allocations = 0
+	stale_target_rejections = 0
+	reset_count += 1
 
 func _mcp_state() -> Dictionary:
 	var causality := _causality_digest()
@@ -258,6 +270,10 @@ func _mcp_state() -> Dictionary:
 		"gravespade_receipt": _receipt_for("gravespade"),
 		"wisps_receipt": _receipt_for("wandering_wisps"),
 		"lantern_reward_receipt": _reward_receipt_for("warden_lantern"),
+		"ledger_allocations": ledger_allocations,
+		"stale_target_rejections": stale_target_rejections,
+		"reset_count": reset_count,
+		"active_ledger_count": _hit_ledgers.size(),
 		"last_rejection_receipt": causality.get("last_rejection", ""),
 		"owner_id": String(owner_id), "authorized_count": authorized_count, "hit_count": hit_count,
 		"rejection_count": rejection_count, "active_ledgers": _hit_ledgers.size(),

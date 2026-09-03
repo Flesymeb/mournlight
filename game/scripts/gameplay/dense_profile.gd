@@ -94,7 +94,7 @@ static func contract() -> Dictionary:
 		"enemy_range": {"minimum": MIN_ENEMIES, "maximum": MAX_ENEMIES, "target": TARGET_ENEMIES},
 		"metrics": [
 			"timestamp_msec", "frame_ms", "physics_ms", "render_ms", "draw_calls", "allocation_bytes", "orphan_nodes", "fps", "sample_count", "physics_sample_count", "sample_availability", "active_enemies", "active_projectiles",
-			"active_pickups", "active_effects", "active_lights", "active_audio_voices", "pooled_enemies", "pooled_pickups",
+			"active_pickups", "active_effects", "active_lights", "active_audio_voices", "pooled_enemies", "pooled_pickups", "attack_ledger_allocations", "attack_stale_target_rejections", "attack_runtime_resets",
 			"spawned_total", "despawned_total", "runtime_error_count", "subsystem_samples", "sample_distributions", "high_water_marks", "lifecycle_deltas",
 		],
 		"telemetry": {"sample_history_cap": SAMPLE_HISTORY_CAP, "per_sample_metrics": true, "runtime_errors_source": "godot_runtime_log"},
@@ -384,7 +384,7 @@ static func _audit_cycle(records: Array) -> Dictionary:
 ## Normalize the bounded per-frame history into host-auditable distributions.
 ## Raw samples remain available; this summary keeps collector logic consistent.
 static func sample_distribution(samples: Array) -> Dictionary:
-	var keys := ["frame_ms", "physics_ms", "render_ms", "draw_calls", "allocation_bytes", "orphan_nodes", "active_enemies", "active_projectiles", "active_pickups", "active_effects", "active_lights", "active_audio_voices", "pooled_enemies", "pooled_pickups"]
+	var keys := ["frame_ms", "physics_ms", "render_ms", "draw_calls", "allocation_bytes", "orphan_nodes", "active_enemies", "active_projectiles", "active_pickups", "active_effects", "active_lights", "active_audio_voices", "pooled_enemies", "pooled_pickups", "attack_ledger_allocations", "attack_stale_target_rejections", "attack_runtime_resets"]
 	var distributions: Dictionary = {}
 	var high_water_marks: Dictionary = {}
 	for key_value in keys:
