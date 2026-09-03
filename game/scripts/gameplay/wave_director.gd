@@ -33,6 +33,9 @@ var terminal_outcome := ""
 var terminal_rejected_count := 0
 var terminal_rejection_reason := ""
 var terminal_transition_receipt: Dictionary = {}
+## Keep presentation labels for diagnostics while exposing the PRD's exact
+## terminal vocabulary to runtime consumers.
+var terminal_requested_outcome := ""
 var ordinary_route_wave_ids: Array[String] = []
 var diagnostic_jump_count := 0
 var transition_serial := 0
@@ -64,6 +67,7 @@ func reset() -> void:
 	terminal_rejected_count = 0
 	terminal_rejection_reason = ""
 	terminal_transition_receipt.clear()
+	terminal_requested_outcome = ""
 	ordinary_route_wave_ids.clear()
 	diagnostic_jump_count = 0
 	transition_serial = 0
@@ -91,6 +95,16 @@ func terminate(outcome: String) -> void:
 		terminal_rejected_count += 1
 		terminal_rejection_reason = "empty_outcome"
 		return
+	terminal_requested_outcome = requested_outcome
+	# The victory presentation hold is an implementation detail; the
+	# authoritative director outcome must remain `victory` for the route/result
+	# contract. Normalize the legacy token at this boundary.
+	if requested_outcome == "victory_presentation":
+		requested_outcome = "victory"
+	if requested_outcome not in ["victory", "failure"]:
+		terminal_rejected_count += 1
+		terminal_rejection_reason = "unsupported_outcome:%s" % requested_outcome
+		return
 	terminated = true
 	terminal_transition_count += 1
 	terminal_outcome = requested_outcome
@@ -98,6 +112,7 @@ func terminate(outcome: String) -> void:
 	terminal_transition_receipt = {
 		"transition_count":terminal_transition_count,
 		"outcome":terminal_outcome,
+		"requested_outcome":terminal_requested_outcome,
 		"phase":phase,
 		"transition_serial":transition_serial,
 		"elapsed":total_elapsed,
@@ -242,7 +257,7 @@ func get_snapshot() -> Dictionary:
 		"enemy_cap":int(encounter.get("cap", definition.get("cap", 0))),
 		"boss_state":"absent" if not boss_spawned else ("requested" if boss_request_count > 0 else "pending"),
 		"terminal_predicate": {"terminated":terminated,"terminal_transition_count":terminal_transition_count,"spawning_allowed":not terminated and phase == "active","outcome":terminal_outcome,"rejected_count":terminal_rejected_count},
-		"terminated":terminated,"terminal_outcome":terminal_outcome,"terminal_transition_receipt":terminal_transition_receipt.duplicate(true),
+		"terminated":terminated,"terminal_outcome":terminal_outcome,"terminal_requested_outcome":terminal_requested_outcome,"terminal_transition_receipt":terminal_transition_receipt.duplicate(true),
 		"terminal_rejected_count":terminal_rejected_count,"terminal_rejection_reason":terminal_rejection_reason,"definition":definition,
 		"expected_route_wave_ids":Array(expected_ids),
 		"ordinary_route_wave_ids":ordinary_route_wave_ids.duplicate(),
@@ -310,6 +325,7 @@ func get_route_contract_receipt() -> Dictionary:
 		"boss_requested_exactly_once": bool(snapshot.get("boss_requested_exactly_once", false)),
 		"stale_transition_rejection_count": int(snapshot.get("stale_transition_rejection_count", 0)),
 		"terminal_outcome": String(snapshot.get("terminal_outcome", "")),
+		"terminal_requested_outcome": String(snapshot.get("terminal_requested_outcome", "")),
 		"terminal_transition_receipt": (snapshot.get("terminal_transition_receipt", {}) as Dictionary).duplicate(true),
 		"terminal": (snapshot.get("terminal_predicate", {}) as Dictionary).duplicate(true),
 	}

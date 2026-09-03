@@ -1446,7 +1446,11 @@ func _on_boss_defeated(_event: Dictionary) -> void:
 	var vfx_receipt := warden.begin_victory_presentation(VICTORY_PRESENTATION_HOLD_SECONDS, run_serial)
 	var wave_state := wave_director.get_snapshot()
 	complete_run_ledger.record_boss("bellkeeper_defeated", {"phase":boss_snapshot.get("phase",0),"defeat_committed":true}, run_elapsed, run_route_kind, int(wave_state.get("diagnostic_jump_count", 0)))
-	wave_director.terminate("victory_presentation")
+	# The director owns the authoritative route outcome.  Keep the authored
+	# victory presentation hold in RunController, but commit the director to the
+	# exact product terminal token immediately so spawn/attack gates and result
+	# receipts agree during the hold.
+	wave_director.terminate("victory")
 	_teardown_generation += 1
 	var hold_retirement := _retire_transient_ownership("victory_hold", "bellkeeper_defeated", _teardown_generation)
 	world.reset_session(false)

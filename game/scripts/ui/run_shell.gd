@@ -175,7 +175,10 @@ func _layout() -> void:
 	subtitle_label.position = Vector2(center.x - 340,page_top + 54)
 	subtitle_label.size = Vector2(680,30)
 	body_label.position = Vector2(center.x - 400,page_top + 86)
-	var body_height := 190.0 if mode == "credits" else 154.0 if mode == "help" else 66.0 if mode == "result" else 56.0
+	# Result carries three compact statistic lines plus the archive caption. Give
+	# that copy a dedicated vertical lane so it cannot cross the brass divider
+	# at the supported 1280x720 capture scale.
+	var body_height := 190.0 if mode == "credits" else 154.0 if mode == "help" else 104.0 if mode == "result" else 56.0
 	body_label.size = Vector2(800,body_height)
 	var visible_count := 0
 	for button in buttons:
@@ -233,7 +236,9 @@ func _layout_result(center: Vector2, page_top: float) -> void:
 	var total_width := visible_cards.size() * card_width + maxi(0,visible_cards.size()-1) * gap
 	for index in visible_cards.size():
 		var card: Panel = visible_cards[index]
-		card.position = Vector2(center.x-total_width*0.5+index*(card_width+gap),page_top+154)
+		# Keep the weapon build row below the summary divider; at 1280x720 the
+		# previous slot began inside that divider and visually cut through cards.
+		card.position = Vector2(center.x-total_width*0.5+index*(card_width+gap),page_top+220)
 		card.size = Vector2(card_width,148)
 		var icon := card.get_node("WeaponIcon") as TextureRect
 		icon.position = Vector2(16,20); icon.size = Vector2(82,92)
@@ -244,7 +249,7 @@ func _layout_result(center: Vector2, page_top: float) -> void:
 		var value_label := card.get_node("WeaponValue") as Label
 		value_label.position = Vector2(108,101); value_label.size = Vector2(card_width-124.0,34)
 	var panel_width := minf(920.0, maxf(420.0, size.x - 120.0))
-	result_upgrade_panel.position = Vector2(center.x-panel_width*0.5,page_top+322)
+	result_upgrade_panel.position = Vector2(center.x-panel_width*0.5,page_top+380)
 	result_upgrade_panel.size = Vector2(panel_width,104)
 	result_upgrade_icon.position = Vector2(22,16); result_upgrade_icon.size = Vector2(56,56)
 	result_upgrade_label.position = Vector2(96,10); result_upgrade_label.size = Vector2(maxf(220.0,panel_width-118.0),84)
@@ -252,7 +257,7 @@ func _layout_result(center: Vector2, page_top: float) -> void:
 		var button := buttons[index]
 		if button.visible:
 			var button_width := minf(480.0, maxf(300.0, size.x - 120.0))
-			button.position = Vector2(center.x-button_width*0.5,page_top+458+index*56)
+			button.position = Vector2(center.x-button_width*0.5,page_top+500+index*56)
 			button.size = Vector2(button_width,46)
 
 func set_mode(next_mode: String, next_summary: Dictionary = {}) -> void:
@@ -488,10 +493,11 @@ func _draw() -> void:
 	draw_arc(seal,38,0,TAU,40,BRASS,3,true)
 	draw_circle(seal+Vector2(-3,-2),21,Color("d4def6"))
 	draw_circle(seal+Vector2(8,-8),19,Color("101733"))
-	draw_line(Vector2(center.x-230,page_top+132),Vector2(center.x+230,page_top+132),BRASS,2,true)
+	var divider_y := page_top + (208.0 if mode == "result" else 132.0)
+	draw_line(Vector2(center.x-230,divider_y),Vector2(center.x+230,divider_y),BRASS,2,true)
 	var frame := Rect2(Vector2(42,42), size-Vector2(84,84))
 	draw_style_box(_page_frame_style(), frame)
-	draw_line(Vector2(frame.position.x, page_top+132), Vector2(frame.end.x, page_top+132), Color(0.67,0.50,0.25,0.34), 1.0, true)
+	draw_line(Vector2(frame.position.x, divider_y), Vector2(frame.end.x, divider_y), Color(0.67,0.50,0.25,0.34), 1.0, true)
 
 func _page_frame_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -541,6 +547,9 @@ func _displayed_result_fields() -> Dictionary:
 		"weapon_ranks":weapon_ranks, "build_summary":build_summary,
 		"selected_upgrades":selected,
 		"selected_upgrade_count":selected.size(),
-		"actions":["retry", "title"],
-		"presentation_contract":{"summary_stats":true,"build_summary":true,"retry":true,"title":true},
+		# Credits/provenance remains a first-class Result affordance alongside
+		# replay and title return; keep the machine-readable receipt aligned with
+		# the visible action row configured in `set_mode("result")`.
+		"actions":["retry", "title", "credits"],
+		"presentation_contract":{"summary_stats":true,"build_summary":true,"retry":true,"title":true,"credits":true},
 	}

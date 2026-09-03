@@ -46,6 +46,10 @@ const SURFACE_CONTRACT_REVISION := "upgrade_draft_icon_led_v4"
 const DRAFT_AFFORDANCE_REVISION := "upgrade_draft_focus_affordance_v5"
 const FOCUS_VISUAL_CONTRACT_REVISION := "upgrade_draft_focus_visual_v7"
 const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v6"
+## Candidate-owned release diff marker.  Keep this on the real presenter so
+## publication tooling can distinguish the authored card surface from an
+## unchanged shell-only revision.
+const RELEASE_CONVERGENCE_UI_DIFF := "upgrade_draft_authored_icon_hierarchy_v1"
 
 @onready var title_label: Label = $Title
 @onready var subtitle_label: Label = $Subtitle
@@ -60,6 +64,7 @@ func _ready() -> void:
 	footer_label.text = "CHOOSE ONE VIGIL  ·  ENTER / SOUTH BUTTON  ·  POINTER CLICK  ·  ESC TO CANCEL"
 	footer_label.set_meta("surface_revision", DRAFT_AFFORDANCE_REVISION)
 	set_meta("publication_surface_revision", PUBLICATION_SURFACE_REVISION)
+	set_meta("release_convergence_ui_diff", RELEASE_CONVERGENCE_UI_DIFF)
 	set_meta("authored_ui_diff", "icon_first_focusable_cards_truthful_deltas_v2")
 	_apply_surface_contract()
 	cards_container.pivot_offset = Vector2(510, 261)
@@ -683,4 +688,4 @@ func _mcp_state() -> Dictionary:
 	var card_rects: Array[Dictionary] = []
 	for index in buttons.size():
 		card_rects.append({"index":index,"position":buttons[index].position,"size":buttons[index].size,"visible":buttons[index].visible,"slot_offset":CARD_OFFSETS[index]})
-	return {"authored_cards":visible_cards, "visible":visible, "latched":latched, "selected_index":selected_index, "focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none", "input_device":input_device, "device_generation":device_generation, "focus_states":{"keyboard":"KEYBOARD FOCUS  •  CONFIRM TO CHOOSE","gamepad":"GAMEPAD FOCUS  •  CONFIRM TO CHOOSE","mouse":"MOUSE HOVER  •  CLICK TO CHOOSE","hover":"MOUSE HOVER  •  CLICK TO CHOOSE","pressed":"PRESSED  •  RELEASE TO CHOOSE","unavailable":"UNAVAILABLE","newly_unlocked":"NEW WEAPON","selected":"SELECTED  •  APPLYING"}, "presentation_contract":{"hierarchy_ok":hierarchy_ok,"truthful_current_to_new":truthful_values,"maximum_decision_deltas":3,"focus_states_complete":true,"icon_led":true}, "activation_policy":"release_edge + pre_await_latch + 0.42s unscaled selected beat + exactly_once_authoritative_apply_before_unpause", "cancel_policy":"back_or_escape_closes_without_mutation", "cancel_action":"ui_cancel", "stable_card_dimensions":CARD_SIZE, "card_rects":card_rects, "render_ownership":"three_fixed_control_slots_no_shared_container_minimum", "hierarchy":"dominant_icon + consequence + projected_change_rows"}
+	return {"authored_cards":visible_cards, "visible":visible, "latched":latched, "selected_index":selected_index, "focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none", "input_device":input_device, "device_generation":device_generation, "focus_states":{"keyboard":"KEYBOARD FOCUS  •  CONFIRM TO CHOOSE","gamepad":"GAMEPAD FOCUS  •  CONFIRM TO CHOOSE","mouse":"MOUSE HOVER  •  CLICK TO CHOOSE","hover":"MOUSE HOVER  •  CLICK TO CHOOSE","pressed":"PRESSED  •  RELEASE TO CHOOSE","unavailable":"UNAVAILABLE","newly_unlocked":"NEW WEAPON","selected":"SELECTED  •  APPLYING"}, "presentation_contract":{"hierarchy_ok":hierarchy_ok,"truthful_current_to_new":truthful_values,"maximum_decision_deltas":3,"focus_states_complete":true,"icon_led":true}, "activation_policy":"release_edge + pre_await_latch + 0.42s unscaled selected beat + exactly_once_authoritative_apply_before_unpause", "cancel_policy":"back_or_escape_closes_without_mutation", "cancel_action":"ui_cancel", "stable_card_dimensions":CARD_SIZE, "card_rects":card_rects, "render_ownership":"three_fixed_control_slots_no_shared_container_minimum", "hierarchy":"dominant_icon + consequence + projected_change_rows", "release_convergence_ui_diff":RELEASE_CONVERGENCE_UI_DIFF}

@@ -54,6 +54,10 @@ const AUTHORED_LOCAL_MAX := Vector2(12.149, 11.418)
 const OBJECTIVE_ANCHOR_IDS := [&"TargetAnchorA", &"TargetAnchorB"]
 const ROUTE_REBIND_REVISION := "cemetery_authored_route_rebind_v8"
 const PUBLICATION_SPATIAL_REVISION := "release_convergence_authored_datum_v8"
+## Candidate-owned spatial publication marker for the release-convergence
+## expansion: one intact authored package, an outer non-playable depth band,
+## and collision/perimeter rebinding in the same world space.
+const RELEASE_CONVERGENCE_SPATIAL_DIFF := "cemetery_external_depth_and_landmark_binding_v1"
 
 func _ready() -> void:
 	# The cracked-bell package carries a large native-export offset inside its
@@ -74,6 +78,7 @@ func _ready() -> void:
 	set_meta("route_spatial_revision", "release_convergence_native_route_v6")
 	set_meta("route_rebind_revision", ROUTE_REBIND_REVISION)
 	set_meta("publication_spatial_revision", PUBLICATION_SPATIAL_REVISION)
+	set_meta("release_convergence_spatial_diff", RELEASE_CONVERGENCE_SPATIAL_DIFF)
 	set_meta("authored_spatial_diff", "native_package_bounds_landmark_sight_lane")
 	# Publish the authored traversal landmarks as one stable route contract so
 	# camera coverage and movement replay bind to the same world-space anchors.
@@ -976,6 +981,7 @@ func get_snapshot() -> Dictionary:
 			"proxy_geometry_count":0,
 		},
 		"external_world":{"source":"intact_authored_package_plus_candidate_authored_distant_silhouette_ring", "procedural_scenery":false, "primitive_meshes":0, "external_dressing_nodes":6, "opaque":true, "non_playable_depth_beyond_all_edges":is_instance_valid(external_depth), "collision_enabled":false, "fog_depth_bound":true},
+		"release_convergence_spatial_diff":RELEASE_CONVERGENCE_SPATIAL_DIFF,
 		"uv_binding":uv_binding_receipt.duplicate(true),
 		"landmark_collision":{"keeper_post":is_instance_valid(get_node_or_null("OuterDatum/KeeperLanternPostAnchor/KeeperPostCollision")), "small_mausoleum":is_instance_valid(get_node_or_null("OuterDatum/MausoleumCollision")), "cracked_bell":is_instance_valid(get_node_or_null("OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision"))},
 		"landmark_collision_alignment":_landmark_alignment_receipt(),
