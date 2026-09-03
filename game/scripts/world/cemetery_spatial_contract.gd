@@ -474,7 +474,21 @@ func _bind_box_collision_to_visual(body_path: String, bounds: AABB, margin: floa
 		var top := expanded.end.y
 		expanded.position.y = grounded_bottom
 		expanded.size.y = maxf(0.1, top - grounded_bottom)
-	return _bind_box_body_world(get_node_or_null(body_path) as StaticBody3D, expanded.get_center(), expanded.size)
+	var body := get_node_or_null(body_path) as StaticBody3D
+	var bound := _bind_box_body_world(body, expanded.get_center(), expanded.size)
+	if bound:
+		# Landmark scenes carry authored child-shape offsets for their original
+		# local anchors. Once the outer body is rebased from the rendered AABB,
+		# retaining that offset would double-translate the collider and leave
+		# near-contact movement out of sync with the visible footprint. The
+		# candidate-owned binding owns the body origin, so center the shape under
+		# it while preserving the imported landmark and its serialized dimensions.
+		var shape_node := _first_shape(body)
+		if is_instance_valid(shape_node):
+			shape_node.position = Vector3.ZERO
+			shape_node.rotation = Vector3.ZERO
+			shape_node.set_meta("bound_to_rendered_aabb", true)
+	return bound
 
 func _bind_tree_collision_to_visual(body_path: String, bounds: AABB) -> Dictionary:
 	var body := get_node_or_null(body_path) as StaticBody3D
@@ -489,6 +503,12 @@ func _bind_tree_collision_to_visual(body_path: String, bounds: AABB) -> Dictiona
 	body.global_position = Vector3(bounds.get_center().x, bounds.position.y + trunk_height * 0.5, bounds.get_center().z)
 	var basis_scale := shape_node.global_transform.basis.get_scale().abs()
 	var cylinder := shape_node.shape as CylinderShape3D
+	# The serialized tree shape is authored relative to the old static-body
+	# anchor. Rebinding the body from the measured trunk AABB requires a neutral
+	# child transform; otherwise the collider remains vertically displaced from
+	# the visible trunk after wrapper scaling.
+	shape_node.position = Vector3.ZERO
+	shape_node.rotation = Vector3.ZERO
 	cylinder.height = trunk_height / maxf(0.001, basis_scale.y)
 	cylinder.radius = trunk_radius / maxf(0.001, maxf(basis_scale.x, basis_scale.z))
 	return {"bound":true,"body_path":body_path,"visual_bounds":bounds,"world_radius":trunk_radius,"world_height":trunk_height}

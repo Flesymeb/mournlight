@@ -654,6 +654,18 @@ func _refresh_card_state(index: int) -> void:
 	# controller flag or placeholder numeric value.
 	elif newly_unlocked: state = "NEW WEAPON"
 	_state_nodes[index].text = state
+	# Keep the interaction line itself visually stateful, not just the card
+	# chrome.  This makes the selected/locked beat readable at a glance and
+	# gives keyboard, pointer, and unavailable states a stable semantic colour
+	# channel without changing the fixed card geometry.
+	var state_color := Color(0.48, 0.95, 0.9)
+	if state.begins_with("SELECTED"):
+		state_color = Color(1.0, 0.76, 0.31)
+	elif state == "UNAVAILABLE" or state == "CHOICE LOCKED":
+		state_color = Color(0.54, 0.57, 0.66)
+	elif state.begins_with("PRESSED") or "HOVER" in state:
+		state_color = Color(0.43, 0.96, 0.86)
+	_state_nodes[index].add_theme_color_override("font_color", state_color)
 	_apply_card_style(index, state)
 	buttons[index].modulate = Color(0.56, 0.58, 0.65) if not available else Color.WHITE
 	# Theme minimums are presentation data, never layout ownership. Reassert only
