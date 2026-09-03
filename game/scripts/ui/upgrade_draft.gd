@@ -50,11 +50,11 @@ const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v12"
 ## Candidate-owned implementation revision for the release-convergence card
 ## surface. This is intentionally behavior-bound (focus routing below), not a
 ## metadata-only publication marker.
-const RELEASE_CONVERGENCE_UI_IMPLEMENTATION_REVISION := "upgrade_draft_focus_routing_v7"
+const RELEASE_CONVERGENCE_UI_IMPLEMENTATION_REVISION := "upgrade_draft_focus_routing_v8"
 ## Candidate-owned release diff marker.  Keep this on the real presenter so
 ## publication tooling can distinguish the authored card surface from an
 ## unchanged shell-only revision.
-const RELEASE_CONVERGENCE_UI_DIFF := "upgrade_draft_authored_icon_hierarchy_v6"
+const RELEASE_CONVERGENCE_UI_DIFF := "upgrade_draft_authored_icon_hierarchy_v7"
 
 @onready var title_label: Label = $Title
 @onready var subtitle_label: Label = $Subtitle
@@ -108,6 +108,7 @@ func _ready() -> void:
 		buttons[index].mouse_exited.connect(_set_hovered.bind(index, false))
 		buttons[index].button_down.connect(_set_pressed.bind(index, true))
 		buttons[index].button_up.connect(_set_pressed.bind(index, false))
+	_refresh_focus_neighbors()
 	visible = false
 	_layout_cards()
 
@@ -221,6 +222,7 @@ func present(next_cards: Array[Dictionary]) -> void:
 		buttons[index].accessibility_description = "Rank %d. %s. %s Activate to confirm." % [projected_rank, "; ".join(delta_summary) if not delta_summary.is_empty() else "New pattern with no numeric delta", _consequence_nodes[index].text]
 		buttons[index].disabled = not bool(card.get("available", true))
 		_refresh_card_state(index)
+	_refresh_focus_neighbors()
 	visible = true
 	if not buttons[0].disabled:
 		buttons[0].grab_focus()
@@ -295,6 +297,34 @@ func _focus_first_available() -> void:
 			button.grab_focus()
 			return
 
+func _refresh_focus_neighbors() -> void:
+	"""Route lateral focus around unavailable offers without escaping the draft."""
+	var count := buttons.size()
+	if count == 0:
+		return
+	for index in count:
+		var button := buttons[index]
+		button.focus_neighbor_top = button.get_path()
+		button.focus_neighbor_bottom = button.get_path()
+		if button.disabled:
+			button.focus_neighbor_left = button.get_path()
+			button.focus_neighbor_right = button.get_path()
+			continue
+		var left_target := index
+		var right_target := index
+		for offset in range(1, count + 1):
+			var candidate_left := (index - offset + count) % count
+			if not buttons[candidate_left].disabled:
+				left_target = candidate_left
+				break
+		for offset in range(1, count + 1):
+			var candidate_right := (index + offset) % count
+			if not buttons[candidate_right].disabled:
+				right_target = candidate_right
+				break
+		button.focus_neighbor_left = buttons[left_target].get_path()
+		button.focus_neighbor_right = buttons[right_target].get_path()
+
 func close() -> void:
 	_presentation_serial += 1
 	visible = false
@@ -354,6 +384,7 @@ func reject_choice() -> void:
 	for index in buttons.size():
 		buttons[index].disabled = index >= cards.size() or not bool(cards[index].get("available", false))
 		_refresh_card_state(index)
+	_refresh_focus_neighbors()
 
 func _decision_changes(source_changes: Variant) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []

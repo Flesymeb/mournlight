@@ -10,7 +10,7 @@ extends Node3D
 ## the shipped high-angle perimeter views. This wrapper datum is intentionally
 ## product-owned; the imported cemetery remains one intact instance and the
 ## additive collision/navigation shell is rebound from its resulting bounds.
-@export var authored_wrapper_scale_multiplier := 1.5
+@export var authored_wrapper_scale_multiplier := 1.58
 ## Keep a measurable non-playable world band around the authored streets so
 ## perimeter camera views retain cemetery depth instead of exposing an abrupt
 ## edge. This datum is consumed by perimeter, spawn, and route binding.
@@ -60,8 +60,8 @@ const PUBLICATION_SPATIAL_REVISION := "release_convergence_authored_datum_v10"
 ## Candidate-owned spatial publication marker for the release-convergence
 ## expansion: one intact authored package, an outer non-playable depth band,
 ## and collision/perimeter rebinding in the same world space.
-const RELEASE_CONVERGENCE_SPATIAL_DIFF := "cemetery_external_depth_and_landmark_binding_v6"
-const RELEASE_CONVERGENCE_SPATIAL_IMPLEMENTATION_REVISION := "cemetery_authored_datum_rebind_v11"
+const RELEASE_CONVERGENCE_SPATIAL_DIFF := "cemetery_external_depth_and_landmark_binding_v8"
+const RELEASE_CONVERGENCE_SPATIAL_IMPLEMENTATION_REVISION := "cemetery_authored_datum_rebind_v13"
 
 func _ready() -> void:
 	# The cracked-bell package carries a large native-export offset inside its
