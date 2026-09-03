@@ -61,6 +61,18 @@ var last_setting_mutation: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# The shell is a full-viewport product surface. Keep its accessibility and
+	# focus contract explicit on the real controls so every page (including
+	# dynamically populated settings/result rows) remains traversable after a
+	# transition or UI-scale change.
+	focus_mode = Control.FOCUS_NONE
+	set_meta("shell_accessibility_contract", {
+		"full_viewport": true,
+		"initial_focus_required": true,
+		"keyboard_mouse_gamepad": true,
+		"focus_states": ["normal", "hover", "focused", "pressed", "disabled"],
+		"persisted_settings": true,
+	})
 	buttons = [$PrimaryButton, $SecondaryButton]
 	for index in range(10):
 		var button := Button.new()
@@ -72,6 +84,8 @@ func _ready() -> void:
 		var button := buttons[index]
 		button.expand_icon = true
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.focus_mode = Control.FOCUS_ALL
+		button.custom_minimum_size = Vector2(300.0, 34.0)
 		button.pressed.connect(_on_button.bind(index))
 	_build_labels()
 	_build_setting_groups()
@@ -178,7 +192,10 @@ func _layout() -> void:
 	# Result carries three compact statistic lines plus the archive caption. Give
 	# that copy a dedicated vertical lane so it cannot cross the brass divider
 	# at the supported 1280x720 capture scale.
-	var body_height := 190.0 if mode == "credits" else 154.0 if mode == "help" else 104.0 if mode == "result" else 56.0
+	# Pause carries the live binding summary plus the collectible/drop hint;
+	# reserve a real text lane so the divider and first action never cut through
+	# the final line at the native 16:9 viewport.
+	var body_height := 190.0 if mode == "credits" else 154.0 if mode == "help" else 104.0 if mode == "result" else 124.0 if mode == "pause" else 56.0
 	body_label.size = Vector2(800,body_height)
 	var visible_count := 0
 	for button in buttons:
@@ -191,7 +208,7 @@ func _layout() -> void:
 		_layout_result(center, page_top)
 		return
 	var compact := visible_count >= 5
-	var start_y := page_top + (360 if mode == "credits" else 350 if mode == "help" else 255 if mode == "result" else 184)
+	var start_y := page_top + (360 if mode == "credits" else 350 if mode == "help" else 255 if mode == "result" else 236 if mode == "pause" else 184)
 	var spacing := 48 if compact else 56
 	var button_height := 42 if compact else 46
 	for index in buttons.size():
@@ -329,6 +346,9 @@ func _configure(title: String, subtitle: String, body: String, entries: Array) -
 			button.visible = false
 	for index in actions.size():
 		var button := buttons[index]
+		button.set_meta("shell_action", String(actions[index]))
+		button.tooltip_text = String(button.text)
+		button.accessibility_name = String(button.text)
 		var previous := buttons[(index - 1 + actions.size()) % actions.size()]
 		var next := buttons[(index + 1) % actions.size()]
 		button.focus_neighbor_top = button.get_path_to(previous)
@@ -493,7 +513,7 @@ func _draw() -> void:
 	draw_arc(seal,38,0,TAU,40,BRASS,3,true)
 	draw_circle(seal+Vector2(-3,-2),21,Color("d4def6"))
 	draw_circle(seal+Vector2(8,-8),19,Color("101733"))
-	var divider_y := page_top + (208.0 if mode == "result" else 132.0)
+	var divider_y := page_top + (208.0 if mode == "result" else 218.0 if mode == "pause" else 132.0)
 	draw_line(Vector2(center.x-230,divider_y),Vector2(center.x+230,divider_y),BRASS,2,true)
 	var frame := Rect2(Vector2(42,42), size-Vector2(84,84))
 	draw_style_box(_page_frame_style(), frame)

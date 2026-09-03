@@ -263,13 +263,13 @@ func _read_movement_input() -> Vector2:
 	return Vector2.ZERO
 
 func _camera_relative_direction(input_vector: Vector2) -> Vector3:
-	if input_vector.length_squared() <= 0.001:
-		camera_relative_direction = Vector3.ZERO
-		return Vector3.ZERO
 	var camera := get_viewport().get_camera_3d()
 	if not camera:
 		camera_forward = Vector3.FORWARD
 		camera_right = Vector3.RIGHT
+		if input_vector.length_squared() <= 0.001:
+			camera_relative_direction = Vector3.ZERO
+			return Vector3.ZERO
 		camera_relative_direction = Vector3(input_vector.x, 0.0, input_vector.y).normalized()
 		return camera_relative_direction
 	var camera_right := camera.global_transform.basis.x
@@ -280,6 +280,9 @@ func _camera_relative_direction(input_vector: Vector2) -> Vector3:
 	camera_forward = camera_forward.normalized()
 	self.camera_right = camera_right
 	self.camera_forward = camera_forward
+	if input_vector.length_squared() <= 0.001:
+		camera_relative_direction = Vector3.ZERO
+		return Vector3.ZERO
 	camera_relative_direction = (camera_right * input_vector.x + camera_forward * -input_vector.y).limit_length(1.0)
 	return camera_relative_direction
 

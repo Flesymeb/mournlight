@@ -164,7 +164,7 @@ func _ready() -> void:
 	# though their collision/anchor bindings were valid.  A modest north bias
 	# preserves the Warden in the lower safe lane while keeping both landmarks
 	# fully readable; it does not move authored geometry.
-	framing_bias = Vector3(0.0, 0.0, -2.0)
+	framing_bias = Vector3(3.2, 0.0, -2.0)
 	# Place the shipped high-angle rig on the south sight lane. The previous
 	# west/east orbits put the tall crypt directly between the camera and the
 	# keeper/bell route, so the live frame read as a wall even though diagnostic
@@ -173,7 +173,11 @@ func _ready() -> void:
 	mouse_yaw_degrees = 0.0
 	obstruction_lateral_bypass = 0.0
 	current = true
-	normal_fov = 78.0
+	# The eastern bell landmark sat just beyond the shipped frustum at the
+	# native spawn lane. A modestly wider lens preserves the readable Warden and
+	# mausoleum silhouettes while bringing the bell and its approach lane into
+	# the same ordinary gameplay frame (without moving authored geometry).
+	normal_fov = 88.0
 	fov = normal_fov
 	# Keep the shipped camera's visibility query bound to the same dedicated
 	# landmark layer as CemeterySpatialContract.  The scene resource historically

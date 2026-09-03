@@ -49,7 +49,7 @@ const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v6"
 ## Candidate-owned release diff marker.  Keep this on the real presenter so
 ## publication tooling can distinguish the authored card surface from an
 ## unchanged shell-only revision.
-const RELEASE_CONVERGENCE_UI_DIFF := "upgrade_draft_authored_icon_hierarchy_v2"
+const RELEASE_CONVERGENCE_UI_DIFF := "upgrade_draft_authored_icon_hierarchy_v3"
 
 @onready var title_label: Label = $Title
 @onready var subtitle_label: Label = $Subtitle
@@ -65,6 +65,11 @@ func _ready() -> void:
 	footer_label.set_meta("surface_revision", DRAFT_AFFORDANCE_REVISION)
 	set_meta("publication_surface_revision", PUBLICATION_SURFACE_REVISION)
 	set_meta("release_convergence_ui_diff", RELEASE_CONVERGENCE_UI_DIFF)
+	set_meta("publication_contract", {
+		"icon_first": true,
+		"decision_delta_cap": MAX_DECISION_DELTAS,
+		"focus_states_dimensionally_stable": true,
+	})
 	set_meta("authored_ui_diff", "icon_first_focusable_cards_truthful_deltas_v2")
 	_apply_surface_contract()
 	cards_container.pivot_offset = Vector2(510, 261)
