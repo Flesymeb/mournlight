@@ -2797,6 +2797,19 @@ func _capture_profile_next_frame_isolation(setup_generation: int, expected_run_s
 	validation_profile_receipt.next_frame_lifecycle = _lifecycle_counters()
 	validation_profile_receipt.next_frame_input_context = next_frame_input_context
 	validation_profile_receipt.next_frame_isolation_pending = false
+	# The immediate teardown snapshot is captured before _begin_run() and can
+	# still contain the retiring attack animation (for example a cast/recovery
+	# hold).  Once this deferred frame proves the ordinary baseline is isolated,
+	# refresh the nested retirement receipt as well; otherwise host tooling sees
+	# a truthful next_frame_isolation=true beside a stale reset_invariants=false.
+	var settled_reset_invariants := _terminal_reset_invariants("profile_reset")
+	var settled_retirement: Dictionary = validation_profile_receipt.get("resolved_retirement", {})
+	if not settled_retirement.is_empty():
+		settled_retirement["reset_invariants"] = settled_reset_invariants.duplicate(true)
+		settled_retirement["post_reset_invariants"] = settled_reset_invariants.duplicate(true)
+		settled_retirement["complete"] = bool(settled_retirement.get("complete", false)) and bool(settled_reset_invariants.get("complete", false))
+		validation_profile_receipt.resolved_retirement = settled_retirement
+	validation_profile_receipt.reset_invariants = settled_reset_invariants.duplicate(true)
 	validation_profile_receipt.phase_sample_availability = {"reset_next_frame": {
 		"frames_ran": true,
 		"frame_sample_count": 0,

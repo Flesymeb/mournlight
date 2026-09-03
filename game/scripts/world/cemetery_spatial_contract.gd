@@ -61,6 +61,7 @@ const PUBLICATION_SPATIAL_REVISION := "release_convergence_authored_datum_v10"
 ## expansion: one intact authored package, an outer non-playable depth band,
 ## and collision/perimeter rebinding in the same world space.
 const RELEASE_CONVERGENCE_SPATIAL_DIFF := "cemetery_external_depth_and_landmark_binding_v6"
+const RELEASE_CONVERGENCE_SPATIAL_IMPLEMENTATION_REVISION := "cemetery_authored_datum_rebind_v11"
 
 func _ready() -> void:
 	# The cracked-bell package carries a large native-export offset inside its
@@ -82,6 +83,7 @@ func _ready() -> void:
 	set_meta("route_rebind_revision", ROUTE_REBIND_REVISION)
 	set_meta("publication_spatial_revision", PUBLICATION_SPATIAL_REVISION)
 	set_meta("release_convergence_spatial_diff", RELEASE_CONVERGENCE_SPATIAL_DIFF)
+	set_meta("release_convergence_spatial_implementation_revision", RELEASE_CONVERGENCE_SPATIAL_IMPLEMENTATION_REVISION)
 	set_meta("publication_contract", {
 		"single_authored_instance": true,
 		"outer_datum_collision_rebound": true,

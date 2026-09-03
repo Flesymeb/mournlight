@@ -47,6 +47,10 @@ const SURFACE_CONTRACT_REVISION := "upgrade_draft_icon_led_v4"
 const DRAFT_AFFORDANCE_REVISION := "upgrade_draft_focus_affordance_v5"
 const FOCUS_VISUAL_CONTRACT_REVISION := "upgrade_draft_focus_visual_v7"
 const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v12"
+## Candidate-owned implementation revision for the release-convergence card
+## surface. This is intentionally behavior-bound (focus routing below), not a
+## metadata-only publication marker.
+const RELEASE_CONVERGENCE_UI_IMPLEMENTATION_REVISION := "upgrade_draft_focus_routing_v7"
 ## Candidate-owned release diff marker.  Keep this on the real presenter so
 ## publication tooling can distinguish the authored card surface from an
 ## unchanged shell-only revision.
@@ -65,6 +69,7 @@ func _ready() -> void:
 	footer_label.text = "CHOOSE ONE VIGIL  ·  ICON → DELTAS  ·  LEFT / RIGHT TO FOCUS  ·  ENTER / SOUTH TO CONFIRM  ·  ESC TO CANCEL"
 	footer_label.set_meta("surface_revision", DRAFT_AFFORDANCE_REVISION)
 	set_meta("publication_surface_revision", PUBLICATION_SURFACE_REVISION)
+	set_meta("release_convergence_ui_implementation_revision", RELEASE_CONVERGENCE_UI_IMPLEMENTATION_REVISION)
 	set_meta("release_convergence_ui_diff", RELEASE_CONVERGENCE_UI_DIFF)
 	set_meta("publication_contract", {
 		"icon_first": true,
@@ -90,6 +95,11 @@ func _ready() -> void:
 		# ring wraps so a held direction can never escape into an underlying page.
 		buttons[index].focus_neighbor_left = buttons[(index - 1 + buttons.size()) % buttons.size()].get_path()
 		buttons[index].focus_neighbor_right = buttons[(index + 1) % buttons.size()].get_path()
+		# Keep focus within the authored three-card decision surface when a
+		# gamepad/keyboard reports a vertical navigation edge. This prevents focus
+		# escaping into the pause backdrop without changing card dimensions.
+		buttons[index].focus_neighbor_top = buttons[index].get_path()
+		buttons[index].focus_neighbor_bottom = buttons[index].get_path()
 		buttons[index].mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		buttons[index].pressed.connect(_choose.bind(index))
 		buttons[index].focus_entered.connect(_on_card_focus_changed.bind(index))

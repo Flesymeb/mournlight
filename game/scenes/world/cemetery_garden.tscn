@@ -75,6 +75,7 @@ metadata/route_receipt_revision = "cemetery_authored_route_rebind_v9"
 metadata/publication_spatial_revision = "release_convergence_authored_datum_v10"
 metadata/authored_spatial_diff = "native_package_bounds_landmark_sight_lane"
 metadata/cracked_bell_rebase = "rendered_center_inside_playable_perimeter_v1"
+metadata/release_convergence_spatial_implementation_revision = "cemetery_authored_datum_rebind_v11"
 
 [node name="PackageTransform" type="Node3D" parent="." unique_id=1533547498]
 transform = Transform3D(2.925, 0, 0, 0, 2.925, 0, 0, 0, 2.925, 0.28, 0.02, 0)
