@@ -49,7 +49,7 @@ const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v6"
 ## Candidate-owned release diff marker.  Keep this on the real presenter so
 ## publication tooling can distinguish the authored card surface from an
 ## unchanged shell-only revision.
-const RELEASE_CONVERGENCE_UI_DIFF := "upgrade_draft_authored_icon_hierarchy_v1"
+const RELEASE_CONVERGENCE_UI_DIFF := "upgrade_draft_authored_icon_hierarchy_v2"
 
 @onready var title_label: Label = $Title
 @onready var subtitle_label: Label = $Subtitle
@@ -61,7 +61,7 @@ func _ready() -> void:
 	# authored UI copy (not telemetry): every draft exposes the same concise
 	# confirm path while the live device-specific tooltip below remains bound to
 	# the active input context.
-	footer_label.text = "CHOOSE ONE VIGIL  ·  ENTER / SOUTH BUTTON  ·  POINTER CLICK  ·  ESC TO CANCEL"
+	footer_label.text = "CHOOSE ONE VIGIL  ·  ENTER / SOUTH BUTTON  ·  CLICK TO CONFIRM  ·  ESC TO CANCEL"
 	footer_label.set_meta("surface_revision", DRAFT_AFFORDANCE_REVISION)
 	set_meta("publication_surface_revision", PUBLICATION_SURFACE_REVISION)
 	set_meta("release_convergence_ui_diff", RELEASE_CONVERGENCE_UI_DIFF)
