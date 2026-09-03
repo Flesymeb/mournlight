@@ -97,6 +97,7 @@ var dense_profile_self_audit: Dictionary = {}
 var ordinary_victory_receipt: Dictionary = {}
 var ordinary_victory_transactions: Array[Dictionary] = []
 var tester_victory_fixture_receipt: Dictionary = {}
+var tester_failure_fixture_receipt: Dictionary = {}
 var pickup_spawned_total := 0
 var pickup_collected_total := 0
 var _profile_samples_ms: Array[float] = []
@@ -184,6 +185,7 @@ const DEVELOPMENT_ONLY_ACTIONS := [
 	&"validation_reset_final_profile", &"tester_victory_prepare", &"tester_victory_advance",
 	&"tester_victory_commit", &"tester_final_profile_prepare", &"tester_final_profile_advance",
 	&"tester_final_profile_reset", &"tester_dense_prepare", &"tester_dense_advance", &"tester_dense_reset",
+	&"tester_failure_prepare", &"tester_failure_advance", &"tester_failure_commit",
 	&"qa_reset_first_run_guidance",
 ]
 
@@ -225,7 +227,7 @@ func _ready() -> void:
 	input_router.device_changed.connect(_on_input_device_changed)
 	draft_view.set_input_device(input_router.active_device, input_router.device_generation)
 	if OS.has_feature("editor"):
-		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_draft", &"validation_prepare_result_failure", &"validation_prepare_result_victory", &"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_advance_density", &"validation_reset_density", &"validation_prepare_final_profile", &"validation_advance_final_profile", &"validation_reset_final_profile", &"tester_victory_prepare", &"tester_victory_advance", &"tester_victory_commit", &"tester_final_profile_prepare", &"tester_final_profile_advance", &"tester_final_profile_reset", &"tester_dense_prepare", &"tester_dense_advance", &"tester_dense_reset", &"qa_reset_first_run_guidance"]:
+		for action in [&"validation_prepare_wave4", &"validation_prepare_boss", &"validation_prepare_draft", &"validation_prepare_result_failure", &"validation_prepare_result_victory", &"validation_prepare_density_3", &"validation_prepare_density_5", &"validation_prepare_density_10", &"validation_prepare_density_18", &"validation_prepare_density_32", &"validation_advance_density", &"validation_reset_density", &"validation_prepare_final_profile", &"validation_advance_final_profile", &"validation_reset_final_profile", &"tester_victory_prepare", &"tester_victory_advance", &"tester_victory_commit", &"tester_final_profile_prepare", &"tester_final_profile_advance", &"tester_final_profile_reset", &"tester_dense_prepare", &"tester_dense_advance", &"tester_dense_reset", &"tester_failure_prepare", &"tester_failure_advance", &"tester_failure_commit", &"qa_reset_first_run_guidance"]:
 			if not InputMap.has_action(action):
 				InputMap.add_action(action)
 	_enter_title()
@@ -283,6 +285,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if OS.has_feature("editor") and event.is_action_pressed(&"tester_victory_commit"):
 		_commit_tester_victory()
+		get_viewport().set_input_as_handled()
+		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"tester_failure_prepare"):
+		_prepare_tester_failure()
+		get_viewport().set_input_as_handled()
+		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"tester_failure_advance"):
+		_advance_tester_failure()
+		get_viewport().set_input_as_handled()
+		return
+	if OS.has_feature("editor") and event.is_action_pressed(&"tester_failure_commit"):
+		_commit_tester_failure()
 		get_viewport().set_input_as_handled()
 		return
 	if OS.has_feature("editor") and event.is_action_pressed(&"tester_final_profile_prepare"):
@@ -476,6 +490,7 @@ func _begin_run() -> void:
 	boss_transition_history.clear()
 	ordinary_victory_receipt.clear()
 	tester_victory_fixture_receipt.clear()
+	tester_failure_fixture_receipt.clear()
 	_victory_transaction_active = false
 	_victory_hold_remaining = 0.0
 	_victory_hold_elapsed = 0.0
@@ -717,7 +732,10 @@ func _pause_run() -> void:
 			"renderer_probe_enabled":false,
 		}
 	_transition("paused")
-	get_tree().paused = true
+	# Preparation is an inspectable checkpoint, not a modal pause. Leaving the
+	# tree running lets Tester invoke the separate advance edge through the
+	# registered input surface; advance itself owns the brief presentation hold.
+	get_tree().paused = false
 	shell.set_mode("pause", last_snapshot)
 	_emit_snapshot()
 
@@ -774,6 +792,11 @@ func _present_result(_event: Dictionary) -> void:
 			tester_victory_fixture_receipt["result_presented"] = true
 			tester_victory_fixture_receipt["result_commit_count"] = terminal_commit_count
 			tester_victory_fixture_receipt["presentation_transaction"] = ordinary_victory_receipt.duplicate(true)
+	if String(tester_failure_fixture_receipt.get("branch_id", "")) == "tester_failure_transaction":
+		tester_failure_fixture_receipt["result_presented"] = true
+		tester_failure_fixture_receipt["result_committed"] = result_committed
+		tester_failure_fixture_receipt["result_commit_count"] = terminal_commit_count
+		tester_failure_fixture_receipt["presentation_paused"] = get_tree().paused
 	_emit_snapshot()
 
 func _finalize_victory_retry(transaction: Dictionary) -> void:
@@ -3497,7 +3520,7 @@ func _validation_controls_receipt() -> Dictionary:
 	var controls: Array[Dictionary] = []
 	for action in actions:
 		controls.append({"action":String(action), "registered":InputMap.has_action(action), "physical_binding_count":InputMap.action_get_events(action).size() if InputMap.has_action(action) else 0})
-	for action in [&"tester_victory_prepare", &"tester_victory_advance", &"tester_victory_commit", &"tester_final_profile_prepare", &"tester_final_profile_advance", &"tester_final_profile_reset", &"tester_dense_prepare", &"tester_dense_advance", &"tester_dense_reset"]:
+	for action in [&"tester_victory_prepare", &"tester_victory_advance", &"tester_victory_commit", &"tester_failure_prepare", &"tester_failure_advance", &"tester_failure_commit", &"tester_final_profile_prepare", &"tester_final_profile_advance", &"tester_final_profile_reset", &"tester_dense_prepare", &"tester_dense_advance", &"tester_dense_reset"]:
 		controls.append({"action":String(action), "registered":InputMap.has_action(action), "physical_binding_count":InputMap.action_get_events(action).size() if InputMap.has_action(action) else 0})
 	controls.append({"action":"qa_reset_first_run_guidance", "registered":InputMap.has_action(&"qa_reset_first_run_guidance"), "physical_binding_count":InputMap.action_get_events(&"qa_reset_first_run_guidance").size() if InputMap.has_action(&"qa_reset_first_run_guidance") else 0})
 	return {"editor_only":OS.has_feature("editor"), "release_export_available":false, "controls":controls, "prepare_and_advance_separate":true, "density_checkpoints":[3,5,10,18,32], "guidance_reset":_guidance_reset_receipt.duplicate(true)}
@@ -4051,7 +4074,10 @@ func _prepare_tester_victory() -> void:
 	boss_snapshot = boss.get_snapshot().duplicate(true)
 	world.set_session_active(false)
 	_validation_setup_generation += 1
-	get_tree().paused = true
+	# Preparation is an inspectable checkpoint, not a modal pause. Leaving the
+	# tree running lets Tester invoke the separate advance edge through the
+	# registered input surface; advance itself owns the presentation hold.
+	get_tree().paused = false
 	var prepared_animation := warden.animation_binding.get_snapshot() if warden.animation_binding else {}
 	var prepared_audio := audio_director._mcp_state()
 	tester_victory_fixture_receipt = {
@@ -4189,8 +4215,100 @@ func _prepare_validation_result(validation_outcome: String) -> void:
 	if validation_outcome == "victory":
 		_prepare_tester_victory()
 	else:
-		health.current_health = 0.0
-		_on_warden_failed({"validation":true})
+		# Preparation must leave the failure branch inspectable.  The previous
+		# helper applied lethal damage immediately, skipping the causal failure
+		# transition and making it impossible for Tester to capture a stable
+		# pre-Result state.  Route the legacy validation action through the same
+		# prepare/advance contract as the explicit tester controls.
+		_prepare_tester_failure()
+
+func _prepare_tester_failure() -> void:
+	if not OS.has_feature("editor") or run_state not in ["active", "boss"] or result_committed:
+		return
+	input_router.clear_transaction_latches("tester_failure_prepare")
+	run_route_kind = "diagnostic_prepared"
+	inventory.prepare_legal_build("representative")
+	health.maximum_health = 5000.0
+	health.reset_warden_health()
+	_last_health = health.current_health
+	warden.global_position = world.arena_contract.get_player_spawn()
+	warden.velocity = Vector3.ZERO
+	warden.planar_velocity = Vector3.ZERO
+	warden.reset_input_latch("tester_failure_prepare")
+	world.set_session_active(true)
+	_validation_setup_generation += 1
+	# Keep the prepared failure branch live so the explicit advance action can be
+	# delivered through the normal tester input context.
+	get_tree().paused = false
+	tester_failure_fixture_receipt = {
+		"branch_id":"tester_failure_transaction",
+		"requested_branch_id":"tester_failure_transaction.prepare",
+		"resolved_branch_id":"tester_failure_transaction.prepared",
+		"setup_generation":_validation_setup_generation,
+		"run_serial":run_serial,
+		"requested_state":"stable_warden_before_failure",
+		"resolved_state":run_state,
+		"requested_route_kind":"diagnostic_prepared",
+		"resolved_route_kind":run_route_kind,
+		"prepare_paused":get_tree().paused,
+		"result_committed":result_committed,
+		"terminal_commit_count":terminal_commit_count,
+		"advance_requested":false,
+		"advance_resolved":false,
+		"commit_requested":false,
+		"commit_resolved":false,
+		"rejected_edge_count":0,
+		"preparation_has_no_terminal_onset":not result_committed and terminal_snapshot.is_empty(),
+		"counts":_profile_counts(),
+		"lifecycle":_lifecycle_counters(),
+	}
+	_emit_snapshot()
+
+func _advance_tester_failure() -> void:
+	if not OS.has_feature("editor") or String(tester_failure_fixture_receipt.get("branch_id", "")) != "tester_failure_transaction":
+		return
+	if int(tester_failure_fixture_receipt.get("setup_generation", -1)) != _validation_setup_generation or int(tester_failure_fixture_receipt.get("run_serial", -1)) != run_serial:
+		tester_failure_fixture_receipt["rejected_edge_count"] = int(tester_failure_fixture_receipt.get("rejected_edge_count", 0)) + 1
+		tester_failure_fixture_receipt["last_rejected_edge"] = {"action":"advance", "reason":"stale_generation_or_run"}
+		_emit_snapshot()
+		return
+	if result_committed or run_state not in ["active", "boss"]:
+		tester_failure_fixture_receipt["rejected_edge_count"] = int(tester_failure_fixture_receipt.get("rejected_edge_count", 0)) + 1
+		tester_failure_fixture_receipt["last_rejected_edge"] = {"action":"advance", "reason":"already_terminal_or_wrong_state"}
+		_emit_snapshot()
+		return
+	get_tree().paused = false
+	tester_failure_fixture_receipt["advance_requested"] = true
+	tester_failure_fixture_receipt["advance_frame"] = Engine.get_process_frames()
+	var resolution := health.apply_damage({
+		"attack_id":"tester.failure.advance.g%04d" % _validation_setup_generation,
+		"damage":health.current_health + 1.0,
+		"damage_channel":"tester_failure_advance",
+	})
+	tester_failure_fixture_receipt["advance_resolved"] = bool(resolution.get("accepted", false)) and result_committed
+	tester_failure_fixture_receipt["resolved_branch_id"] = "tester_failure_transaction.result_pending" if bool(tester_failure_fixture_receipt["advance_resolved"]) else "tester_failure_transaction.advance_rejected"
+	tester_failure_fixture_receipt["resolved_state"] = run_state
+	tester_failure_fixture_receipt["result_committed_after_advance"] = result_committed
+	tester_failure_fixture_receipt["terminal_commit_count_after_advance"] = terminal_commit_count
+	tester_failure_fixture_receipt["presentation_paused"] = get_tree().paused
+	_emit_snapshot()
+
+func _commit_tester_failure() -> void:
+	if not OS.has_feature("editor") or String(tester_failure_fixture_receipt.get("branch_id", "")) != "tester_failure_transaction":
+		return
+	if not bool(tester_failure_fixture_receipt.get("advance_resolved", false)):
+		tester_failure_fixture_receipt["rejected_edge_count"] = int(tester_failure_fixture_receipt.get("rejected_edge_count", 0)) + 1
+		tester_failure_fixture_receipt["last_rejected_edge"] = {"action":"commit", "reason":"failure_not_advanced"}
+		_emit_snapshot()
+		return
+	tester_failure_fixture_receipt["commit_requested"] = true
+	tester_failure_fixture_receipt["commit_frame"] = Engine.get_process_frames()
+	# Failure already owns the authoritative Result handoff; commit is a
+	# receipt-only edge that confirms exactly one terminal snapshot.
+	tester_failure_fixture_receipt["commit_resolved"] = result_committed and terminal_commit_count == 1
+	tester_failure_fixture_receipt["resolved_branch_id"] = "tester_failure_transaction.result_committed" if bool(tester_failure_fixture_receipt["commit_resolved"]) else "tester_failure_transaction.commit_rejected"
+	tester_failure_fixture_receipt["terminal_commit_count"] = terminal_commit_count
+	_emit_snapshot()
 
 func _emit_snapshot() -> void:
 	if not is_node_ready():
@@ -4362,6 +4480,7 @@ func _mcp_state() -> Dictionary:
 		"complete_run_ledger":complete_run_ledger.get_snapshot(),
 		"validation_profile_matrix":_profile_matrix_snapshot(),
 		"tester_victory_fixture":tester_victory_fixture_receipt,
+		"tester_failure_fixture":tester_failure_fixture_receipt,
 		"reward_pickups":{"spawned_total":pickup_spawned_total,"collected_total":pickup_collected_total,"live":_active_pickup_count},
 		"reward_feedback":_reward_feedback_snapshot(),
 		"vitality_indicators":spawner._mcp_state().get("vitality_indicators", {}),

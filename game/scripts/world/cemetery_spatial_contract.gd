@@ -10,7 +10,7 @@ extends Node3D
 ## the shipped high-angle perimeter views. This wrapper datum is intentionally
 ## product-owned; the imported cemetery remains one intact instance and the
 ## additive collision/navigation shell is rebound from its resulting bounds.
-@export var authored_wrapper_scale_multiplier := 2.4
+@export var authored_wrapper_scale_multiplier := 1.5
 ## Keep a measurable non-playable world band around the authored streets so
 ## perimeter camera views retain cemetery depth instead of exposing an abrupt
 ## edge. This datum is consumed by perimeter, spawn, and route binding.

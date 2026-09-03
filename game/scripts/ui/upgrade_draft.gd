@@ -60,7 +60,7 @@ func _ready() -> void:
 	footer_label.text = "CHOOSE ONE VIGIL  ·  ENTER / SOUTH BUTTON  ·  POINTER CLICK  ·  ESC TO CANCEL"
 	footer_label.set_meta("surface_revision", DRAFT_AFFORDANCE_REVISION)
 	set_meta("publication_surface_revision", PUBLICATION_SURFACE_REVISION)
-	set_meta("authored_ui_diff", "icon_first_focusable_cards_truthful_deltas")
+	set_meta("authored_ui_diff", "icon_first_focusable_cards_truthful_deltas_v2")
 	_apply_surface_contract()
 	cards_container.pivot_offset = Vector2(510, 261)
 	for index in buttons.size():
