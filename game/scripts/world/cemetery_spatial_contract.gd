@@ -26,7 +26,7 @@ extends Node3D
 ## Extra authored approach clearance around the central mausoleum.  Objective
 ## and route markers use this lane so the visible landmark, its gameplay
 ## collision, and the traversable street remain in the same world-space frame.
-@export var landmark_sight_lane_margin := 3.0
+@export var landmark_sight_lane_margin := 3.25
 ## Visibility probes intentionally use the perimeter/landmark layer only.  The
 ## gameplay layer stays authoritative for Warden/enemy collision, while this
 ## separate mask prevents GroundCollision and MausoleumCollision from becoming
@@ -52,8 +52,8 @@ var _late_rebind_attempted := false
 const AUTHORED_LOCAL_MIN := Vector2(-12.143, -11.415)
 const AUTHORED_LOCAL_MAX := Vector2(12.149, 11.418)
 const OBJECTIVE_ANCHOR_IDS := [&"TargetAnchorA", &"TargetAnchorB"]
-const ROUTE_REBIND_REVISION := "cemetery_authored_route_rebind_v8"
-const PUBLICATION_SPATIAL_REVISION := "release_convergence_authored_datum_v8"
+const ROUTE_REBIND_REVISION := "cemetery_authored_route_rebind_v9"
+const PUBLICATION_SPATIAL_REVISION := "release_convergence_authored_datum_v9"
 ## Candidate-owned spatial publication marker for the release-convergence
 ## expansion: one intact authored package, an outer non-playable depth band,
 ## and collision/perimeter rebinding in the same world space.

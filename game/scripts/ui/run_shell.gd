@@ -372,6 +372,18 @@ func _refresh_settings_page() -> void:
 		["back","BACK"]])
 	_set_auxiliary_visibility(true, false)
 
+## Keep settings mutations from stealing the user's traversal position.  The
+## page is rebuilt after every toggle so the label reflects the persisted
+## value; restoring the previously activated row makes keyboard/gamepad and
+## pointer navigation feel like one continuous transaction.
+func _refresh_settings_page_preserving_focus(focus_action: String = "") -> void:
+	_refresh_settings_page()
+	if focus_action.is_empty():
+		return
+	var index := actions.find(StringName(focus_action))
+	if index >= 0 and index < buttons.size() and buttons[index].visible and not buttons[index].disabled:
+		buttons[index].grab_focus.call_deferred()
+
 func _set_auxiliary_visibility(settings_visible: bool, result_visible: bool) -> void:
 	for label in setting_group_labels:
 		label.visible = settings_visible
@@ -457,14 +469,14 @@ func _on_button(index: int) -> void:
 		setting_values[key] = next
 		settings.set_value(key,next)
 		last_setting_mutation = {"key":key,"before":before,"after":next}
-		_refresh_settings_page()
+		_refresh_settings_page_preserving_focus(String(action))
 		return
 	if action == &"window_mode":
 		var before := int(setting_values.window_mode)
 		setting_values.window_mode = 1 - before
 		settings.set_value("window_mode",setting_values.window_mode)
 		last_setting_mutation = {"key":"window_mode","before":before,"after":setting_values.window_mode}
-		_refresh_settings_page()
+		_refresh_settings_page_preserving_focus(String(action))
 		return
 	if action == &"ui_scale":
 		var before := float(setting_values.ui_scale)
@@ -473,7 +485,7 @@ func _on_button(index: int) -> void:
 		setting_values.ui_scale = choices[(choice_index+1)%choices.size()]
 		settings.set_value("ui_scale",setting_values.ui_scale)
 		last_setting_mutation = {"key":"ui_scale","before":before,"after":setting_values.ui_scale}
-		_refresh_settings_page()
+		_refresh_settings_page_preserving_focus(String(action))
 		return
 	if action in [&"screen_shake",&"hit_flash",&"damage_numbers",&"danger_contrast"]:
 		var key := String(action)
@@ -481,14 +493,14 @@ func _on_button(index: int) -> void:
 		setting_values[key] = not before
 		settings.set_value(key,setting_values[key])
 		last_setting_mutation = {"key":key,"before":before,"after":setting_values[key]}
-		_refresh_settings_page()
+		_refresh_settings_page_preserving_focus(String(action))
 		return
 	if action == &"target_bias":
 		var before := int(setting_values.target_bias)
 		setting_values.target_bias = 1-before
 		settings.set_value("target_bias",setting_values.target_bias)
 		last_setting_mutation = {"key":"target_bias","before":before,"after":setting_values.target_bias}
-		_refresh_settings_page()
+		_refresh_settings_page_preserving_focus(String(action))
 		return
 	if action in [&"settings",&"credits",&"back"]:
 		_record_shell_action(action, false)
@@ -549,7 +561,26 @@ func _onoff(value: Variant) -> String:
 	return "ON" if bool(value) else "OFF"
 
 func _mcp_state() -> Dictionary:
-	return {"mode":mode,"return_mode":return_mode,"visible":visible,"action_latched":action_latched,"action_generation":action_generation,"last_action_receipt":last_action_receipt,"displayed_result_fields":_displayed_result_fields(),"focus":String(get_viewport().gui_get_focus_owner().get_path()) if get_viewport().gui_get_focus_owner() else "none","actions":actions,"settings":setting_values,"last_setting_mutation":last_setting_mutation}
+	var focus_owner := get_viewport().gui_get_focus_owner()
+	var focus_action := ""
+	if is_instance_valid(focus_owner):
+		focus_action = String(focus_owner.get_meta("shell_action", ""))
+	return {
+		"mode":mode,"return_mode":return_mode,"visible":visible,
+		"action_latched":action_latched,"action_generation":action_generation,
+		"last_action_receipt":last_action_receipt,
+		"displayed_result_fields":_displayed_result_fields(),
+		"focus":String(focus_owner.get_path()) if is_instance_valid(focus_owner) else "none",
+		"focus_action":focus_action,"actions":actions,"settings":setting_values,
+		"last_setting_mutation":last_setting_mutation,
+		"accessibility_contract": {
+			"full_viewport":true,"focus_traversal":not actions.is_empty(),
+			"focus_device":"mouse" if focus_action.is_empty() and visible else "keyboard_or_gamepad",
+			"state_styles":["normal","hover","pressed","focused","disabled"],
+			"settings_persisted":true,"result_replay_bound":mode == "result" and actions.has(&"retry"),
+			"action_count":actions.size(),"focus_action":focus_action,
+		},
+	}
 
 func _displayed_result_fields() -> Dictionary:
 	if mode != "result": return {}

@@ -45,7 +45,7 @@ const MAX_DECISION_DELTAS := 3
 const SURFACE_CONTRACT_REVISION := "upgrade_draft_icon_led_v4"
 const DRAFT_AFFORDANCE_REVISION := "upgrade_draft_focus_affordance_v5"
 const FOCUS_VISUAL_CONTRACT_REVISION := "upgrade_draft_focus_visual_v7"
-const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v7"
+const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v8"
 ## Candidate-owned release diff marker.  Keep this on the real presenter so
 ## publication tooling can distinguish the authored card surface from an
 ## unchanged shell-only revision.
@@ -61,7 +61,7 @@ func _ready() -> void:
 	# authored UI copy (not telemetry): every draft exposes the same concise
 	# confirm path while the live device-specific tooltip below remains bound to
 	# the active input context.
-	footer_label.text = "CHOOSE ONE VIGIL  ·  ARROWS / ENTER / SOUTH  ·  CLICK TO CONFIRM  ·  ESC TO CANCEL"
+	footer_label.text = "CHOOSE ONE VIGIL  ·  LEFT / RIGHT TO FOCUS  ·  ENTER / SOUTH TO CONFIRM  ·  ESC TO CANCEL"
 	footer_label.set_meta("surface_revision", DRAFT_AFFORDANCE_REVISION)
 	set_meta("publication_surface_revision", PUBLICATION_SURFACE_REVISION)
 	set_meta("release_convergence_ui_diff", RELEASE_CONVERGENCE_UI_DIFF)
@@ -113,7 +113,7 @@ func _apply_surface_contract() -> void:
 	for index in buttons.size():
 		# Keep the authored icon-led card as the sole actionable surface while
 		# exposing the same confirm affordance used by keyboard/gamepad focus.
-		buttons[index].tooltip_text = "Select vigil %d  •  ARROWS / ENTER / SOUTH" % (index + 1)
+		buttons[index].tooltip_text = "Focus vigil %d  •  LEFT / RIGHT, then ENTER / SOUTH" % (index + 1)
 		# Keep keyboard/gamepad focus visibly distinct from hover and pressed
 		# states without changing the authored card dimensions or hierarchy.
 		buttons[index].add_theme_color_override("font_focus_color", Color("f8e8b0"))

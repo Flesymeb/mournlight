@@ -4463,6 +4463,12 @@ func _mcp_state() -> Dictionary:
 		"upgrade_draft":draft_controller.get_snapshot(), "upgrade_transaction":upgrade_transaction_receipt.duplicate(true), "teardown_receipt":teardown_receipt,
 		"tree_paused": get_tree().paused, "shell_mode": shell.mode,
 		"shell_return_mode": shell.return_mode, "shell_action_latched": shell.action_latched,
+		# Keep the two release-convergence surfaces directly discoverable from the
+		# controller snapshot.  Tester can bind a page transition or route receipt
+		# without scraping presentation labels or inferring ownership from pause.
+		"shell_accessibility": shell._mcp_state().get("accessibility_contract", {}),
+		"shell_focus_action": shell._mcp_state().get("focus_action", ""),
+		"route_contract": wave_director.get_route_contract_receipt(),
 		"process_ownership":{
 			"controller":process_mode, "shell":shell.process_mode,
 			"world":world.process_mode, "wave_director":wave_director.process_mode,
