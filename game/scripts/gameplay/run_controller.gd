@@ -3459,6 +3459,11 @@ func _profile_renderer_receipt() -> Dictionary:
 		"hardware_backed":identity_complete and not software_renderer,
 		"classification":classification,
 		"classification_reason":classification_reason,
+		# Keep a concise alias alongside the qualification-specific field so
+		# native recapture tooling can consume the renderer predicate without
+		# duplicating detector logic. The gate still uses the authoritative
+		# `hardware_qualification_eligible` value above.
+		"hardware_eligibility":identity_complete and not software_renderer,
 		"hardware_qualification_eligible":identity_complete and not software_renderer,
 		"project_name":String(ProjectSettings.get_setting("application/config/name", "Mournlight")),
 		"profile_identity":"mournlight.release.final_wave.v1",

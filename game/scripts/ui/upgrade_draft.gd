@@ -467,6 +467,11 @@ func _rebuild_stat_rows(index: int, changes: Array) -> void:
 		return
 	var body := _stat_bodies[index]
 	for child in body.get_children():
+		# Remove synchronously before queueing deletion.  `queue_free()` alone
+		# leaves the old Controls in the container until the next idle frame,
+		# which can make the render-sink audit (and a rapid draft reopen) observe
+		# stale rows alongside the bounded replacement set.
+		body.remove_child(child)
 		child.queue_free()
 	var bounded_changes: Array[Dictionary] = _decision_changes(changes)
 	# Keep this invariant explicit even if the filtering helper is changed later.

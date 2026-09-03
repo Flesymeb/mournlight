@@ -52,6 +52,7 @@ static func contract() -> Dictionary:
 		"editor_opt_in": true,
 		"release_presentation_impact": "none_when_disabled",
 		"renderer_gate": "hardware_qualification_eligible == true",
+		"hardware_eligibility_field": "hardware_eligibility",
 		"qualification_mode": QUALIFICATION_MODE,
 		"cycle_budget": {"required": REQUIRED_QUALIFICATION_CYCLES, "maximum": MAX_QUALIFICATION_CYCLES, "bounded": true},
 		"qualification_statuses": {
@@ -142,6 +143,7 @@ static func host_handoff_contract() -> Dictionary:
 		"qualification_owner":"Tester",
 		"native_capture_required":true,
 		"renderer_gate":"hardware_qualification_eligible == true",
+		"hardware_eligibility_field":"hardware_eligibility",
 		"target_viewport":{"width":1920,"height":1080},
 		"required_cycles":REQUIRED_QUALIFICATION_CYCLES,
 		"serial_protocol":["tester_dense_prepare","tester_dense_advance","tester_dense_reset"],
@@ -230,6 +232,10 @@ static func renderer_guard(renderer: Dictionary) -> Dictionary:
 	return {
 		"classification":classification,
 		"hardware_qualification_eligible":hardware_eligible,
+		# Stable short alias for host receipts. Keep the qualification-specific
+		# field above as the authoritative gate while exposing the plain-language
+		# eligibility predicate used by release tooling.
+		"hardware_eligibility":hardware_eligible,
 		"status":status,
 		"native_qualification_allowed":status == NATIVE_STATUS,
 		"sampling_allowed":true,
@@ -310,7 +316,7 @@ static func self_audit() -> Dictionary:
 		all_pass = all_pass and bool(value)
 	return {
 		"identity":"mournlight.dense_receipt_self_audit.v1",
-		"release_guard":"OS.has_feature(\"editor\")",
+		"release_guard":RELEASE_GUARD,
 		"contract_id":CONTRACT_ID,
 		"contract_version":CONTRACT_VERSION,
 		"contract_signature":CONTRACT_SIGNATURE,

@@ -407,3 +407,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.8, 0.05, 3.6)
 
 [node name="12_Return" type="Marker3D" parent="OuterDatum/RouteCheckpoints" unique_id=556009249 groups=["arena_route_checkpoint"]]
 position = Vector3(0, 0.05, 6.2)
+
+[node name="13_LandmarkSightLane" type="Marker3D" parent="OuterDatum/RouteCheckpoints" groups=["arena_route_checkpoint", "landmark_sight_lane"]]
+position = Vector3(3.2, 0.05, -1.4)
+metadata/spatial_role = "authored_landmark_traversal_anchor"
+metadata/collision_space = "OuterDatum"
