@@ -70,10 +70,11 @@ script = ExtResource("4_spatial_contract")
 metadata/spatial_binding = "single_authored_package_plus_additive_outer_datum_v2"
 metadata/outer_datum_source = "rendered_package_aabb"
 metadata/external_depth_contract = "9m_non_playable_band_bound_to_authored_aabb"
-metadata/route_spatial_revision = "release_convergence_native_route_v6"
-metadata/route_receipt_revision = "cemetery_authored_route_rebind_v8"
-metadata/publication_spatial_revision = "release_convergence_authored_datum_v8"
+metadata/route_spatial_revision = "release_convergence_native_route_v7"
+metadata/route_receipt_revision = "cemetery_authored_route_rebind_v9"
+metadata/publication_spatial_revision = "release_convergence_authored_datum_v9"
 metadata/authored_spatial_diff = "native_package_bounds_landmark_sight_lane"
+metadata/cracked_bell_rebase = "rendered_center_inside_playable_perimeter_v1"
 
 [node name="PackageTransform" type="Node3D" parent="." unique_id=1533547498]
 transform = Transform3D(4.602, 0, 0, 0, 4.602, 0, 0, 0, 4.602, 0.28, 0.02, 0)

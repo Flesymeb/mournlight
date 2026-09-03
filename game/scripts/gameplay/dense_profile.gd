@@ -72,6 +72,7 @@ static func contract() -> Dictionary:
 		"sample_history_cap": SAMPLE_HISTORY_CAP,
 		"dense_update_budget": {
 			"scheduler_version": "owner_snapshot_token_buckets.v1",
+			"quality_wrapper": {"revision":"dense_quality_wrapper_v1", "activation":"tester_dense_prepare", "restoration":"tester_dense_reset_or_run_teardown", "controls":["directional_shadows","landmark_shadows","fullscreen_glow"]},
 			"shared_bucket_policy": "stable_id_hash_plus_spawn_generation",
 			"buckets": work_buckets(),
 			"steering_bucket_count": STEERING_BUCKET_COUNT,

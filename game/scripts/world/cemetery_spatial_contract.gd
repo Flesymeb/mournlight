@@ -57,7 +57,7 @@ const PUBLICATION_SPATIAL_REVISION := "release_convergence_authored_datum_v9"
 ## Candidate-owned spatial publication marker for the release-convergence
 ## expansion: one intact authored package, an outer non-playable depth band,
 ## and collision/perimeter rebinding in the same world space.
-const RELEASE_CONVERGENCE_SPATIAL_DIFF := "cemetery_external_depth_and_landmark_binding_v4"
+const RELEASE_CONVERGENCE_SPATIAL_DIFF := "cemetery_external_depth_and_landmark_binding_v5"
 
 func _ready() -> void:
 	# The cracked-bell package carries a large native-export offset inside its
@@ -74,8 +74,8 @@ func _ready() -> void:
 	# Candidate-owned release receipt: the intact cemetery package, its native
 	# transform-space datum, and additive collision/navigation anchors are bound
 	# as one spatial contract for runtime inspection.
-	set_meta("release_spatial_binding_revision", "release_convergence_native_datum_v6")
-	set_meta("route_spatial_revision", "release_convergence_native_route_v6")
+	set_meta("release_spatial_binding_revision", "release_convergence_native_datum_v7")
+	set_meta("route_spatial_revision", "release_convergence_native_route_v7")
 	set_meta("route_rebind_revision", ROUTE_REBIND_REVISION)
 	set_meta("publication_spatial_revision", PUBLICATION_SPATIAL_REVISION)
 	set_meta("release_convergence_spatial_diff", RELEASE_CONVERGENCE_SPATIAL_DIFF)
@@ -276,6 +276,28 @@ func _bind_outer_datum_to_authored_package() -> void:
 	# and enemy movement aligned with the visible bell on every reload/rebind.
 	var bell_visual_path := "OuterDatum/CrackedMoonBellAnchor/CrackedBellAsset"
 	var bell_bounds := get_visual_subtree_aabb(bell_visual_path)
+	# Keep the imported candidate landmark on the traversable side of the
+	# authored perimeter. Its native export offset can place the visible bell
+	# beyond the old combat fence even though the anchor itself is in-bounds;
+	# rebase the intact landmark wrapper as one unit, never its meshes.
+	var bell_anchor := get_node_or_null("OuterDatum/CrackedMoonBellAnchor") as Marker3D
+	if bell_bounds.size.length_squared() > 0.001 and is_instance_valid(bell_anchor):
+		var safe_bell_x := clampf(bell_bounds.get_center().x, playable.position.x + 4.0, playable.end.x - 4.0)
+		var bell_offset_x := safe_bell_x - bell_bounds.get_center().x
+		if absf(bell_offset_x) > 0.01:
+			bell_anchor.global_position += Vector3(bell_offset_x, 0.0, 0.0)
+			bell_bounds = get_visual_subtree_aabb(bell_visual_path)
+	# The imported bell carries a native export offset inside its authored child
+	# transform. Rebase the candidate-owned landmark anchor to the measured
+	# rendered footprint while preserving the child's world transform; otherwise
+	# camera coverage and route checkpoints target an empty marker several metres
+	# away from the visible bell and its collision body.
+	var bell_asset := get_node_or_null(bell_visual_path) as Node3D
+	var bell_asset_world := bell_asset.global_transform if is_instance_valid(bell_asset) else Transform3D.IDENTITY
+	if bell_bounds.size.length_squared() > 0.001 and is_instance_valid(bell_anchor):
+		bell_anchor.global_position = Vector3(bell_bounds.get_center().x, 0.0, bell_bounds.get_center().z)
+		if is_instance_valid(bell_asset):
+			bell_asset.global_transform = bell_asset_world
 	var bell_bound := _bind_box_collision_to_visual("OuterDatum/CrackedMoonBellAnchor/CrackedBellCollision", bell_bounds, landmark_collision_margin)
 	var tree_bindings := {
 		"northeast_tree":"PackageTransform/AuthoredCemeteryPackage/Sketchfab_model/59eaeb0f852e494285bd67ea8f850a42_fbx/RootNode/DeadTree3",

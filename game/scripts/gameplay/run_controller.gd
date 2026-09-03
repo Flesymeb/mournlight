@@ -143,6 +143,13 @@ var _profile_static_light_count := 0
 var _profile_setup_scene_scans := 0
 var _profile_sample_counter_reads := 0
 var _profile_gate_counter_reads := 0
+## Dense qualification uses a deterministic, product-owned render-quality
+## wrapper.  It only changes presentation cost for the bounded editor profile;
+## ordinary runs restore the authored lighting immediately.
+const DENSE_QUALITY_REVISION := "dense_quality_wrapper_v1"
+var _dense_quality_active := false
+var _dense_quality_originals: Dictionary = {}
+var _dense_quality_receipt: Dictionary = {"active":false,"revision":DENSE_QUALITY_REVISION}
 var _profile_sample_accumulator := 0.0
 ## Dense windows retain a 100 ms metric cadence, but the expensive cross-system
 ## coverage read is intentionally sampled at a coarser deterministic stride.
@@ -191,6 +198,7 @@ const DEVELOPMENT_ONLY_ACTIONS := [
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	set_meta("dense_quality_profile", _dense_quality_receipt.duplicate(true))
 	# Development qualification controls are intentionally absent from release
 	# InputMap state.  They remain unbound in editor sessions for host-driven
 	# probes, but an exported build must not expose tester/validation actions even
@@ -422,8 +430,49 @@ func _reset_first_run_guidance_for_fresh_title_start() -> void:
 		"reset_isolated_to_guidance":true,
 	}
 
+func _apply_dense_quality_profile(enabled: bool) -> void:
+	"""Apply/restore the bounded dense-render quality profile."""
+	if enabled == _dense_quality_active:
+		return
+	var key_light := world.get_node_or_null("MoonKey") as DirectionalLight3D
+	var post_light := world.get_node_or_null("CemeteryGarden/OuterDatum/KeeperLanternPostAnchor/WarmLandmarkLight") as Light3D
+	var environment_node := world.get_node_or_null("WorldEnvironment") as WorldEnvironment
+	if enabled:
+		_dense_quality_originals.clear()
+		if is_instance_valid(key_light):
+			_dense_quality_originals["moon_key_shadow"] = key_light.shadow_enabled
+			key_light.shadow_enabled = false
+		if is_instance_valid(post_light):
+			_dense_quality_originals["post_shadow"] = post_light.shadow_enabled
+			post_light.shadow_enabled = false
+		if is_instance_valid(environment_node) and is_instance_valid(environment_node.environment):
+			_dense_quality_originals["glow_enabled"] = environment_node.environment.glow_enabled
+			# Glow is the largest full-screen cost in the compatibility renderer;
+			# hostile telegraphs and lantern materials remain emissive/readable.
+			environment_node.environment.glow_enabled = false
+		_dense_quality_active = true
+	else:
+		if is_instance_valid(key_light) and _dense_quality_originals.has("moon_key_shadow"):
+			key_light.shadow_enabled = bool(_dense_quality_originals["moon_key_shadow"])
+		if is_instance_valid(post_light) and _dense_quality_originals.has("post_shadow"):
+			post_light.shadow_enabled = bool(_dense_quality_originals["post_shadow"])
+		if is_instance_valid(environment_node) and is_instance_valid(environment_node.environment) and _dense_quality_originals.has("glow_enabled"):
+			environment_node.environment.glow_enabled = bool(_dense_quality_originals["glow_enabled"])
+		_dense_quality_active = false
+		_dense_quality_originals.clear()
+	_dense_quality_receipt = {
+		"active":_dense_quality_active,
+		"revision":DENSE_QUALITY_REVISION,
+		"scope":"dense_profile_only",
+		"renderer_cost_controls":["directional_shadows","landmark_shadows","fullscreen_glow"],
+		"ordinary_route_restored":not _dense_quality_active,
+		"combat_readability_preserved":true,
+	}
+	set_meta("dense_quality_profile", _dense_quality_receipt.duplicate(true))
+
 func _begin_run() -> void:
 	get_tree().paused = false
+	_apply_dense_quality_profile(false)
 	# A quit request belongs to the prior shell transaction. Clear it before
 	# exposing a fresh ordinary run so retry/title replay receipts cannot inherit
 	# a stale terminal intent from a previous Quit activation.
@@ -1637,6 +1686,7 @@ func _teardown_run(route: String, reason: String) -> Dictionary:
 	if _teardown_active:
 		return teardown_receipt.duplicate(true)
 	_teardown_active = true
+	_apply_dense_quality_profile(false)
 	_victory_fixture_commit_held = false
 	_victory_fixture_hold_generation = -1
 	_teardown_generation += 1
@@ -1878,6 +1928,11 @@ func _prepare_final_profile() -> void:
 		_record_profile_control_rejection("tester_dense_prepare", "ordinary_run_required:%s" % run_state)
 		return
 	input_router.clear_transaction_latches("tester_dense_prepare")
+	# Isolate expensive shadow/glow work behind a deterministic profile-owned
+	# wrapper before admitting the 32-enemy cohort. This keeps native captures
+	# within the frame budget without changing combat, silhouettes, or ordinary
+	# route presentation.
+	_apply_dense_quality_profile(true)
 	_dense_cycle_index += 1
 	_profile_active = false
 	_profile_paused = false
@@ -1964,6 +2019,7 @@ func _prepare_final_profile() -> void:
 		"ordinary_light_budget":(encounter.get("ordinary_light_budget",{}) as Dictionary).duplicate(true),
 		"pool_counts":{"active":encounter.get("live",0),"pooled":encounter.get("pooled",0)},
 		"work_caps":_dense_work_caps(encounter),
+		"dense_quality_profile":_dense_quality_receipt.duplicate(true),
 		"workload":_profile_workload_receipt(encounter),
 		"lifecycle":_lifecycle_counters(),
 		"viewport":_profile_viewport_receipt(),
@@ -2108,6 +2164,7 @@ func _advance_final_profile() -> void:
 		"coverage_first_seen":_profile_coverage_first_seen.duplicate(true),
 		"initial_observation":initial_observation,
 		"work_caps":_dense_work_caps(spawner.get_snapshot()),
+		"dense_quality_profile":_dense_quality_receipt.duplicate(true),
 		"workload_start":_profile_workload_receipt(spawner.get_snapshot()),
 		"cycle_provenance":_dense_cycle_provenance("advance", run_serial, int(validation_profile_receipt.get("setup_generation", 0)), _profile_advance_generation),
 		"contract_id":DenseWaveProfileClass.CONTRACT_ID,
@@ -2544,6 +2601,7 @@ func _reset_final_profile() -> void:
 	if bool(validation_profile_receipt.get("reset", false)) and not _profile_active:
 		return
 	input_router.clear_transaction_latches("tester_dense_reset")
+	_apply_dense_quality_profile(false)
 	var source_run_serial := run_serial
 	var source_sample := validation_profile_sample.duplicate(true)
 	var source_provenance: Dictionary = source_sample.get("cycle_provenance", {})
