@@ -152,7 +152,10 @@ func _ready() -> void:
 	# escape lane and landmark context.
 	follow_height = 21.0
 	follow_distance = 21.0
-	follow_lateral = -2.5
+	# Hold the orbit on the east/south sight lane.  This lateral separation keeps
+	# the mausoleum facade from sitting directly over the Warden while preserving
+	# the native street and keeper/bell silhouettes in the frame.
+	follow_lateral = 6.0
 	# Aim a little farther up the authored north route so the mausoleum and bell
 	# remain fully framed from spawn; the closer 22 m rig keeps the Warden in the
 	# lower safe lane despite this landmark-forward bias.
@@ -170,7 +173,11 @@ func _ready() -> void:
 	# mausoleum sits west of the authored street, so this keeps its facade in the
 	# left third while reserving the right third for the cracked bell and escape
 	# route in the shipped framebuffer.
-	framing_bias = Vector3(4.0, 0.0, -1.6)
+	# Bias the sight lane toward the south-east street so the tall mausoleum
+	# reads as an upper-left landmark instead of filling the centre of the
+	# shipped framebuffer.  The Warden remains in the lower-safe lane while the
+	# keeper post and cracked bell stay inside the same high-angle composition.
+	framing_bias = Vector3(8.0, 0.0, 4.0)
 	# Place the shipped high-angle rig on the south sight lane. The previous
 	# west/east orbits put the tall crypt directly between the camera and the
 	# keeper/bell route, so the live frame read as a wall even though diagnostic

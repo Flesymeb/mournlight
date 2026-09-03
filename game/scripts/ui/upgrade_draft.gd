@@ -46,11 +46,11 @@ const MAX_DECISION_DELTAS := 3
 const SURFACE_CONTRACT_REVISION := "upgrade_draft_icon_led_v4"
 const DRAFT_AFFORDANCE_REVISION := "upgrade_draft_focus_affordance_v5"
 const FOCUS_VISUAL_CONTRACT_REVISION := "upgrade_draft_focus_visual_v7"
-const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v9"
+const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v10"
 ## Candidate-owned release diff marker.  Keep this on the real presenter so
 ## publication tooling can distinguish the authored card surface from an
 ## unchanged shell-only revision.
-const RELEASE_CONVERGENCE_UI_DIFF := "upgrade_draft_authored_icon_hierarchy_v4"
+const RELEASE_CONVERGENCE_UI_DIFF := "upgrade_draft_authored_icon_hierarchy_v5"
 
 @onready var title_label: Label = $Title
 @onready var subtitle_label: Label = $Subtitle
@@ -129,6 +129,7 @@ func _apply_surface_contract() -> void:
 		# hierarchy as the shipped draft surface.
 		buttons[index].set_meta("choice_hierarchy", ["icon", "title", "rank", "decision_deltas", "consequence"])
 		buttons[index].set_meta("surface_revision", SURFACE_CONTRACT_REVISION)
+		buttons[index].set_meta("visual_hierarchy_revision", PUBLICATION_SURFACE_REVISION)
 		# Keep the authored card contract discoverable to accessibility and
 		# runtime evidence consumers without adding extra decision rows.
 		buttons[index].set_meta("decision_delta_cap", MAX_DECISION_DELTAS)

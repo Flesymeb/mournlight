@@ -179,6 +179,7 @@ var _reward_experience_receipt: Dictionary = {}
 var _reward_duplicate_rejections := 0
 var upgrade_transaction_receipt: Dictionary = {}
 var _upgrade_commit_in_progress := false
+var candidate_session_handshake: Dictionary = {}
 
 const PROFILE_SAMPLE_INTERVAL_SECONDS := 0.1
 const PROFILE_MAX_SAMPLES := 128
@@ -198,6 +199,15 @@ const DEVELOPMENT_ONLY_ACTIONS := [
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	candidate_session_handshake = {
+		"contract_id":"mournlight.candidate_session.v1",
+		"scene":"res://main.tscn",
+		"workspace":ProjectSettings.globalize_path("res://"),
+		"generation":1,
+		"ready":true,
+		"shell_owner":"/root/Mournlight/Interface/RunShellView",
+	}
+	set_meta("candidate_session_handshake", candidate_session_handshake.duplicate(true))
 	set_meta("dense_quality_profile", _dense_quality_receipt.duplicate(true))
 	# Development qualification controls are intentionally absent from release
 	# InputMap state.  They remain unbound in editor sessions for host-driven
@@ -4431,6 +4441,7 @@ func _mcp_state() -> Dictionary:
 	var ledger_checks: Dictionary = ledger_snapshot.get("contract_checks", {})
 	var observation_work: Dictionary = validation_profile_sample.get("observation_work", _profile_observation_work_receipt())
 	return {
+		"candidate_session_handshake":candidate_session_handshake.duplicate(true),
 		"run_state":run_state, "run_serial":run_serial, "run_elapsed":run_elapsed,
 		"profile_status":validation_profile_sample.get("status", validation_profile_receipt.get("status", "idle")),
 		"profile_active":_profile_active,

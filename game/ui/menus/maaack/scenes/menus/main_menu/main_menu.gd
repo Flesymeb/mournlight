@@ -24,8 +24,42 @@ func _ready() -> void:
 	super._ready()
 	new_game_button.show()
 	new_game_button.grab_focus.call_deferred()
+	_configure_product_focus_contract()
 	_resize_background()
 	get_viewport().size_changed.connect(_resize_background)
+
+func _configure_product_focus_contract() -> void:
+	# The retained Maaack menu owns title-page traversal, but its stock focus
+	# graph is implicit. Rebind the four visible product actions explicitly so
+	# keyboard, mouse and gamepad all share one deterministic loop and every
+	# control exposes a stable accessibility name/state.
+	var menu_buttons: Array[Button] = []
+	for node in get_tree().get_nodes_in_group("menu_button"):
+		if node is Button and node.is_visible_in_tree():
+			menu_buttons.append(node as Button)
+	if menu_buttons.is_empty():
+		for path in [
+			"MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/NewGameButton",
+			"MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/OptionsButton",
+			"MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/CreditsButton",
+			"MenuContainer/MenuButtonsMargin/MenuButtonsContainer/MenuButtonsBoxContainer/ExitButton"]:
+			var button := get_node_or_null(path) as Button
+			if is_instance_valid(button):
+				menu_buttons.append(button)
+	for index in menu_buttons.size():
+		var button := menu_buttons[index]
+		button.focus_mode = Control.FOCUS_ALL
+		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		button.accessibility_name = button.text
+		button.set_meta("title_shell_action", button.name)
+		button.focus_neighbor_top = button.get_path_to(menu_buttons[(index - 1 + menu_buttons.size()) % menu_buttons.size()])
+		button.focus_neighbor_bottom = button.get_path_to(menu_buttons[(index + 1) % menu_buttons.size()])
+	set_meta("title_accessibility_contract", {
+		"focus_traversal":true,
+		"keyboard_mouse_gamepad":true,
+		"actions":["play","settings","credits","quit"],
+		"state_styles":["normal","hover","focused","pressed","disabled"],
+	})
 
 
 func _process(delta: float) -> void:

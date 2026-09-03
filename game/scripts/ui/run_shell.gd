@@ -59,9 +59,25 @@ var settings := MournlightSettingsStore.new()
 var setting_values: Dictionary
 var last_setting_mutation: Dictionary = {}
 var focus_graph_generation := 0
+var candidate_session_generation := 0
+var candidate_session_handshake: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Candidate-scoped handshake is intentionally truthful and local: it
+	# identifies the exact running scene/shell owner and its generation so a
+	# Runtime rebind can verify it is observing a fresh candidate session rather
+	# than an unrelated editor instance.  No receipt is fabricated here.
+	candidate_session_generation += 1
+	candidate_session_handshake = {
+		"contract_id":"mournlight.shell_candidate_session.v1",
+		"scene":"res://main.tscn",
+		"shell_path":get_path(),
+		"generation":candidate_session_generation,
+		"ready":true,
+		"owner":"RunShellView",
+	}
+	set_meta("candidate_session_handshake", candidate_session_handshake.duplicate(true))
 	# The shell is a full-viewport product surface. Keep its accessibility and
 	# focus contract explicit on the real controls so every page (including
 	# dynamically populated settings/result rows) remains traversable after a
@@ -592,6 +608,7 @@ func _mcp_state() -> Dictionary:
 		"last_setting_mutation":last_setting_mutation,
 		"settings_persistence": settings.last_persist_receipt.duplicate(true),
 		"focus_graph_generation": focus_graph_generation,
+		"candidate_session_handshake":candidate_session_handshake.duplicate(true),
 		"accessibility_contract": {
 			"full_viewport":true,"focus_traversal":not actions.is_empty(),
 			"focus_device":"mouse" if focus_action.is_empty() and visible else "keyboard_or_gamepad",

@@ -15,6 +15,9 @@ extends Node3D
 ## perimeter camera views retain cemetery depth instead of exposing an abrupt
 ## edge. This datum is consumed by perimeter, spawn, and route binding.
 @export var authored_playable_inset := 9.25
+## Published non-playable band separating the traversable street from the
+## retained cemetery silhouette at every cardinal perimeter.
+@export var external_depth_band_margin := 3.0
 ## A slightly wider additive shell keeps the authored mausoleum/tree footprints
 ## aligned with their rendered bounds during near-contact movement replays.
 ## This is product-owned collision datum; imported child meshes remain intact.
@@ -53,11 +56,11 @@ const AUTHORED_LOCAL_MIN := Vector2(-12.143, -11.415)
 const AUTHORED_LOCAL_MAX := Vector2(12.149, 11.418)
 const OBJECTIVE_ANCHOR_IDS := [&"TargetAnchorA", &"TargetAnchorB"]
 const ROUTE_REBIND_REVISION := "cemetery_authored_route_rebind_v9"
-const PUBLICATION_SPATIAL_REVISION := "release_convergence_authored_datum_v9"
+const PUBLICATION_SPATIAL_REVISION := "release_convergence_authored_datum_v10"
 ## Candidate-owned spatial publication marker for the release-convergence
 ## expansion: one intact authored package, an outer non-playable depth band,
 ## and collision/perimeter rebinding in the same world space.
-const RELEASE_CONVERGENCE_SPATIAL_DIFF := "cemetery_external_depth_and_landmark_binding_v5"
+const RELEASE_CONVERGENCE_SPATIAL_DIFF := "cemetery_external_depth_and_landmark_binding_v6"
 
 func _ready() -> void:
 	# The cracked-bell package carries a large native-export offset inside its
@@ -95,6 +98,7 @@ func _ready() -> void:
 		"native_scale": native_map_scale,
 		"wrapper_scale_multiplier": authored_wrapper_scale_multiplier,
 		"objective_lane_margin": landmark_sight_lane_margin,
+		"external_depth_band_margin": external_depth_band_margin,
 		"anchors_rebound_from_rendered_aabb": true,
 	})
 	set_meta("landmark_collision_contract", {
@@ -108,6 +112,7 @@ func _ready() -> void:
 	if is_instance_valid(external_depth):
 		external_depth.set_meta("non_playable", true)
 		external_depth.set_meta("collision_enabled", false)
+		external_depth.set_meta("band_margin", external_depth_band_margin)
 		set_meta("external_depth_binding", "candidate_authored_cardinal_silhouette_band_v4")
 	# Reassert the single transform-space collision contract after the authored
 	# scene is instanced. Some inherited scene overrides restore StaticBody3D's
