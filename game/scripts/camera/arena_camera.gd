@@ -150,8 +150,12 @@ func _ready() -> void:
 	# the rig in keeps the Warden, nearby threats, drops, and telegraphs readable
 	# at the shipped 1280/1920 widths while the arena clamp still preserves an
 	# escape lane and landmark context.
-	follow_height = 21.0
-	follow_distance = 21.0
+	# The native cemetery package is now materially larger than the original
+	# combat pad.  A 24 m orbit keeps the Warden and nearby telegraphs legible
+	# while giving the mausoleum/bell silhouettes enough breathing room so the
+	# shipped frame reads as an arena instead of a wall of crypt facade.
+	follow_height = 24.0
+	follow_distance = 24.0
 	# Hold the orbit on the east/south sight lane.  This lateral separation keeps
 	# the mausoleum facade from sitting directly over the Warden while preserving
 	# the native street and keeper/bell silhouettes in the frame.
@@ -194,7 +198,7 @@ func _ready() -> void:
 	# native spawn lane. A modestly wider lens preserves the readable Warden and
 	# mausoleum silhouettes while bringing the bell and its approach lane into
 	# the same ordinary gameplay frame (without moving authored geometry).
-	normal_fov = 90.0
+	normal_fov = 86.0
 	fov = normal_fov
 	# Keep the shipped camera's visibility query bound to the same dedicated
 	# landmark layer as CemeterySpatialContract.  The scene resource historically

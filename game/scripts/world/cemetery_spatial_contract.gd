@@ -1086,7 +1086,7 @@ func get_snapshot() -> Dictionary:
 				# Keep the spatial receipt synchronized with the shipped ArenaCamera
 				# rig. Older values described a superseded overview camera and made
 				# route evidence appear mis-bound even when runtime framing was correct.
-				"camera_profile":{"fov":90.0,"follow_height":25.0,"follow_distance":25.0,"follow_lateral":5.0,"framing_bias":Vector3(0.0,0.0,-6.0),"yaw_degrees":0.0,"landmark_blend":0.28,"visibility_collision_mask":camera_visibility_collision_mask},
+				"camera_profile":{"fov":86.0,"follow_height":24.0,"follow_distance":24.0,"follow_lateral":6.0,"framing_bias":Vector3(8.0,0.0,4.0),"yaw_degrees":0.0,"landmark_blend":0.28,"visibility_collision_mask":camera_visibility_collision_mask},
 			"proxy_geometry_count":0,
 		},
 		"external_world":{"source":"intact_authored_package_plus_candidate_authored_distant_silhouette_ring", "procedural_scenery":false, "primitive_meshes":0, "external_dressing_nodes":6, "opaque":true, "non_playable_depth_beyond_all_edges":is_instance_valid(external_depth), "collision_enabled":false, "fog_depth_bound":true},

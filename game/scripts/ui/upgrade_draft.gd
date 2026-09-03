@@ -62,7 +62,7 @@ func _ready() -> void:
 	# authored UI copy (not telemetry): every draft exposes the same concise
 	# confirm path while the live device-specific tooltip below remains bound to
 	# the active input context.
-	footer_label.text = "CHOOSE ONE VIGIL  ·  LEFT / RIGHT TO FOCUS  ·  ENTER / SOUTH TO CONFIRM  ·  ESC TO CANCEL"
+	footer_label.text = "CHOOSE ONE VIGIL  ·  ICON → DELTAS  ·  LEFT / RIGHT TO FOCUS  ·  ENTER / SOUTH TO CONFIRM  ·  ESC TO CANCEL"
 	footer_label.set_meta("surface_revision", DRAFT_AFFORDANCE_REVISION)
 	set_meta("publication_surface_revision", PUBLICATION_SURFACE_REVISION)
 	set_meta("release_convergence_ui_diff", RELEASE_CONVERGENCE_UI_DIFF)

@@ -113,14 +113,14 @@ far = 180.0
 arena_limit = Vector2(34.0, 32.0)
 # Release framing keeps the Warden in the lower-safe lane while exposing the
 # native cross-route, perimeter depth, and both landmark silhouettes.
-normal_fov = 90.0
-follow_height = 21.0
-follow_distance = 21.0
+normal_fov = 86.0
+follow_height = 24.0
+follow_distance = 24.0
 # The camera-aware profile keeps the Warden in the lower-safe lane while
 # bringing the native mausoleum, cracked bell, keeper post, and an escape lane
 # into one readable frame without replacing or hiding the authored package.
-follow_lateral = -2.5
-framing_bias = Vector3(4, 0, -1.6)
+follow_lateral = 6.0
+framing_bias = Vector3(8, 0, 4)
 arena_fill_limit = Vector2(33.0, 30.5)
 coverage_max_correction = 3.5
 coverage_threat_weight = 0.18
