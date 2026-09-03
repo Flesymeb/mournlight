@@ -11,7 +11,7 @@ var offered: Array[Dictionary] = []
 var selected: Array[Dictionary] = []
 var draft_serial := 0
 var active := false
-var offer_strategy := "three_weapon_lanes"
+var offer_strategy := "three_weapon_lanes_with_deterministic_fallback"
 var offer_slots: Array[Dictionary] = []
 var last_selection_receipt: Dictionary = {}
 var selection_generation := 0
@@ -51,6 +51,37 @@ func open_draft(inventory: WeaponInventory, health: WardenHealth, warden: Warden
 		var upgrade := resource as MournlightUpgradeDefinition
 		if upgrade.is_eligible(int(ranks.get(upgrade.upgrade_id, 0)), inventory):
 			eligible.append(upgrade)
+	# A late-run catalog can temporarily exhaust one or more exact weapon lanes
+	# (for example after a diagnostic build has skipped an intermediate rank).
+	# Keep the draft a real three-choice transaction by admitting deterministic,
+	# still-applicable fallback definitions.  Fallbacks never exceed max rank and
+	# are projected/applied against the current authoritative rank, so every
+	# displayed card remains actionable rather than an inert placeholder.
+	if eligible.size() < 3:
+		for resource in CATALOG.upgrades:
+			if eligible.size() >= 3:
+				break
+			var upgrade := resource as MournlightUpgradeDefinition
+			if not upgrade or eligible.has(upgrade):
+				continue
+			var current_upgrade_rank := int(ranks.get(upgrade.upgrade_id, 0))
+			if current_upgrade_rank >= upgrade.max_rank:
+				continue
+			# Utility upgrades are always safe fallbacks; weapon upgrades may also
+			# catch up a lane when its authored prerequisite was skipped.
+			if upgrade.action != "weapon_rank" or inventory.get_rank(upgrade.weapon_id) < (inventory.get_definition(upgrade.weapon_id).max_rank if inventory.get_definition(upgrade.weapon_id) else 0):
+				eligible.append(upgrade)
+	if eligible.size() < 3:
+		for resource in CATALOG.upgrades:
+			if eligible.size() >= 3:
+				break
+			var upgrade := resource as MournlightUpgradeDefinition
+			if not upgrade or eligible.has(upgrade):
+				continue
+			var current_upgrade_rank := int(ranks.get(upgrade.upgrade_id, 0))
+			var weapon_definition := inventory.get_definition(upgrade.weapon_id) if upgrade.action == "weapon_rank" else null
+			if current_upgrade_rank < upgrade.max_rank and (not weapon_definition or inventory.get_rank(upgrade.weapon_id) < weapon_definition.max_rank):
+				eligible.append(upgrade)
 	if eligible.size() < 3:
 		return []
 	active = true
@@ -81,7 +112,9 @@ func open_draft(inventory: WeaponInventory, health: WardenHealth, warden: Warden
 		active = false
 		return []
 	for definition in chosen:
-		offered.append(definition.project(int(ranks.get(definition.upgrade_id, 0)), inventory, health, warden))
+		var projection := definition.project(int(ranks.get(definition.upgrade_id, 0)), inventory, health, warden)
+		projection["fallback_eligible"] = not definition.is_eligible(int(ranks.get(definition.upgrade_id, 0)), inventory)
+		offered.append(projection)
 	draft_opened.emit(offered)
 	return offered
 

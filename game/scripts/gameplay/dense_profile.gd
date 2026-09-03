@@ -12,6 +12,9 @@ const TARGET_ENEMIES := 32
 const WINDOW_SECONDS := 4.0
 const SAMPLE_INTERVAL_SECONDS := 0.1
 const SAMPLE_HISTORY_CAP := 128
+## Receipt history is bounded independently from per-window samples so serial
+## native retries cannot grow the controller indefinitely between resets.
+const CYCLE_RECEIPT_HISTORY_CAP := 12
 ## Telemetry remains sampled every 100 ms; expensive cross-system coverage
 ## inspection is amortised across this many samples. Coverage is cumulative.
 const SYSTEM_OBSERVATION_STRIDE := 2
@@ -70,6 +73,7 @@ static func contract() -> Dictionary:
 		"sample_interval_seconds": SAMPLE_INTERVAL_SECONDS,
 		"system_observation_stride": SYSTEM_OBSERVATION_STRIDE,
 		"sample_history_cap": SAMPLE_HISTORY_CAP,
+		"cycle_receipt_history_cap": CYCLE_RECEIPT_HISTORY_CAP,
 		"dense_update_budget": {
 			"scheduler_version": "owner_snapshot_token_buckets.v1",
 			"quality_wrapper": {"revision":"dense_quality_wrapper_v1", "activation":"tester_dense_prepare", "restoration":"tester_dense_reset_or_run_teardown", "controls":["directional_shadows","landmark_shadows","fullscreen_glow"]},
@@ -112,6 +116,7 @@ static func contract() -> Dictionary:
 			"advance": "exactly_once_per_prepare_until_reset",
 			"reset": "repeat_returns_existing_isolation_receipt",
 			"delayed_callbacks": "must_not_replace_cycle_identity_or_run_serial",
+			"receipt_history": "capped_to_cycle_receipt_history_cap",
 		},
 		"host_sequence": "tester_dense_prepare -> tester_dense_advance -> tester_dense_reset (serial, once per cycle)",
 		"self_audit_id": "mournlight.dense_receipt_self_audit.v1",

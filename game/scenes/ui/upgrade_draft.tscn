@@ -17,9 +17,9 @@ metadata/presentation_contract = "authored_icon_led_current_to_new_v3"
 metadata/decision_delta_limit = 3
 metadata/surface_contract_revision = "upgrade_draft_icon_led_v4"
 metadata/route_transaction_binding = "ordinary_first_upgrade_pause_commit_resume_v2"
-metadata/publication_surface_revision = "release_convergence_icon_led_cards_v11"
+metadata/publication_surface_revision = "release_convergence_icon_led_cards_v12"
 metadata/authored_ui_diff = "icon_first_focusable_cards_truthful_deltas_v3"
-metadata/release_convergence_ui_diff = "upgrade_draft_authored_icon_hierarchy_v4"
+metadata/release_convergence_ui_diff = "upgrade_draft_authored_icon_hierarchy_v6"
 
 [node name="Shade" type="ColorRect" parent="."]
 layout_mode = 1
@@ -51,6 +51,19 @@ offset_bottom = 164.0
 text = "THE NIGHT HOLDS ITS BREATH  ·  ICON → DELTAS  ·  CURRENT → NEXT"
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.75,0.62,0.96,1)
+
+[node name="TitleRule" type="HSeparator" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -132.0
+offset_top = 171.0
+offset_right = 132.0
+offset_bottom = 173.0
+grow_horizontal = 2
+mouse_filter = 2
+modulate = Color(0.92, 0.69, 0.33, 0.72)
 
 [node name="Cards" type="Control" parent="."]
 layout_mode = 1

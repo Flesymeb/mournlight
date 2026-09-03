@@ -2841,7 +2841,7 @@ func _record_profile_cycle(phase: String, receipt: Dictionary) -> void:
 		"eligible": entry["cycle_index"] <= DenseWaveProfileClass.MAX_QUALIFICATION_CYCLES,
 	}
 	validation_profile_cycles.append(entry)
-	while validation_profile_cycles.size() > 16:
+	while validation_profile_cycles.size() > DenseWaveProfileClass.CYCLE_RECEIPT_HISTORY_CAP:
 		validation_profile_cycles.pop_front()
 
 func _profile_cycle_comparison() -> Dictionary:

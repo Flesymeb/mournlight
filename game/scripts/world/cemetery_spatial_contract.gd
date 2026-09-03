@@ -465,6 +465,15 @@ func _bind_box_collision_to_visual(body_path: String, bounds: AABB, margin: floa
 	if bounds.size.length_squared() <= 0.001:
 		return false
 	var expanded := bounds.grow(margin)
+	# Keep landmark footprints grounded in the same world datum as their
+	# rendered meshes. Imported bell/crypt AABBs can carry a tiny negative Y
+	# origin from exporter padding; letting that through makes the StaticBody
+	# float/sink relative to the visible base during near-contact traversal.
+	if body_path.contains("CrackedBell") or body_path.contains("Mausoleum"):
+		var grounded_bottom := maxf(0.0, expanded.position.y)
+		var top := expanded.end.y
+		expanded.position.y = grounded_bottom
+		expanded.size.y = maxf(0.1, top - grounded_bottom)
 	return _bind_box_body_world(get_node_or_null(body_path) as StaticBody3D, expanded.get_center(), expanded.size)
 
 func _bind_tree_collision_to_visual(body_path: String, bounds: AABB) -> Dictionary:

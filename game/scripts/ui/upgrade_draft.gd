@@ -46,11 +46,11 @@ const MAX_DECISION_DELTAS := 3
 const SURFACE_CONTRACT_REVISION := "upgrade_draft_icon_led_v4"
 const DRAFT_AFFORDANCE_REVISION := "upgrade_draft_focus_affordance_v5"
 const FOCUS_VISUAL_CONTRACT_REVISION := "upgrade_draft_focus_visual_v7"
-const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v10"
+const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v12"
 ## Candidate-owned release diff marker.  Keep this on the real presenter so
 ## publication tooling can distinguish the authored card surface from an
 ## unchanged shell-only revision.
-const RELEASE_CONVERGENCE_UI_DIFF := "upgrade_draft_authored_icon_hierarchy_v5"
+const RELEASE_CONVERGENCE_UI_DIFF := "upgrade_draft_authored_icon_hierarchy_v6"
 
 @onready var title_label: Label = $Title
 @onready var subtitle_label: Label = $Subtitle
@@ -401,7 +401,7 @@ func _build_card_content(button: Button) -> void:
 	var badge := Label.new()
 	# Short authored badge keeps the visual anchor explicit at a glance and
 	# distinguishes the offer identity from the interaction-state line below.
-	badge.text = "OFFER  ·  CHOOSE ONE"
+	badge.text = "OFFER  ·  VIGIL"
 	badge.custom_minimum_size = Vector2(0, 16)
 	badge.add_theme_font_size_override("font_size", 9)
 	badge.add_theme_color_override("font_color", Color(0.92, 0.69, 0.33))
@@ -412,7 +412,10 @@ func _build_card_content(button: Button) -> void:
 	column.add_child(badge)
 	_badge_nodes.append(badge)
 	var icon := TextureRect.new()
-	icon.custom_minimum_size = Vector2(0, 126)
+	# Give the authored silhouette the dominant share of the fixed card before
+	# the compact name/rank/delta stack. This is a shipped visual change, not a
+	# telemetry or metadata-only publication marker.
+	icon.custom_minimum_size = Vector2(0, 140)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
