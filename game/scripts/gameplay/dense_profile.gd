@@ -30,6 +30,9 @@ const SECONDARY_COMPOSITOR_RESOLUTION_SCALE := 0.5
 const SECONDARY_COMPOSITOR_REFRESH_SECONDS := 0.12
 const NATIVE_STATUS := "qualified"
 const SOFTWARE_STATUS := "rejected_software_renderer"
+## Stable reason token carried by post-sampling receipts. Keep this aligned
+## with the status so host handoff tooling can match either field directly.
+const SOFTWARE_REJECTION_REASON := SOFTWARE_STATUS
 const UNKNOWN_STATUS := "pending_native_renderer"
 const QUALIFICATION_MODE := "native_renderer_three_cycle"
 const REQUIRED_QUALIFICATION_CYCLES := 3
@@ -176,6 +179,7 @@ static func preflight(renderer: Dictionary, viewport: Dictionary, process_frame_
 		"renderer_classification": classification,
 		"hardware_qualification_eligible": hardware_eligible,
 		"renderer_gate_status": renderer_status(classification, hardware_eligible),
+		"renderer_rejection_reason": SOFTWARE_REJECTION_REASON if classification == "software" else ("native_identity_pending" if classification == "unknown" else ""),
 		"viewport": viewport.duplicate(true),
 		"frame_execution": {
 			"process_frame_start": process_frame_start,
@@ -247,6 +251,7 @@ static func renderer_guard(renderer: Dictionary) -> Dictionary:
 		"sampling_allowed":true,
 		"software_rejected":status == SOFTWARE_STATUS,
 		"reason":"native_identity_verified" if status == NATIVE_STATUS else ("software_renderer_detected" if status == SOFTWARE_STATUS else "native_identity_pending"),
+		"renderer_rejection_reason":SOFTWARE_REJECTION_REASON if status == SOFTWARE_STATUS else ("native_identity_pending" if status == UNKNOWN_STATUS else ""),
 	}
 
 static func qualification_contract() -> Dictionary:
@@ -314,7 +319,7 @@ static func self_audit() -> Dictionary:
 		"reset_isolation_failure_rejected":String(reset_failure.get("status", "")) == "rejected" and reset_failure.get("reasons", []).has("reset_isolation_false"),
 		"required_metric_names_present":required_metrics.size() >= 10 and required_metrics.has("frame_ms") and required_metrics.has("physics_ms") and required_metrics.has("render_ms") and required_metrics.has("allocation_bytes") and required_metrics.has("subsystem_samples") and required_metrics.has("lifecycle_deltas") and required_metrics.has("runtime_error_count"),
 		"renderer_guard_native_pass":bool(native_guard.get("native_qualification_allowed", false)) and native_guard.get("status", "") == NATIVE_STATUS,
-		"renderer_guard_software_rejected":bool(software_guard.get("software_rejected", false)) and not bool(software_guard.get("native_qualification_allowed", true)),
+		"renderer_guard_software_rejected":bool(software_guard.get("software_rejected", false)) and not bool(software_guard.get("native_qualification_allowed", true)) and software_guard.get("renderer_rejection_reason", "") == SOFTWARE_REJECTION_REASON,
 		"renderer_guard_unknown_pending":unknown_guard.get("status", "") == UNKNOWN_STATUS and not bool(unknown_guard.get("native_qualification_allowed", true)),
 	}
 	var all_pass := true

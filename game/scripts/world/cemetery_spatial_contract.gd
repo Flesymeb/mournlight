@@ -241,8 +241,10 @@ func _process(_delta: float) -> void:
 		return
 	var visual_rect := get_authored_visual_rect()
 	if visual_rect.size.x <= authored_playable_inset * 2.0 or visual_rect.size.y <= authored_playable_inset * 2.0:
+		set_meta("spatial_rebind_ready", false)
 		return
 	_late_rebind_attempted = true
+	set_meta("spatial_rebind_ready", true)
 	_bind_outer_datum_to_authored_package()
 
 func _calibrate_authored_visibility() -> void:

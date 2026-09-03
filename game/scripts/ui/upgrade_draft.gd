@@ -222,6 +222,13 @@ func _normalize_card(value: Variant) -> Dictionary:
 	normalized["title"] = str(normalized.get("title", "VIGIL"))
 	var icon_candidate := str(normalized.get("icon_path", ""))
 	normalized["icon_path"] = icon_candidate if not icon_candidate.is_empty() else FALLBACK_ICON_PATH
+	# Resolve the authored silhouette at the presenter boundary so malformed
+	# catalog payloads cannot silently render an empty icon while still claiming
+	# an icon-led choice. The fallback is a shipped stat icon, never a text or
+	# decorative glyph placeholder.
+	if not ResourceLoader.exists(normalized["icon_path"]):
+		normalized["icon_path"] = FALLBACK_ICON_PATH
+	normalized["icon_resource_ready"] = ResourceLoader.exists(normalized["icon_path"])
 	normalized["consequence"] = str(normalized.get("consequence", "Shape the next exchange."))
 	# The presenter is a render boundary, not an eligibility authority. Still,
 	# unknown ids must never look actionable when a malformed/test payload bypasses

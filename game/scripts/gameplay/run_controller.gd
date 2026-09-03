@@ -2585,6 +2585,7 @@ func _advance_profile_sample(delta: float) -> void:
 		else (DenseWaveProfileClass.NATIVE_STATUS if qualification_passed and renderer_gate_status == DenseWaveProfileClass.NATIVE_STATUS else "rejected_native_predicates"))
 	)
 	validation_profile_sample["renderer_gate_status"] = renderer_gate_status
+	validation_profile_sample["renderer_rejection_reason"] = DenseWaveProfileClass.SOFTWARE_REJECTION_REASON if renderer_gate_status == DenseWaveProfileClass.SOFTWARE_STATUS else ("native_identity_pending" if renderer_gate_status == DenseWaveProfileClass.UNKNOWN_STATUS else ("native_predicates_failed" if not qualification_passed else ""))
 	validation_profile_sample["phase_sample_availability"] = {
 		"advance_start":{"frames_ran":false,"frame_sample_count":0,"physics_sample_count":0,"samples_available":false},
 		"advance_complete": {
@@ -3594,7 +3595,13 @@ func _profile_qualification(sample: Dictionary) -> Dictionary:
 	if not bool(renderer.get("identity_complete", false)):
 		reasons.append("renderer_identity_incomplete")
 	if not bool(renderer.get("hardware_backed", false)):
-		reasons.append("software_or_unknown_renderer")
+		# Preserve the explicit software rejection token in the qualification
+		# receipt. Sampling remains complete and diagnostic on Mesa/llvmpipe, but
+		# host tooling must not infer a native failure from a generic predicate.
+		if String(renderer.get("classification", "unknown")) == "software":
+			reasons.append(DenseWaveProfileClass.SOFTWARE_REJECTION_REASON)
+		else:
+			reasons.append("software_or_unknown_renderer")
 	var requested_workload := int(sample.get("requested_enemy_workload", -1))
 	var start_workload := int(sample.get("start_enemy_workload", -1))
 	var minimum_workload := int(sample.get("minimum_enemy_workload", -1))
@@ -3627,7 +3634,8 @@ func _profile_qualification(sample: Dictionary) -> Dictionary:
 	var renderer_classification := String(renderer.get("classification", "unknown"))
 	var renderer_eligible := bool(renderer.get("hardware_qualification_eligible", false))
 	var gate_status := DenseWaveProfileClass.renderer_status(renderer_classification, renderer_eligible)
-	return {"qualified":reasons.is_empty(), "ordinary_route_qualified":passive_ordinary and reasons.is_empty(), "density_qualified":density_qualified, "sample_available":sample_count > 0 and physics_sample_count > 0, "reasons":reasons, "requires_hardware":true, "renderer_gate_status":gate_status, "p95_limit_ms":16.67,
+	var renderer_rejection_reason := DenseWaveProfileClass.SOFTWARE_REJECTION_REASON if renderer_classification == "software" else ("native_identity_pending" if renderer_classification == "unknown" else "")
+	return {"qualified":reasons.is_empty(), "ordinary_route_qualified":passive_ordinary and reasons.is_empty(), "density_qualified":density_qualified, "sample_available":sample_count > 0 and physics_sample_count > 0, "reasons":reasons, "renderer_rejection_reason":renderer_rejection_reason, "requires_hardware":true, "renderer_gate_status":gate_status, "p95_limit_ms":16.67,
 		"required_density_range":{"minimum":25,"maximum":40,"boundary_target":32}}
 
 func _validation_controls_receipt() -> Dictionary:
