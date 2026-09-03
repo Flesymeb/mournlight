@@ -74,14 +74,14 @@ directional_shadow_max_distance = 42.0
 [node name="ShadowLift" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-38, 148, 0)
 light_color = Color(0.36, 0.39, 0.55, 1)
-light_energy = 0.60
+light_energy = 0.78
 light_specular = 0.0
 shadow_enabled = false
 
 [node name="RouteWarmFill" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-52, -24, 0)
 light_color = Color(1, 0.68, 0.42, 1)
-light_energy = 0.68
+light_energy = 0.82
 light_specular = 0.0
 shadow_enabled = false
 
