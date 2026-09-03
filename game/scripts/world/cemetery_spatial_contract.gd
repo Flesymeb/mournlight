@@ -57,7 +57,7 @@ const PUBLICATION_SPATIAL_REVISION := "release_convergence_authored_datum_v9"
 ## Candidate-owned spatial publication marker for the release-convergence
 ## expansion: one intact authored package, an outer non-playable depth band,
 ## and collision/perimeter rebinding in the same world space.
-const RELEASE_CONVERGENCE_SPATIAL_DIFF := "cemetery_external_depth_and_landmark_binding_v2"
+const RELEASE_CONVERGENCE_SPATIAL_DIFF := "cemetery_external_depth_and_landmark_binding_v3"
 
 func _ready() -> void:
 	# The cracked-bell package carries a large native-export offset inside its
@@ -101,7 +101,7 @@ func _ready() -> void:
 	if is_instance_valid(external_depth):
 		external_depth.set_meta("non_playable", true)
 		external_depth.set_meta("collision_enabled", false)
-		set_meta("external_depth_binding", "candidate_authored_distant_silhouette_ring")
+		set_meta("external_depth_binding", "candidate_authored_cardinal_silhouette_band_v4")
 	# Reassert the single transform-space collision contract after the authored
 	# scene is instanced. Some inherited scene overrides restore StaticBody3D's
 	# default layer (1), which makes landmark/perimeter bodies invisible to the

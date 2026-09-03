@@ -119,6 +119,8 @@ var _coverage_occluder_original_visibility: Dictionary = {}
 var _tall_occluder_bindings: Array[Dictionary] = []
 var _camera_response_allowed := false
 var _mouse_look_receipt: Dictionary = {}
+var _live_framing_contract: Dictionary = {}
+const LIVE_FRAMING_CONTRACT_REVISION := "arena_live_landmark_coverage_v1"
 
 func _ready() -> void:
 	# Rebase the shipped camera from one authoritative sight lane. Older
@@ -148,8 +150,8 @@ func _ready() -> void:
 	# the rig in keeps the Warden, nearby threats, drops, and telegraphs readable
 	# at the shipped 1280/1920 widths while the arena clamp still preserves an
 	# escape lane and landmark context.
-	follow_height = 16.5
-	follow_distance = 16.5
+	follow_height = 21.0
+	follow_distance = 21.0
 	follow_lateral = -2.5
 	# Aim a little farther up the authored north route so the mausoleum and bell
 	# remain fully framed from spawn; the closer 22 m rig keeps the Warden in the
@@ -164,20 +166,28 @@ func _ready() -> void:
 	# though their collision/anchor bindings were valid.  A modest north bias
 	# preserves the Warden in the lower safe lane while keeping both landmarks
 	# fully readable; it does not move authored geometry.
-	framing_bias = Vector3(1.2, 0.0, -2.4)
+	# Nudge the live target east toward the keeper/bell lane.  The native
+	# mausoleum sits west of the authored street, so this keeps its facade in the
+	# left third while reserving the right third for the cracked bell and escape
+	# route in the shipped framebuffer.
+	framing_bias = Vector3(4.0, 0.0, -1.6)
 	# Place the shipped high-angle rig on the south sight lane. The previous
 	# west/east orbits put the tall crypt directly between the camera and the
 	# keeper/bell route, so the live frame read as a wall even though diagnostic
 	# coverage reported anchor markers visible. The south lane separates all
 	# three landmark silhouettes in the actual gameplay framebuffer.
-	mouse_yaw_degrees = 32.0
+	# The release baseline is the south sight lane: positive-Z camera looking
+	# north into the authored streets.  Keep this datum identical to reset_view
+	# so the first active frame and every later follow tick share one framing
+	# contract instead of inheriting a stale editor yaw.
+	mouse_yaw_degrees = 0.0
 	obstruction_lateral_bypass = 0.0
 	current = true
 	# The eastern bell landmark sat just beyond the shipped frustum at the
 	# native spawn lane. A modestly wider lens preserves the readable Warden and
 	# mausoleum silhouettes while bringing the bell and its approach lane into
 	# the same ordinary gameplay frame (without moving authored geometry).
-	normal_fov = 84.0
+	normal_fov = 90.0
 	fov = normal_fov
 	# Keep the shipped camera's visibility query bound to the same dedicated
 	# landmark layer as CemeterySpatialContract.  The scene resource historically
@@ -253,6 +263,8 @@ func _process(delta: float) -> void:
 	# the mausoleum/bell landmarks into the same readable frame at spawn.
 	var requested_target := target.global_position + _lead + framing_bias
 	var subjects := _select_coverage_subjects()
+	_live_framing_contract = _build_live_framing_contract(subjects)
+	set_meta("live_framing_contract", _live_framing_contract.duplicate(true))
 	var arena_target := _compose_arena_target(requested_target, subjects)
 	var desired_obstruction_strength := 1.0 if _coverage_obstructed_count > 0 else 0.0
 	var obstruction_damping := 7.0 if desired_obstruction_strength > _obstruction_response_strength else 1.8
@@ -342,7 +354,12 @@ func _process(delta: float) -> void:
 		# Keep enough native cemetery depth in every cardinal view. At the old
 		# eight-metre inset the high-angle frustum crossed the authored edge and
 		# exposed the empty world background as a hard dark band.
-		var camera_margin := 16.0
+		# Keep the camera inside the authored package without collapsing the
+		# horizontal leg of the high-angle orbit.  A 16 m clamp forced the south
+		# camera to z≈13 and turned the intended 49° view into a near-vertical
+		# 72° shot.  The retained package plus ExternalDepth provides an authored
+		# 9 m band, so an 8 m inset preserves both depth and the survivor-like lens.
+		var camera_margin := 8.0
 		desired_position.x = clampf(desired_position.x, visual_rect.position.x + camera_margin, visual_rect.end.x - camera_margin)
 		desired_position.z = clampf(desired_position.z, visual_rect.position.y + camera_margin, visual_rect.end.y - camera_margin)
 	global_position = global_position.lerp(desired_position, 1.0 - exp(-follow_damping * delta))
@@ -812,7 +829,7 @@ func reset_view() -> void:
 	# The release datum is a south-lane azimuth so the central mausoleum does not
 	# swallow the keeper post/bell sight lane at spawn. Subsequent mouse-look
 	# remains bounded around this authored baseline.
-	mouse_yaw_degrees = -45.0
+	mouse_yaw_degrees = 0.0
 	mouse_pitch_degrees = 49.0
 	_mouse_look_receipt.clear()
 	var router := get_node_or_null("../../InputContextRouter")
@@ -879,8 +896,47 @@ func _snap_to_target() -> void:
 		framing_target = arena_contract.clamp_camera_target(framing_target)
 	_safe_frame_offset = Vector3.ZERO
 	_coverage_offset = Vector3.ZERO
-	global_position = framing_target + Vector3(follow_lateral, follow_height, follow_distance)
+	var pitch := deg_to_rad(mouse_pitch_degrees)
+	var yaw := deg_to_rad(mouse_yaw_degrees)
+	var radius := maxf(0.1, Vector2(follow_height, follow_distance).length())
+	var orbit := Vector3(sin(yaw) * cos(pitch) * radius, sin(pitch) * radius, cos(yaw) * cos(pitch) * radius)
+	global_position = framing_target + orbit + Vector3(follow_lateral, 0.0, 0.0)
 	look_at(framing_target + Vector3(0.0, 1.8, 0.0), Vector3.UP)
+
+func _build_live_framing_contract(subjects: Array[Node3D]) -> Dictionary:
+	var actor_bounds := AABB()
+	var actor_count := 0
+	var threat_paths: Array[String] = []
+	for subject in subjects:
+		if not is_instance_valid(subject):
+			continue
+		var subject_bounds := AABB(subject.global_position - Vector3(0.7, 0.0, 0.7), Vector3(1.4, 2.1, 1.4))
+		actor_bounds = subject_bounds if actor_count == 0 else actor_bounds.merge(subject_bounds)
+		actor_count += 1
+		if subject != target:
+			threat_paths.append(String(subject.get_path()))
+	var landmark_bounds := AABB()
+	var landmark_ids: Array[String] = []
+	for entry in [["keeper", "../CemeteryGarden/OuterDatum/KeeperLanternPostAnchor"], ["mausoleum", "../CemeteryGarden/OuterDatum/SmallMausoleumAnchor"], ["bell", "../CemeteryGarden/OuterDatum/CrackedMoonBellAnchor"]]:
+		var node := get_node_or_null(String(entry[1])) as Node3D
+		if not is_instance_valid(node):
+			continue
+		var bounds := AABB(node.global_position - Vector3(2.0, 0.0, 2.0), Vector3(4.0, 8.0, 4.0))
+		landmark_bounds = bounds if landmark_ids.is_empty() else landmark_bounds.merge(bounds)
+		landmark_ids.append(String(entry[0]))
+	var escape_rect := arena_contract.get_playable_rect() if is_instance_valid(arena_contract) else Rect2(-arena_fill_limit, arena_fill_limit * 2.0)
+	return {
+		"revision": LIVE_FRAMING_CONTRACT_REVISION,
+		"source":"live_player_threat_escape_landmark_bounds",
+		"actor_count":actor_count,
+		"threat_paths":threat_paths,
+		"actor_bounds":actor_bounds,
+		"landmark_ids":landmark_ids,
+		"landmark_bounds":landmark_bounds,
+		"escape_lane_rect":escape_rect,
+		"camera_mode":"high_angle_follow",
+		"hard_hide_disabled":true,
+	}
 
 func _update_mouse_look() -> void:
 	# ArenaCamera lives under World; the router is a sibling of World on the
@@ -938,6 +994,7 @@ func _mcp_state() -> Dictionary:
 		"compositor_allowed":false,
 		"effect_visual_count":isolated_visual_count,
 		"framing_target": framing_target,
+		"live_framing_contract": _live_framing_contract.duplicate(true),
 		"safe_frame_ok":safe_frame_ok,
 		"safe_frame_correction_active":safe_frame_correction_active,
 		"safe_frame_offset":_safe_frame_offset,

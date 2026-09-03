@@ -32,6 +32,7 @@ var _title_nodes: Array[Label] = []
 var _rank_nodes: Array[Label] = []
 var _consequence_nodes: Array[Label] = []
 var _state_nodes: Array[Label] = []
+var _badge_nodes: Array[Label] = []
 var _stat_bodies: Array[VBoxContainer] = []
 var _card_styles: Array[StyleBoxFlat] = []
 var _presentation_serial := 0
@@ -181,6 +182,8 @@ func present(next_cards: Array[Dictionary]) -> void:
 	_pressed = [false, false, false]
 	for index in buttons.size():
 		var card: Dictionary = cards[index] if index < cards.size() else _normalize_card({})
+		if index < _badge_nodes.size():
+			_badge_nodes[index].text = "OFFER %s  ·  VIGIL" % char(65 + index)
 		var icon_path := str(card.get("icon_path", ""))
 		_icon_nodes[index].texture = load(icon_path if not icon_path.is_empty() else FALLBACK_ICON_PATH) as Texture2D
 		_title_nodes[index].text = str(card.get("title", "VIGIL")).to_upper()
@@ -390,6 +393,21 @@ func _build_card_content(button: Button) -> void:
 	state_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(state_label)
 	_state_nodes.append(state_label)
+	# Authored offer badge: a compact visual anchor that makes each card read as
+	# a deliberate choice surface before the player parses its stat rows. This is
+	# intentionally distinct from the interaction-state line below and remains
+	# inside the fixed card slot at every supported UI scale.
+	var badge := Label.new()
+	badge.text = "VIGIL OFFER"
+	badge.custom_minimum_size = Vector2(0, 16)
+	badge.add_theme_font_size_override("font_size", 9)
+	badge.add_theme_color_override("font_color", Color(0.92, 0.69, 0.33))
+	badge.add_theme_color_override("font_shadow_color", Color(0.03, 0.02, 0.01, 0.9))
+	badge.add_theme_constant_override("shadow_offset_x", 1)
+	badge.add_theme_constant_override("shadow_offset_y", 1)
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(badge)
+	_badge_nodes.append(badge)
 	var icon := TextureRect.new()
 	icon.custom_minimum_size = Vector2(0, 118)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE

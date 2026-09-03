@@ -51,7 +51,7 @@ radial_segments = 20
 rings = 10
 
 [sub_resource type="StandardMaterial3D" id="ExternalHillMaterial"]
-albedo_color = Color(0.075, 0.10, 0.22, 1)
+albedo_color = Color(0.028, 0.042, 0.095, 1)
 metallic = 0.05
 roughness = 0.96
 
@@ -87,40 +87,40 @@ metadata/spatial_binding_version = 2
 [node name="ExternalDepth" type="Node3D" parent="." unique_id=227997052 groups=["external_world_depth"]]
 metadata/non_playable = true
 metadata/spatial_role = "distant_cemetery_silhouette"
-metadata/spatial_revision = "release_convergence_external_depth_band_v3"
+metadata/spatial_revision = "release_convergence_external_depth_band_v4"
 
 [node name="WestHill" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997053]
-position = Vector3(-49, -1.8, 0)
-scale = Vector3(10, 3.2, 15)
+position = Vector3(-24, -3.4, 0)
+scale = Vector3(13, 3.0, 18)
 mesh = SubResource("ExternalHillMesh")
 material_override = SubResource("ExternalHillMaterial")
 
 [node name="EastHill" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997054]
-position = Vector3(49, -1.8, -2)
-scale = Vector3(10, 3.0, 15)
+position = Vector3(24, -3.4, -1)
+scale = Vector3(13, 3.0, 18)
 mesh = SubResource("ExternalHillMesh")
 material_override = SubResource("ExternalHillMaterial")
 
 [node name="NorthHill" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997055]
-position = Vector3(0, -1.8, -48)
-scale = Vector3(15, 3.4, 9)
+position = Vector3(0, -3.4, -24)
+scale = Vector3(18, 3.2, 13)
 mesh = SubResource("ExternalHillMesh")
 material_override = SubResource("ExternalHillMaterial")
 
 [node name="SouthHill" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997056]
-position = Vector3(0, -1.8, 48)
-scale = Vector3(15, 2.8, 9)
+position = Vector3(0, -3.4, 24)
+scale = Vector3(18, 2.8, 13)
 mesh = SubResource("ExternalHillMesh")
 material_override = SubResource("ExternalHillMaterial")
 
 [node name="WestSpire" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997057]
-position = Vector3(-42, 0.8, -28)
+position = Vector3(-25, 0.4, -18)
 scale = Vector3(1.2, 1.8, 1.2)
 mesh = SubResource("ExternalSpireMesh")
 material_override = SubResource("ExternalSpireMaterial")
 
 [node name="EastSpire" type="MeshInstance3D" parent="ExternalDepth" unique_id=227997058]
-position = Vector3(42, 0.8, 28)
+position = Vector3(25, 0.4, 18)
 scale = Vector3(1.1, 1.6, 1.1)
 mesh = SubResource("ExternalSpireMesh")
 material_override = SubResource("ExternalSpireMaterial")

@@ -11,14 +11,25 @@ const DEFAULTS := {
 
 var values: Dictionary = DEFAULTS.duplicate(true)
 var apply_generation := 0
+var persisted_generation := 0
 var last_apply_receipt: Dictionary = {}
+var last_persist_receipt: Dictionary = {}
 
 func load_settings() -> Dictionary:
 	var config := ConfigFile.new()
-	if config.load(PATH) == OK:
+	var load_status := config.load(PATH)
+	if load_status == OK:
 		for key in DEFAULTS:
 			values[key] = config.get_value("settings", key, DEFAULTS[key])
+		persisted_generation = int(config.get_value("meta", "generation", 0))
 	apply()
+	last_persist_receipt = {
+		"path": PATH,
+		"loaded": load_status == OK,
+		"generation": persisted_generation,
+		"keys": values.keys(),
+		"transaction":"reload_then_apply",
+	}
 	return values.duplicate(true)
 
 func set_value(key: String, value: Variant) -> void:
@@ -29,7 +40,25 @@ func set_value(key: String, value: Variant) -> void:
 	var config := ConfigFile.new()
 	for stored_key in values:
 		config.set_value("settings", stored_key, values[stored_key])
-	config.save(PATH)
+	config.set_value("meta", "generation", persisted_generation + 1)
+	var save_status := config.save(PATH)
+	if save_status == OK:
+		persisted_generation += 1
+	last_persist_receipt = {
+		"path": PATH,
+		"saved": save_status == OK,
+		"generation": persisted_generation,
+		"keys": values.keys(),
+		"last_key": key,
+		"transaction":"mutate_apply_persist",
+	}
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree:
+		tree.root.set_meta("mournlight_settings_persistence_receipt", last_persist_receipt.duplicate(true))
+
+func reload_settings() -> Dictionary:
+	"""Reload persisted values and re-apply them for retry/title transitions."""
+	return load_settings()
 
 func apply() -> void:
 	_set_bus("Master", float(values.master_volume))
@@ -58,6 +87,7 @@ func apply() -> void:
 				"Effects":_bus_receipt(&"Effects"),
 			},
 		}
+		last_apply_receipt["settings_persistence"] = last_persist_receipt.duplicate(true)
 		tree.root.set_meta("mournlight_audio_settings_receipt", last_apply_receipt.duplicate(true))
 	TargetSelector.configure_bias(int(values.target_bias))
 

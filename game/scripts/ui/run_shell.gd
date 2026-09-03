@@ -58,6 +58,7 @@ var result_upgrade_label: Label
 var settings := MournlightSettingsStore.new()
 var setting_values: Dictionary
 var last_setting_mutation: Dictionary = {}
+var focus_graph_generation := 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -282,6 +283,8 @@ func set_mode(next_mode: String, next_summary: Dictionary = {}) -> void:
 		return_mode = mode if mode in ["title","pause","result"] else "title"
 	mode = next_mode
 	summary = next_summary.duplicate(true)
+	if next_mode in ["title", "settings"] and is_instance_valid(settings):
+		setting_values = settings.reload_settings()
 	action_latched = false
 	visible = mode != "hidden"
 	body_label.add_theme_font_size_override("font_size", 14)
@@ -341,9 +344,11 @@ func _configure(title: String, subtitle: String, body: String, entries: Array) -
 			button.icon = ICONS.get(String(action), ICONS.settings)
 			button.visible = true
 			button.disabled = false
+			button.focus_mode = Control.FOCUS_ALL
 			_apply_button_surface(button, mode == "settings")
 		else:
 			button.visible = false
+			button.focus_mode = Control.FOCUS_NONE
 	for index in actions.size():
 		var button := buttons[index]
 		button.set_meta("shell_action", String(actions[index]))
@@ -356,6 +361,14 @@ func _configure(title: String, subtitle: String, body: String, entries: Array) -
 		if mode == "settings":
 			button.focus_neighbor_left = button.get_path_to(buttons[index - 1] if index % 2 == 1 else button)
 			button.focus_neighbor_right = button.get_path_to(buttons[index + 1] if index % 2 == 0 and index + 1 < actions.size() else button)
+	focus_graph_generation += 1
+	set_meta("focus_graph_receipt", {
+		"generation": focus_graph_generation,
+		"mode": mode,
+		"action_count": actions.size(),
+		"device_aware": true,
+		"hidden_controls_released": true,
+	})
 
 func _refresh_settings_page() -> void:
 	var display := "FULLSCREEN" if int(setting_values.window_mode) == 1 else "WINDOWED"
@@ -573,6 +586,8 @@ func _mcp_state() -> Dictionary:
 		"focus":String(focus_owner.get_path()) if is_instance_valid(focus_owner) else "none",
 		"focus_action":focus_action,"actions":actions,"settings":setting_values,
 		"last_setting_mutation":last_setting_mutation,
+		"settings_persistence": settings.last_persist_receipt.duplicate(true),
+		"focus_graph_generation": focus_graph_generation,
 		"accessibility_contract": {
 			"full_viewport":true,"focus_traversal":not actions.is_empty(),
 			"focus_device":"mouse" if focus_action.is_empty() and visible else "keyboard_or_gamepad",

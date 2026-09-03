@@ -13,6 +13,8 @@ var draft_serial := 0
 var active := false
 var offer_strategy := "three_weapon_lanes"
 var offer_slots: Array[Dictionary] = []
+var last_selection_receipt: Dictionary = {}
+var selection_generation := 0
 
 func _ready() -> void:
 	CATALOG.validate_catalog()
@@ -24,6 +26,8 @@ func reset() -> void:
 	draft_serial = 0
 	active = false
 	offer_slots.clear()
+	last_selection_receipt.clear()
+	selection_generation = 0
 
 func cancel() -> bool:
 	"""Close the current offer without mutating ranks or the selected build.
@@ -96,6 +100,18 @@ func choose(index: int, inventory: WeaponInventory, health: WardenHealth, warden
 	var choice := projection.duplicate(true)
 	choice["application"] = application
 	selected.append(choice)
+	selection_generation += 1
+	last_selection_receipt = {
+		"generation": selection_generation,
+		"draft_serial": draft_serial,
+		"id": String(choice.get("id", "")),
+		"rank": int(choice.get("rank", 0)),
+		"applied_modifier": choice.get("changes", []),
+		"application_accepted": bool(application.get("accepted", false)),
+		"matches_projection": bool(application.get("matches_projection", false)),
+		"exactly_once": true,
+		"transaction":"authoritative_choice_commit",
+	}
 	# The authoritative offer is a transient transaction payload. Retire it as
 	# soon as the choice commits so runtime snapshots cannot report a stale,
 	# still-actionable draft while the run has already resumed. The selected
@@ -107,13 +123,13 @@ func choose(index: int, inventory: WeaponInventory, health: WardenHealth, warden
 	return choice
 
 func get_snapshot() -> Dictionary:
-	return {"active":active, "serial":draft_serial, "offered":offered.duplicate(true), "selected":selected.duplicate(true), "ranks":ranks.duplicate(true), "catalog_size":CATALOG.upgrades.size(), "offer_strategy":offer_strategy, "offer_slots":offer_slots.duplicate(true)}
+	return {"active":active, "serial":draft_serial, "offered":offered.duplicate(true), "selected":selected.duplicate(true), "ranks":ranks.duplicate(true), "catalog_size":CATALOG.upgrades.size(), "offer_strategy":offer_strategy, "offer_slots":offer_slots.duplicate(true), "last_selection_receipt":last_selection_receipt.duplicate(true), "selection_generation":selection_generation}
 
 func _mcp_state() -> Dictionary:
 	var offer_digest: Array[Dictionary] = []
 	for card in offered:
 		offer_digest.append({"id":card.id, "title":card.title, "rank":card.rank, "icon_path":card.icon_path, "current":card.current, "result":card.result, "effect_lines":card.effect_lines})
-	return {"authoritative_offer":offer_digest, "authoritative_selection":_selection_digest(), "active":active, "serial":draft_serial, "catalog_size":CATALOG.upgrades.size(), "ranks":ranks, "offer_strategy":offer_strategy, "offer_slots":offer_slots.duplicate(true)}
+	return {"authoritative_offer":offer_digest, "authoritative_selection":_selection_digest(), "active":active, "serial":draft_serial, "catalog_size":CATALOG.upgrades.size(), "ranks":ranks, "offer_strategy":offer_strategy, "offer_slots":offer_slots.duplicate(true), "last_selection_receipt":last_selection_receipt.duplicate(true), "selection_generation":selection_generation}
 
 func _selection_digest() -> Dictionary:
 	if selected.is_empty():
