@@ -1988,6 +1988,8 @@ func _prepare_final_profile() -> void:
 		"contract_id":DenseWaveProfileClass.CONTRACT_ID,
 		"contract_version":DenseWaveProfileClass.CONTRACT_VERSION,
 		"contract_signature":DenseWaveProfileClass.CONTRACT_SIGNATURE,
+		"diagnostic_only":true,
+		"release_export_available":false,
 		# Setup validity is independent from renderer qualification. A software
 		# renderer must still run the real four-second collector so frame/entity/
 		# lifecycle diagnostics remain useful; only the final qualification gate
@@ -2312,6 +2314,15 @@ func _try_begin_passive_ordinary_profile() -> void:
 	_emit_snapshot()
 
 func _advance_profile_sample(delta: float) -> void:
+	# Keep the release boundary at the sampling owner as well as the tester
+	# entrypoints. A stale diagnostic flag or serialized replay state must never
+	# enable instrumentation or render-measurement overhead in an export.
+	if _profile_active and not DenseWaveProfileClass.tester_guard():
+		_profile_active = false
+		_profile_paused = false
+		RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), false)
+		_apply_dense_quality_profile(false)
+		return
 	if not _profile_active or get_tree().paused:
 		return
 	var process_frame_delta := maxi(0, Engine.get_process_frames() - _profile_process_frame_start)
@@ -2459,6 +2470,8 @@ func _advance_profile_sample(delta: float) -> void:
 		"contract_id":DenseWaveProfileClass.CONTRACT_ID,
 		"contract_version":DenseWaveProfileClass.CONTRACT_VERSION,
 		"contract_signature":DenseWaveProfileClass.CONTRACT_SIGNATURE,
+		"diagnostic_only":true,
+		"release_export_available":false,
 		"status":"complete", "branch_id":sample_branch,
 		"sample_kind":_profile_origin, "route_kind":run_route_kind,
 		"passive":_profile_origin == "ordinary_final_wave_passive",

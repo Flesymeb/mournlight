@@ -1078,7 +1078,10 @@ func get_snapshot() -> Dictionary:
 				# previous 46 m / 82 degree legacy values described a superseded
 				# overview rig and contradicted the live camera evidence even though
 				# collision and landmark bindings were correct.
-				"camera_profile":{"fov":84.0,"follow_height":16.5,"follow_distance":16.5,"follow_lateral":-2.5,"framing_bias":Vector3(1.2,0.0,-2.4),"yaw_degrees":-45.0,"landmark_blend":0.28,"visibility_collision_mask":camera_visibility_collision_mask},
+				# Keep the spatial receipt synchronized with the shipped ArenaCamera
+				# rig. Older values described a superseded overview camera and made
+				# route evidence appear mis-bound even when runtime framing was correct.
+				"camera_profile":{"fov":90.0,"follow_height":25.0,"follow_distance":25.0,"follow_lateral":5.0,"framing_bias":Vector3(0.0,0.0,-6.0),"yaw_degrees":0.0,"landmark_blend":0.28,"visibility_collision_mask":camera_visibility_collision_mask},
 			"proxy_geometry_count":0,
 		},
 		"external_world":{"source":"intact_authored_package_plus_candidate_authored_distant_silhouette_ring", "procedural_scenery":false, "primitive_meshes":0, "external_dressing_nodes":6, "opaque":true, "non_playable_depth_beyond_all_edges":is_instance_valid(external_depth), "collision_enabled":false, "fog_depth_bound":true},

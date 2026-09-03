@@ -50,7 +50,7 @@ const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v9"
 ## Candidate-owned release diff marker.  Keep this on the real presenter so
 ## publication tooling can distinguish the authored card surface from an
 ## unchanged shell-only revision.
-const RELEASE_CONVERGENCE_UI_DIFF := "upgrade_draft_authored_icon_hierarchy_v3"
+const RELEASE_CONVERGENCE_UI_DIFF := "upgrade_draft_authored_icon_hierarchy_v4"
 
 @onready var title_label: Label = $Title
 @onready var subtitle_label: Label = $Subtitle
@@ -114,7 +114,7 @@ func _apply_surface_contract() -> void:
 	for index in buttons.size():
 		# Keep the authored icon-led card as the sole actionable surface while
 		# exposing the same confirm affordance used by keyboard/gamepad focus.
-		buttons[index].tooltip_text = "Focus vigil %d  •  LEFT / RIGHT, then ENTER / SOUTH" % (index + 1)
+		buttons[index].tooltip_text = "Focus vigil %d  •  ICON → STATS → CONSEQUENCE  •  LEFT / RIGHT, then ENTER / SOUTH" % (index + 1)
 		# Keep keyboard/gamepad focus visibly distinct from hover and pressed
 		# states without changing the authored card dimensions or hierarchy.
 		buttons[index].add_theme_color_override("font_focus_color", Color("f8e8b0"))

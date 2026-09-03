@@ -95,7 +95,11 @@ func _ready() -> void:
 	set_mode("title")
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"ui_cancel") and mode in ["settings", "help", "credits"]:
+	# `ui_cancel` is intentionally unbound because InputContextRouter owns the
+	# Escape/context_back route. Keep a physical Escape fallback so shell pages
+	# remain keyboard-back traversable when a platform omits that generic action.
+	var escape_pressed := event is InputEventKey and (event as InputEventKey).physical_keycode == KEY_ESCAPE and (event as InputEventKey).pressed
+	if (event.is_action_pressed(&"ui_cancel") or escape_pressed) and mode in ["settings", "help", "credits"]:
 		_record_shell_action(&"back", false)
 		action_requested.emit(&"back")
 		get_viewport().set_input_as_handled()

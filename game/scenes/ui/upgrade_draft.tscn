@@ -19,6 +19,7 @@ metadata/surface_contract_revision = "upgrade_draft_icon_led_v4"
 metadata/route_transaction_binding = "ordinary_first_upgrade_pause_commit_resume_v2"
 metadata/publication_surface_revision = "release_convergence_icon_led_cards_v9"
 metadata/authored_ui_diff = "icon_first_focusable_cards_truthful_deltas_v3"
+metadata/release_convergence_ui_diff = "upgrade_draft_authored_icon_hierarchy_v4"
 
 [node name="Shade" type="ColorRect" parent="."]
 layout_mode = 1
@@ -66,26 +67,26 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="CardA" type="Button" parent="Cards"]
-custom_minimum_size = Vector2(328,522)
+custom_minimum_size = Vector2(328,430)
 layout_mode = 0
 offset_right = 328.0
-offset_bottom = 522.0
+offset_bottom = 430.0
 text = ""
 
 [node name="CardB" type="Button" parent="Cards"]
-custom_minimum_size = Vector2(328,522)
+custom_minimum_size = Vector2(328,430)
 layout_mode = 0
 offset_left = 346.0
 offset_right = 674.0
-offset_bottom = 522.0
+offset_bottom = 430.0
 text = ""
 
 [node name="CardC" type="Button" parent="Cards"]
-custom_minimum_size = Vector2(328,522)
+custom_minimum_size = Vector2(328,430)
 layout_mode = 0
 offset_left = 692.0
 offset_right = 1020.0
-offset_bottom = 522.0
+offset_bottom = 430.0
 text = ""
 
 [node name="Footer" type="Label" parent="."]
