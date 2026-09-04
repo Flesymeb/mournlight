@@ -1385,7 +1385,18 @@ func _on_draft_choice(index: int) -> void:
 	choice["natural_choice"] = run_route_kind == "ordinary" and int(wave_state.get("diagnostic_jump_count", 0)) == 0
 	choice["truthful_transaction"] = bool((choice.get("application", {}) as Dictionary).get("accepted", false)) and bool((choice.get("application", {}) as Dictionary).get("matches_projection", false))
 	selected_upgrades.append(choice)
-	if bool(choice.get("natural_choice", false)) and not _first_run_guidance_completed:
+	# A first-choice commit completes onboarding only after the player has
+	# actually traversed the authored chain (movement, automatic attack,
+	# death-position drop, attraction, and collection).  This prevents a
+	# diagnostic or pre-seeded XP draft from falsely satisfying the tutorial.
+	var guidance_chain_complete := (
+		_guidance_movement_observed
+		and _guidance_attack_observed
+		and pickup_spawned_total > 0
+		and not _reward_attraction_receipt.is_empty()
+		and pickup_collected_total > 0
+	)
+	if bool(choice.get("natural_choice", false)) and guidance_chain_complete and not _first_run_guidance_completed:
 		_first_run_guidance_completed = true
 		_first_run_guidance_dismissed = true
 		_first_run_guidance_completion = {
@@ -1395,6 +1406,13 @@ func _on_draft_choice(index: int) -> void:
 			"upgrade_id":String(choice.get("id", "")),
 			"elapsed":run_elapsed,
 			"stages_taught":["movement_and_automatic_attack", "world_drop", "attraction_and_collection", "natural_upgrade_draft"],
+			"prerequisites": {
+				"movement":_guidance_movement_observed,
+				"automatic_attack":_guidance_attack_observed,
+				"death_position_drop":pickup_spawned_total > 0,
+				"attraction":not _reward_attraction_receipt.is_empty(),
+				"collection":pickup_collected_total > 0,
+			},
 		}
 	complete_run_ledger.record_draft(choice, run_elapsed, run_route_kind, int(wave_state.get("diagnostic_jump_count", 0)))
 	draft_view.close()
@@ -3832,7 +3850,7 @@ func _first_run_guidance_snapshot() -> Dictionary:
 	}
 	var drop_position: Variant = _reward_spawn_receipt.get("position", null) if drop_seen else null
 	if _first_run_guidance_completed:
-		return {"visible":false,"stage":"complete","completed":true,"completion":_first_run_guidance_completion.duplicate(true),"bindings":bindings,"help_surface":"pause_controls_and_help","device":input_router.active_device,"aim_input_generation":input_router.aim_input_generation,"milestones":milestones,"drop_position":drop_position,"reset":_guidance_reset_receipt.duplicate(true)}
+		return {"visible":false,"stage":"complete","completed":true,"completion":_first_run_guidance_completion.duplicate(true),"bindings":bindings,"help_surface":"pause_controls_and_help","device":input_router.active_device,"aim_input_generation":input_router.aim_input_generation,"milestones":milestones,"completion_prerequisites":milestones.duplicate(true),"drop_position":drop_position,"reset":_guidance_reset_receipt.duplicate(true)}
 	if run_route_kind != "ordinary" or run_state not in ["active", "draft"]:
 		return {"visible":false,"stage":"inactive","completed":false,"bindings":bindings,"help_surface":"pause_controls_and_help","device":input_router.active_device,"aim_input_generation":input_router.aim_input_generation,"milestones":milestones,"drop_position":drop_position,"reset":_guidance_reset_receipt.duplicate(true)}
 	var stage := "movement"
@@ -3885,7 +3903,7 @@ func _first_run_guidance_snapshot() -> Dictionary:
 		prompt = "FACE THE THREAT; THE WARDEN LANTERN ATTACKS AUTOMATICALLY"
 		action_label = "NO FIRE BUTTON"
 		icon = "lantern"
-	return {"visible":not _first_run_guidance_dismissed,"stage":stage,"progress_stage":_guidance_progress_stage,"title":title,"prompt":prompt,"action_label":action_label,"icon":icon,"completed":false,"bindings":bindings,"inputmap_bound":true,"device":input_router.active_device,"device_generation":input_router.device_generation,"aim_input_generation":input_router.aim_input_generation,"dismissal":"toggle_guidance_help_action","dismissed":_first_run_guidance_dismissed,"persists_across_retry_after_completion":true,"help_surface":"pause_controls_and_help","illustration":"res://assets/ui/guidance/first_run_gameplay.png","milestones":milestones,"drop_position":drop_position,"reset":_guidance_reset_receipt.duplicate(true)}
+	return {"visible":not _first_run_guidance_dismissed,"stage":stage,"progress_stage":_guidance_progress_stage,"title":title,"prompt":prompt,"action_label":action_label,"icon":icon,"completed":false,"bindings":bindings,"inputmap_bound":true,"device":input_router.active_device,"device_generation":input_router.device_generation,"aim_input_generation":input_router.aim_input_generation,"dismissal":"toggle_guidance_help_action","dismissed":_first_run_guidance_dismissed,"persists_across_retry_after_completion":true,"help_surface":"pause_controls_and_help","illustration":"res://assets/ui/guidance/first_run_gameplay.png","milestones":milestones,"completion_prerequisites":milestones.duplicate(true),"drop_position":drop_position,"reset":_guidance_reset_receipt.duplicate(true)}
 
 func _qa_reset_first_run_guidance() -> void:
 	if not OS.has_feature("editor"):

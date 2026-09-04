@@ -143,6 +143,23 @@ metadata/non_playable = true
 metadata/spatial_role = "external_world_boundary_silhouette"
 metadata/visual_contract = "additive_fence_depth_v1"
 
+[node name="SouthExternalFenceRail" type="MeshInstance3D" parent="ExternalDepth"]
+position = Vector3(0, 0.35, 25.4)
+mesh = SubResource("ExternalFenceRailMesh")
+material_override = SubResource("ExternalFenceMaterial")
+metadata/non_playable = true
+metadata/spatial_role = "external_world_boundary_silhouette"
+metadata/visual_contract = "additive_fence_depth_v2"
+
+[node name="WestExternalFenceRail" type="MeshInstance3D" parent="ExternalDepth"]
+position = Vector3(-25.4, 0.35, 0)
+rotation_degrees = Vector3(0, 90, 0)
+mesh = SubResource("ExternalFenceRailMesh")
+material_override = SubResource("ExternalFenceMaterial")
+metadata/non_playable = true
+metadata/spatial_role = "external_world_boundary_silhouette"
+metadata/visual_contract = "additive_fence_depth_v2"
+
 [node name="NativeNavigationRegion" type="NavigationRegion3D" parent="OuterDatum" unique_id=798922117]
 navigation_mesh = SubResource("CemeteryNavigationMesh")
 metadata/_spatial_contract = "native_authored_streets"

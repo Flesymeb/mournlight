@@ -101,6 +101,18 @@ layout_mode = 0
 offset_right = 328.0
 offset_bottom = 430.0
 text = ""
+focus_mode = 2
+tooltip_text = "Vigil offer A"
+
+[node name="HierarchyAccent" type="ColorRect" parent="Cards/CardA"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 4.0
+grow_horizontal = 2
+mouse_filter = 2
+color = Color(0.92, 0.69, 0.33, 0.9)
+metadata/visual_role = "choice_hierarchy_accent"
 
 [node name="CardB" type="Button" parent="Cards"]
 custom_minimum_size = Vector2(328,430)
@@ -109,6 +121,18 @@ offset_left = 346.0
 offset_right = 674.0
 offset_bottom = 430.0
 text = ""
+focus_mode = 2
+tooltip_text = "Vigil offer B"
+
+[node name="HierarchyAccent" type="ColorRect" parent="Cards/CardB"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 4.0
+grow_horizontal = 2
+mouse_filter = 2
+color = Color(0.76, 0.49, 1, 0.9)
+metadata/visual_role = "choice_hierarchy_accent"
 
 [node name="CardC" type="Button" parent="Cards"]
 custom_minimum_size = Vector2(328,430)
@@ -117,6 +141,18 @@ offset_left = 692.0
 offset_right = 1020.0
 offset_bottom = 430.0
 text = ""
+focus_mode = 2
+tooltip_text = "Vigil offer C"
+
+[node name="HierarchyAccent" type="ColorRect" parent="Cards/CardC"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 4.0
+grow_horizontal = 2
+mouse_filter = 2
+color = Color(0.27, 0.68, 0.9, 0.9)
+metadata/visual_role = "choice_hierarchy_accent"
 
 [node name="Footer" type="Label" parent="."]
 layout_mode = 1

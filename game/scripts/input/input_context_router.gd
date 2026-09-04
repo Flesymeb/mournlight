@@ -39,6 +39,8 @@ var mouse_look_generation := 0
 ## gameplay state.  This counter is edge-backed and never consumed by UI.
 var aim_input_generation := 0
 var zoom_step_delta := 0
+var zoom_input_generation := 0
+var last_zoom_receipt: Dictionary = {}
 var _movement_actions := {
 	&"move_left": false, &"move_right": false,
 	&"move_forward": false, &"move_back": false,
@@ -121,16 +123,23 @@ func _input(event: InputEvent) -> void:
 	if context in ["active", "boss"]:
 		if event.is_action_pressed(&"camera_zoom_in"):
 			zoom_step_delta -= 1
+			zoom_input_generation += 1
+			last_zoom_receipt = {"generation":zoom_input_generation,"steps":-1,"context":context,"accepted":true,"modal_isolated":context in ["active", "boss"]}
 			get_viewport().set_input_as_handled()
 			return
 		if event.is_action_pressed(&"camera_zoom_out"):
 			zoom_step_delta += 1
+			zoom_input_generation += 1
+			last_zoom_receipt = {"generation":zoom_input_generation,"steps":1,"context":context,"accepted":true,"modal_isolated":context in ["active", "boss"]}
 			get_viewport().set_input_as_handled()
 			return
 	if event is InputEventMouseButton and context in ["active", "boss"]:
 		var wheel := event as InputEventMouseButton
 		if wheel.pressed and wheel.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-			zoom_step_delta += -1 if wheel.button_index == MOUSE_BUTTON_WHEEL_UP else 1
+			var wheel_step := -1 if wheel.button_index == MOUSE_BUTTON_WHEEL_UP else 1
+			zoom_step_delta += wheel_step
+			zoom_input_generation += 1
+			last_zoom_receipt = {"generation":zoom_input_generation,"steps":wheel_step,"context":context,"accepted":true,"modal_isolated":context in ["active", "boss"],"device":"mouse"}
 			get_viewport().set_input_as_handled()
 			return
 	# Escape/Start owns the pause transaction. It is intentionally separate from
@@ -193,6 +202,7 @@ func consume_mouse_look() -> Vector2:
 func consume_zoom_steps() -> int:
 	var result := zoom_step_delta
 	zoom_step_delta = 0
+	last_zoom_receipt = {"generation":zoom_input_generation,"steps":0,"context":context,"accepted":false,"reason":"reset"}
 	return result
 
 func clear_movement_latch(reason := "reset") -> void:
@@ -498,6 +508,8 @@ func _mcp_state() -> Dictionary:
 		"mouse_look_generation":mouse_look_generation,
 		"aim_input_generation":aim_input_generation,
 		"zoom_step_delta":zoom_step_delta,
+		"zoom_input_generation":zoom_input_generation,
+		"last_zoom_receipt":last_zoom_receipt.duplicate(true),
 	}
 
 func get_binding_audit() -> Dictionary:

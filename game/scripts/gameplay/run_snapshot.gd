@@ -14,6 +14,8 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 	var terminal: Dictionary = controller.terminal_snapshot if controller.terminal_snapshot is Dictionary else {}
 	var arena_camera := world.get_node_or_null("ArenaCamera") if world else null
 	var cemetery_contract := world.get_node_or_null("CemeteryGarden") if world else null
+	var camera_visibility: Dictionary = arena_camera._mcp_state() if arena_camera and arena_camera.has_method("_mcp_state") else {}
+	var camera_zoom: Dictionary = (camera_visibility.get("zoom", {}) as Dictionary).duplicate(true)
 	return {
 		"serial": int(controller.run_serial),
 		"state": String(controller.run_state),
@@ -72,7 +74,11 @@ static func make(controller: Node, world: Node, warden: Node, health: Node, spaw
 		"reward_feedback":controller._reward_feedback_snapshot(),
 		"warden_animation": warden.animation_binding.get_snapshot() if warden and warden.animation_binding else {},
 		"warden_movement": warden.get_movement_snapshot() if warden else {},
-		"camera_visibility": arena_camera._mcp_state() if arena_camera and arena_camera.has_method("_mcp_state") else {},
+		"camera_visibility": camera_visibility,
+		# Promote the bounded lens contract to the top-level run receipt so
+		# Tester/runtime probes can verify min/default/max and modal isolation
+		# without depending on a deep/truncated camera payload.
+		"camera_zoom": camera_zoom,
 		"arena_collision": cemetery_contract._mcp_state() if cemetery_contract and cemetery_contract.has_method("_mcp_state") else {},
 		"terminal_reset_invariants": controller._terminal_reset_invariants("snapshot"),
 		"upgrade_draft": controller.draft_controller.get_snapshot(),
