@@ -97,7 +97,7 @@ static func contract() -> Dictionary:
 			"active_pickups", "active_effects", "active_lights", "active_audio_voices", "pooled_enemies", "pooled_pickups", "attack_ledger_allocations", "attack_stale_target_rejections", "attack_runtime_resets",
 			"spawned_total", "despawned_total", "runtime_error_count", "subsystem_samples", "sample_distributions", "high_water_marks", "lifecycle_deltas",
 		],
-		"telemetry": {"sample_history_cap": SAMPLE_HISTORY_CAP, "per_sample_metrics": true, "runtime_errors_source": "godot_runtime_log"},
+		"telemetry": {"sample_history_cap": SAMPLE_HISTORY_CAP, "per_sample_metrics": true, "runtime_errors_source": "godot_runtime_log", "overflow_fields":["dropped_samples","overflow"]},
 		"receipts": ["requested", "resolved", "reset_isolation", "setup_generation", "advance_generation", "cycle_id", "phase"],
 		"phase_receipts": ["prepare", "advance_start", "advance_complete", "reset", "reset_next_frame"],
 		"cycle_identity": ["identity", "cycle_index", "cycle_id", "run_serial", "setup_generation", "advance_generation"],

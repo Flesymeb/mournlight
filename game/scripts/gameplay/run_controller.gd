@@ -125,6 +125,7 @@ var _victory_fixture_hold_generation := -1
 var complete_run_ledger: CompleteRunLedger
 var _profile_physics_samples_ms: Array[float] = []
 var _profile_metric_samples: Array[Dictionary] = []
+var _profile_dropped_samples := 0
 var _profile_advance_generation := 0
 var _profile_process_frame_start := 0
 var _profile_physics_frame_start := 0
@@ -494,6 +495,7 @@ func _begin_run() -> void:
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
 	_profile_metric_samples.clear()
+	_profile_dropped_samples = 0
 	_profile_elapsed = 0.0
 	_profile_sample_accumulator = 0.0
 	_profile_observation_stride = 0
@@ -527,8 +529,10 @@ func _begin_run() -> void:
 	_guidance_attack_observed = false
 	_guidance_progress_stage = 0
 	_guidance_attack_baseline = world.attack_runtime.authorized_count
-	if not _first_run_guidance_completed:
-		_first_run_guidance_dismissed = false
+	# Guidance dismissal is session-scoped, just like completion.  Retry must
+	# start clean gameplay without replaying a prompt the player explicitly
+	# dismissed, even when they have not yet reached the first upgrade.  A title
+	# Play boundary (or the editor QA reset) is the explicit opt-in reset point.
 	_transition("initializing")
 	run_serial += 1
 	if String(_guidance_reset_receipt.get("reason", "")) == "fresh_title_play":
@@ -1951,6 +1955,7 @@ func _prepare_final_profile() -> void:
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
 	_profile_metric_samples.clear()
+	_profile_dropped_samples = 0
 	_profile_elapsed = 0.0
 	_profile_sample_accumulator = 0.0
 	_profile_observation_stride = 0
@@ -2050,6 +2055,7 @@ func _prepare_final_profile() -> void:
 		"advance_action_required":true,
 		"reset_isolation_pending":true,
 		"phase_sample_availability":{"prepare":{"frames_ran":false,"frame_sample_count":0,"physics_sample_count":0,"samples_available":false}},
+		"dropped_samples":0, "overflow":false,
 		"requested_resolved_receipt":{"requested":32,"resolved":int(encounter.get("live",0)),"reset_isolation":false},
 		"timeout_policy":"bounded_pending_until_advance_complete_or_reset",
 	}
@@ -2135,6 +2141,7 @@ func _advance_final_profile() -> void:
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
 	_profile_metric_samples.clear()
+	_profile_dropped_samples = 0
 	_profile_elapsed = 0.0
 	_profile_sample_accumulator = 0.0
 	_profile_observation_stride = 0
@@ -2186,6 +2193,7 @@ func _advance_final_profile() -> void:
 		"target_density":DenseWaveProfileClass.TARGET_ENEMIES,
 		"host_handoff":DenseWaveProfileClass.host_handoff_contract(),
 		"phase_sample_availability":{"advance_start":{"frames_ran":false,"frame_sample_count":0,"physics_sample_count":0,"samples_available":false}},
+		"dropped_samples":0, "overflow":false,
 		"requested_resolved_receipt":{"requested":32,"resolved":int(initial_density),"reset_isolation":false},
 		"timeout_policy":"bounded_pending_until_advance_complete_or_reset",
 		"preflight":DenseWaveProfileClass.preflight(_profile_renderer_receipt(), _profile_viewport_receipt(), _profile_process_frame_start, _profile_process_frame_start, 0, 0, "advance_start", {"branch_id":validation_profile_receipt.get("branch_id", ""), "run_serial":run_serial, "setup_generation":validation_profile_receipt.get("setup_generation", 0), "advance_generation":_profile_advance_generation}, {"required":true,"pending":true}),
@@ -2303,6 +2311,7 @@ func _try_begin_passive_ordinary_profile() -> void:
 	_profile_samples_ms.clear()
 	_profile_physics_samples_ms.clear()
 	_profile_metric_samples.clear()
+	_profile_dropped_samples = 0
 	_profile_elapsed = 0.0
 	_profile_sample_accumulator = 0.0
 	_profile_sample_counter_reads = 0
@@ -2461,8 +2470,13 @@ func _advance_profile_sample(delta: float) -> void:
 				"combat":(workload_sample.get("attacks", {}) as Dictionary).duplicate(true),
 			},
 		})
+	else:
+		_profile_dropped_samples += 1
 	if _profile_samples_ms.size() < PROFILE_MAX_SAMPLES:
 		_profile_samples_ms.append(frame_ms)
+	# Keep scalar and structured histories bounded while exposing overflow.
+	elif _profile_dropped_samples == 0:
+		_profile_dropped_samples += 1
 	if _profile_physics_samples_ms.size() < PROFILE_MAX_SAMPLES:
 		var physics_sample_ms := float(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)) * 1000.0
 		if physics_sample_ms <= 0.0 and Engine.physics_ticks_per_second > 0:
@@ -2529,6 +2543,8 @@ func _advance_profile_sample(delta: float) -> void:
 		"sample_distributions":sample_distribution,
 		"high_water_marks":(sample_distribution.get("high_water_marks", {}) as Dictionary).duplicate(true),
 		"telemetry_sample_count":_profile_metric_samples.size(),
+		"dropped_samples":_profile_dropped_samples,
+		"overflow":_profile_dropped_samples > 0,
 		"sample_history_cap":PROFILE_MAX_SAMPLES, "window_seconds":_profile_elapsed,
 		"sampling_renderer_independent":true,
 		"physics_sample_count":sorted_physics.size(),
@@ -2663,6 +2679,7 @@ func _reset_final_profile() -> void:
 	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), false)
 	_profile_metric_samples.clear()
 	_profile_observation_stride = 0
+	_profile_dropped_samples = 0
 	_profile_last_system_observation.clear()
 	# Retire the public record immediately beside the active-owner flag. Any
 	# teardown callback or snapshot emitted below therefore sees one state.
@@ -2782,6 +2799,7 @@ func _profile_reset_sample(source_sample: Dictionary, source_run_serial: int, ne
 		"end_enemy_workload":0,
 		"sample_count":0,
 		"physics_sample_count":0,
+		"dropped_samples":0, "overflow":false,
 		"sample_availability":{"frames_ran":false,"frame_samples_nonzero":false,"physics_samples_nonzero":false,"samples_available":false,"renderer_gate_applied_after_sampling":true},
 		"frame_execution":{"process_frame_start":Engine.get_process_frames(),"process_frame_end":Engine.get_process_frames(),"process_frame_delta":0,"frames_ran":false},
 		"window_seconds":0.0,
@@ -4508,6 +4526,8 @@ func _mcp_state() -> Dictionary:
 		"profile_worst_ms":profile_frame_ms.get("worst", 0.0),
 		"profile_frame_sample_count":validation_profile_sample.get("sample_count", 0),
 		"profile_telemetry_sample_count":validation_profile_sample.get("telemetry_sample_count", 0),
+		"profile_dropped_samples":validation_profile_sample.get("dropped_samples", 0),
+		"profile_overflow":validation_profile_sample.get("overflow", false),
 		"profile_telemetry_samples":validation_profile_sample.get("telemetry_samples", []),
 		"profile_subsystem_samples":validation_profile_sample.get("subsystem_samples", []),
 		"profile_sample_distributions":validation_profile_sample.get("sample_distributions", {}),
