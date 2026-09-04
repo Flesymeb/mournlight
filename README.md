@@ -1,6 +1,6 @@
-# GameLoop Development Record
+# HoH Development Record
 
-<!-- GameLoop generated development record; do not edit. -->
+<!-- HoH generated development record; do not edit. -->
 
 **Product:** `mournlight-project-package-20260830`  
 **Workflow:** Project Planner → Developer → QA Tester
@@ -11,7 +11,7 @@ This README records high-level autonomous development and QA history.
 
 ## Publication scope
 
-This product history records iteration goals and QA outcomes. Detailed tool, cache, receipt, and staging provenance remains in the private GameLoop Runtime audit.
+This product history records iteration goals and QA outcomes. Detailed tool, cache, receipt, and staging provenance remains in the private HoH Runtime audit.
 
 ---
 
@@ -31,7 +31,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 
 | Candidate | Base | Current state |
 | --- | --- | --- |
-| `loop-157-f97469156e36` | `development_snapshot:attempt-0669f6e5adf69b613ac5fc1b` | NEEDS VISUAL QA |
+| `loop-157-f97469156e36` | `development_snapshot:attempt-0669f6e5adf69b613ac5fc1b` | BLOCKED |
 
 ### Project Planner
 
@@ -48,7 +48,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -58,7 +58,21 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 
 | Field | Value |
 | --- | --- |
-| Status | UNTESTED |
+| Status | FAIL |
+| Candidate | `loop-157-f97469156e36` |
+| Product completion | IN PROGRESS |
+| Review scope | `phase` |
+| Findings | 5 (3 blocking focus items) |
+
+### Evidence / QA findings
+
+| ID | Severity | Summary |
+| --- | --- | --- |
+| `finding.release_convergence_camera_movement_dash_contract` | MINOR | Camera and dash lifecycle are not independently recaptured. |
+| `finding.release_convergence_run_lifecycle_restart_contract` | MAJOR | Run restart and failure recovery are still unverified. |
+| `finding.release_convergence_weapon_build_identity_contract` | MINOR | Weapon and upgrade identity are not fully exercised in live play. |
+| `finding.release_convergence_complete_run_release_contract` | BLOCKER | The complete release run is still missing. |
+| `tester.mcp_coverage_incomplete` | MAJOR | Tester did not complete every required live MCP, source, state, log, and screenshot probe after bounded same-session corrections. |
 
 ---
 
@@ -85,7 +99,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -134,7 +148,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 0 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -185,7 +199,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -234,7 +248,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 0 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -284,7 +298,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 8 |
 | Blocker | See the QA outcome below. |
@@ -335,7 +349,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | INCOMPLETE ATTEMPT |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 0 |
 | Changed paths | 0 |
 | Blocker | See the QA outcome below. |
@@ -460,7 +474,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | INCOMPLETE ATTEMPT |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 0 |
 | Changed paths | 0 |
 | Blocker | See the QA outcome below. |
@@ -613,7 +627,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | INCOMPLETE ATTEMPT |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 0 |
 | Changed paths | 0 |
 | Blocker | See the QA outcome below. |
@@ -650,7 +664,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | INCOMPLETE ATTEMPT |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 0 |
 | Changed paths | 0 |
 | Blocker | See the QA outcome below. |
@@ -687,7 +701,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -736,7 +750,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -785,7 +799,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -835,7 +849,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -884,7 +898,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -935,7 +949,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -983,7 +997,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 8 |
 | Blocker | See the QA outcome below. |
@@ -1032,7 +1046,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -1083,7 +1097,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 6 |
 | Blocker | See the QA outcome below. |
@@ -1132,7 +1146,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -1185,7 +1199,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -1234,7 +1248,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -1285,7 +1299,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 8 |
 | Blocker | See the QA outcome below. |
@@ -1335,7 +1349,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -1384,7 +1398,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -1437,7 +1451,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 6 |
 | Blocker | See the QA outcome below. |
@@ -1488,7 +1502,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -1540,7 +1554,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -1594,7 +1608,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -1643,7 +1657,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -1693,7 +1707,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -1742,7 +1756,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -1792,7 +1806,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -1841,7 +1855,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -1892,7 +1906,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -1942,7 +1956,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -1992,7 +2006,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -2041,7 +2055,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -2092,7 +2106,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -2141,7 +2155,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -2190,7 +2204,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -2240,7 +2254,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -2288,7 +2302,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -2339,7 +2353,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 6 |
 | Blocker | See the QA outcome below. |
@@ -2389,7 +2403,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -2439,7 +2453,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -2490,7 +2504,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -2538,7 +2552,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 6 |
 | Blocker | See the QA outcome below. |
@@ -2589,7 +2603,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -2639,7 +2653,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -2689,7 +2703,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -2739,7 +2753,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -2788,7 +2802,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -2837,7 +2851,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -2887,7 +2901,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -2935,7 +2949,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -2984,7 +2998,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -3031,7 +3045,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -3080,7 +3094,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 0 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -3131,7 +3145,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -3180,7 +3194,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -3230,7 +3244,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -3280,7 +3294,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -3330,7 +3344,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -3380,7 +3394,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 0 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -3429,7 +3443,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -3479,7 +3493,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -3531,7 +3545,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -3581,7 +3595,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 0 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -3631,7 +3645,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -3681,7 +3695,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -3733,7 +3747,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -3781,7 +3795,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 6 |
 | Blocker | See the QA outcome below. |
@@ -3829,7 +3843,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -3879,7 +3893,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -3928,7 +3942,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -3978,7 +3992,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -4028,7 +4042,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -4078,7 +4092,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -4128,7 +4142,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -4177,7 +4191,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -4227,7 +4241,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -4278,7 +4292,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -4329,7 +4343,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 6 |
 | Blocker | See the QA outcome below. |
@@ -4379,7 +4393,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -4430,7 +4444,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 0 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -4481,7 +4495,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -4530,7 +4544,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -4580,7 +4594,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -4629,7 +4643,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 0 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -4677,7 +4691,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -4725,7 +4739,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -4774,7 +4788,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -4823,7 +4837,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -4873,7 +4887,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -4925,7 +4939,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -4976,7 +4990,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 6 |
 | Blocker | See the QA outcome below. |
@@ -5026,7 +5040,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 11 |
 | Blocker | See the QA outcome below. |
@@ -5076,7 +5090,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -5125,7 +5139,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -5175,7 +5189,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -5225,7 +5239,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -5273,7 +5287,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -5324,7 +5338,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -5374,7 +5388,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -5422,7 +5436,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -5473,7 +5487,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 7 |
 | Blocker | See the QA outcome below. |
@@ -5525,7 +5539,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 6 |
 | Blocker | See the QA outcome below. |
@@ -5576,7 +5590,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -5627,7 +5641,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -5675,7 +5689,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -5727,7 +5741,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -5776,7 +5790,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -5827,7 +5841,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -5877,7 +5891,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -5935,7 +5949,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -5986,7 +6000,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -6035,7 +6049,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -6085,7 +6099,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 6 |
 | Blocker | See the QA outcome below. |
@@ -6135,7 +6149,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 0 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -6185,7 +6199,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -6236,7 +6250,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -6284,7 +6298,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -6333,7 +6347,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -6382,7 +6396,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 7 |
 | Blocker | See the QA outcome below. |
@@ -6434,7 +6448,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 6 |
 | Blocker | See the QA outcome below. |
@@ -6487,7 +6501,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -6537,7 +6551,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -6587,7 +6601,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -6639,7 +6653,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 7 |
 | Blocker | See the QA outcome below. |
@@ -6688,7 +6702,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -6738,7 +6752,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -6787,7 +6801,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -6841,7 +6855,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -6890,7 +6904,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 8 |
 | Blocker | See the QA outcome below. |
@@ -6939,7 +6953,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -6989,7 +7003,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -7037,7 +7051,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 5 |
 | Blocker | See the QA outcome below. |
@@ -7086,7 +7100,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -7135,7 +7149,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -7185,7 +7199,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -7233,7 +7247,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -7281,7 +7295,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 2 |
 | Blocker | See the QA outcome below. |
@@ -7329,7 +7343,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 1 |
 | Blocker | See the QA outcome below. |
@@ -7376,7 +7390,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -7425,7 +7439,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 9 |
 | Blocker | See the QA outcome below. |
@@ -7478,7 +7492,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 4 |
 | Blocker | See the QA outcome below. |
@@ -7527,7 +7541,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 2 |
 | Changed paths | 6 |
 | Blocker | See the QA outcome below. |
@@ -7577,7 +7591,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | PASS |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 3 |
 | Changed paths | 10 |
 | Blocker | See the QA outcome below. |
@@ -7625,7 +7639,7 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 | Field | Value |
 | --- | --- |
 | Status | NEEDS VISUAL QA |
-| Summary | Implementation details are retained in the private GameLoop Runtime audit. |
+| Summary | Implementation details are retained in the private HoH Runtime audit. |
 | Completed tasks | 1 |
 | Changed paths | 3 |
 | Blocker | See the QA outcome below. |
@@ -7662,5 +7676,5 @@ This product history records iteration goals and QA outcomes. Detailed tool, cac
 - Latest attempted: `loop-157-f97469156e36`
 - Latest warm start: `loop-157-25eb44153a48`
 - Last published: `loop-157-f97469156e36`
-- Best verified: `loop-156-25eb44153a48`
-- Generated by the GameLoop host from immutable run evidence.
+- Best verified: `loop-157-f97469156e36`
+- Generated by the HoH host from immutable run evidence.
