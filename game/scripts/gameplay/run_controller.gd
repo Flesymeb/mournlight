@@ -417,10 +417,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	# fallback out of _unhandled_input preserves one activation per transaction.
 
 func start_run() -> void:
-	# A Play action from the title is an intentional fresh onboarding session.
-	# Retry calls _begin_run() directly and must retain completed guidance, while
-	# returning to title and choosing Play should expose the first-run sequence
-	# again so a new player can rediscover movement, drops, and upgrades.
+	# A Play action from the title starts a fresh run, while the completion marker
+	# for the first-run lesson remains session/profile state.  Retry and title
+	# re-entry therefore do not resurrect a lesson the player already completed.
 	if run_state == "title":
 		_reset_first_run_guidance_for_fresh_title_start()
 	_next_baseline_reason = "fresh_start"
@@ -428,6 +427,22 @@ func start_run() -> void:
 	_begin_run()
 
 func _reset_first_run_guidance_for_fresh_title_start() -> void:
+	# Guidance completion is a session/profile milestone, not a per-run flag.
+	# Returning to the title and pressing Play must not make a completed first-run
+	# lesson reappear; Retry and title re-entry both retain the completion marker.
+	# The explicit editor-only QA reset remains the sole way to clear it.
+	if _first_run_guidance_completed:
+		_first_run_guidance_dismissed = true
+		_guidance_reset_receipt = {
+			"requested":false,
+			"resolved":true,
+			"generation":_guidance_reset_generation,
+			"editor_only":false,
+			"reason":"completed_guidance_preserved_on_title_play",
+			"run_serial":run_serial,
+			"reset_isolated_to_guidance":true,
+		}
+		return
 	_first_run_guidance_completed = false
 	_first_run_guidance_completion.clear()
 	_first_run_guidance_dismissed = false
@@ -3913,10 +3928,12 @@ func _qa_reset_first_run_guidance() -> void:
 	_first_run_guidance_dismissed = false
 	_first_run_guidance_completion.clear()
 	_guidance_movement_observed = false
+	_guidance_aim_observed = false
 	_guidance_dash_observed = false
 	_guidance_attack_observed = false
 	_guidance_progress_stage = 0
 	_guidance_attack_baseline = world.attack_runtime.authorized_count
+	_guidance_aim_baseline = input_router.aim_input_generation
 	_guidance_reset_receipt = {
 		"requested":true, "resolved":true,
 		"generation":_guidance_reset_generation,

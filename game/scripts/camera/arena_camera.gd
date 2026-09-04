@@ -191,7 +191,10 @@ func _ready() -> void:
 	# reads as an upper-left landmark instead of filling the centre of the
 	# shipped framebuffer.  The Warden remains in the lower-safe lane while the
 	# keeper post and cracked bell stay inside the same high-angle composition.
-	framing_bias = Vector3(8.0, 0.0, 4.0)
+	# Keep the player and nearby threats as the primary visual subject.  A
+	# smaller authored bias leaves the mausoleum and bell in the upper context
+	# band without pulling the combat lane off-centre at the shipped lens.
+	framing_bias = Vector3(4.0, 0.0, 1.0)
 	# Place the shipped high-angle rig on the south sight lane. The previous
 	# west/east orbits put the tall crypt directly between the camera and the
 	# keeper/bell route, so the live frame read as a wall even though diagnostic
@@ -526,7 +529,7 @@ func _compose_arena_target(requested_target: Vector3, subjects: Array[Node3D]) -
 	# 18% blend left the mausoleum centered and hid the keeper/bell silhouettes.
 	# 42% keeps all three landmarks in one readable band while nearby threats
 	# remain the primary safe-lane subject.
-		composed = composed.lerp(landmark_target, 0.28)
+		composed = composed.lerp(landmark_target, 0.20)
 	_coverage_obstructed_count = 0
 	_coverage_obstructing_path = ""
 	_coverage_obstructing_paths.clear()
