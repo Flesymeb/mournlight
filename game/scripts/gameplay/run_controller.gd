@@ -165,10 +165,12 @@ var _first_run_guidance_completed := false
 var _first_run_guidance_completion: Dictionary = {}
 var _first_run_guidance_dismissed := false
 var _guidance_movement_observed := false
+var _guidance_aim_observed := false
 var _guidance_dash_observed := false
 var _guidance_attack_observed := false
 var _guidance_progress_stage := 0
 var _guidance_attack_baseline := 0
+var _guidance_aim_baseline := 0
 var _guidance_reset_generation := 0
 var _guidance_reset_receipt: Dictionary = {}
 var _known_reward_ids: Dictionary = {}
@@ -275,6 +277,12 @@ func _process(delta: float) -> void:
 				health.health_changed.emit(health.current_health, health.maximum_health)
 		if not _guidance_movement_observed and warden.planar_velocity.length() > 0.45:
 			_guidance_movement_observed = true
+			_guidance_progress_stage = maxi(_guidance_progress_stage, 1)
+		if not _guidance_aim_observed and input_router.aim_input_generation > _guidance_aim_baseline:
+			_guidance_aim_observed = true
+			# Aim discovery is intentionally orthogonal to movement progress: a
+			# player can move and sweep the mouse in either order without skipping
+			# the defensive Dash lesson.
 			_guidance_progress_stage = maxi(_guidance_progress_stage, 1)
 		if not _guidance_attack_observed and world.attack_runtime.authorized_count > _guidance_attack_baseline:
 			_guidance_attack_observed = true
@@ -424,10 +432,12 @@ func _reset_first_run_guidance_for_fresh_title_start() -> void:
 	_first_run_guidance_completion.clear()
 	_first_run_guidance_dismissed = false
 	_guidance_movement_observed = false
+	_guidance_aim_observed = false
 	_guidance_dash_observed = false
 	_guidance_attack_observed = false
 	_guidance_progress_stage = 0
 	_guidance_attack_baseline = world.attack_runtime.authorized_count
+	_guidance_aim_baseline = input_router.aim_input_generation
 	_guidance_reset_generation += 1
 	_guidance_reset_receipt = {
 		"requested":true,
@@ -525,10 +535,12 @@ func _begin_run() -> void:
 	_reward_experience_receipt.clear()
 	_reward_duplicate_rejections = 0
 	_guidance_movement_observed = false
+	_guidance_aim_observed = false
 	_guidance_dash_observed = false
 	_guidance_attack_observed = false
 	_guidance_progress_stage = 0
 	_guidance_attack_baseline = world.attack_runtime.authorized_count
+	_guidance_aim_baseline = input_router.aim_input_generation
 	# Guidance dismissal is session-scoped, just like completion.  Retry must
 	# start clean gameplay without replaying a prompt the player explicitly
 	# dismissed, even when they have not yet reached the first upgrade.  A title
@@ -3792,6 +3804,7 @@ func _profile_subsystem_samples() -> Array[Dictionary]:
 func _first_run_guidance_snapshot() -> Dictionary:
 	var bindings := {
 		"move":input_router.binding_label([&"move_forward", &"move_left", &"move_back", &"move_right"], 4),
+		"aim":"MOUSE / RIGHT STICK",
 		# Dash owns the physical Space/south-button action in gameplay. Menu
 		# confirmation is a separate standard UI binding on keyboard (Enter),
 		# while the south button remains context-routed on gamepad.
@@ -3809,6 +3822,7 @@ func _first_run_guidance_snapshot() -> Dictionary:
 	var upgrade_seen := _first_run_guidance_completed or not _first_run_guidance_completion.is_empty()
 	var milestones := {
 		"movement":_guidance_movement_observed,
+		"aim":_guidance_aim_observed,
 		"dash":_guidance_dash_observed,
 		"automatic_attack":_guidance_attack_observed,
 		"death_position_drop":drop_seen,
@@ -3818,9 +3832,9 @@ func _first_run_guidance_snapshot() -> Dictionary:
 	}
 	var drop_position: Variant = _reward_spawn_receipt.get("position", null) if drop_seen else null
 	if _first_run_guidance_completed:
-		return {"visible":false,"stage":"complete","completed":true,"completion":_first_run_guidance_completion.duplicate(true),"bindings":bindings,"help_surface":"pause_controls_and_help","device":input_router.active_device,"milestones":milestones,"drop_position":drop_position,"reset":_guidance_reset_receipt.duplicate(true)}
+		return {"visible":false,"stage":"complete","completed":true,"completion":_first_run_guidance_completion.duplicate(true),"bindings":bindings,"help_surface":"pause_controls_and_help","device":input_router.active_device,"aim_input_generation":input_router.aim_input_generation,"milestones":milestones,"drop_position":drop_position,"reset":_guidance_reset_receipt.duplicate(true)}
 	if run_route_kind != "ordinary" or run_state not in ["active", "draft"]:
-		return {"visible":false,"stage":"inactive","completed":false,"bindings":bindings,"help_surface":"pause_controls_and_help","device":input_router.active_device,"milestones":milestones,"drop_position":drop_position,"reset":_guidance_reset_receipt.duplicate(true)}
+		return {"visible":false,"stage":"inactive","completed":false,"bindings":bindings,"help_surface":"pause_controls_and_help","device":input_router.active_device,"aim_input_generation":input_router.aim_input_generation,"milestones":milestones,"drop_position":drop_position,"reset":_guidance_reset_receipt.duplicate(true)}
 	var stage := "movement"
 	var title := "KEEPER'S FIRST VIGIL"
 	var prompt := "MOVE TO KEEP AN ESCAPE LANE"
@@ -3848,6 +3862,11 @@ func _first_run_guidance_snapshot() -> Dictionary:
 		icon = "wisp"
 	elif _guidance_progress_stage < 1 and not _guidance_movement_observed:
 		stage = "movement"
+	elif _guidance_movement_observed and not _guidance_aim_observed:
+		stage = "aim"
+		prompt = "SWEEP YOUR AIM; MOUSE OR RIGHT STICK BIASES THE NEXT THREAT"
+		action_label = String(bindings.aim)
+		icon = "lantern"
 	elif _guidance_progress_stage < 2 and not _guidance_dash_observed:
 		stage = "dash"
 		prompt = "DASH THROUGH PRESSURE; THE BRIEF FLASH MARKS SAFETY"
@@ -3866,7 +3885,7 @@ func _first_run_guidance_snapshot() -> Dictionary:
 		prompt = "FACE THE THREAT; THE WARDEN LANTERN ATTACKS AUTOMATICALLY"
 		action_label = "NO FIRE BUTTON"
 		icon = "lantern"
-	return {"visible":not _first_run_guidance_dismissed,"stage":stage,"progress_stage":_guidance_progress_stage,"title":title,"prompt":prompt,"action_label":action_label,"icon":icon,"completed":false,"bindings":bindings,"inputmap_bound":true,"device":input_router.active_device,"device_generation":input_router.device_generation,"dismissal":"toggle_guidance_help_action","dismissed":_first_run_guidance_dismissed,"persists_across_retry_after_completion":true,"help_surface":"pause_controls_and_help","illustration":"res://assets/ui/guidance/first_run_gameplay.png","milestones":milestones,"drop_position":drop_position,"reset":_guidance_reset_receipt.duplicate(true)}
+	return {"visible":not _first_run_guidance_dismissed,"stage":stage,"progress_stage":_guidance_progress_stage,"title":title,"prompt":prompt,"action_label":action_label,"icon":icon,"completed":false,"bindings":bindings,"inputmap_bound":true,"device":input_router.active_device,"device_generation":input_router.device_generation,"aim_input_generation":input_router.aim_input_generation,"dismissal":"toggle_guidance_help_action","dismissed":_first_run_guidance_dismissed,"persists_across_retry_after_completion":true,"help_surface":"pause_controls_and_help","illustration":"res://assets/ui/guidance/first_run_gameplay.png","milestones":milestones,"drop_position":drop_position,"reset":_guidance_reset_receipt.duplicate(true)}
 
 func _qa_reset_first_run_guidance() -> void:
 	if not OS.has_feature("editor"):

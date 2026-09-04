@@ -34,6 +34,10 @@ var movement_vector := Vector2.ZERO
 ## upgrade-confirm transactions.
 var mouse_look_delta := Vector2.ZERO
 var mouse_look_generation := 0
+## Right-stick aim is optional during combat, but it remains an explicit input
+## receipt so first-run guidance can teach the affordance without inventing a
+## gameplay state.  This counter is edge-backed and never consumed by UI.
+var aim_input_generation := 0
 var zoom_step_delta := 0
 var _movement_actions := {
 	&"move_left": false, &"move_right": false,
@@ -68,6 +72,14 @@ func _input(event: InputEvent) -> void:
 		mouse_look_delta += motion.relative
 		mouse_look_delta = mouse_look_delta.limit_length(180.0)
 		mouse_look_generation += 1
+		if motion.relative.length_squared() >= 4.0:
+			aim_input_generation += 1
+	elif event is InputEventJoypadMotion:
+		var joy_motion := event as InputEventJoypadMotion
+		# Godot's conventional right stick is axes 2/3. Keep this as a
+		# lightweight discovery receipt; target bias remains optional gameplay.
+		if joy_motion.axis in [2, 3] and absf(joy_motion.axis_value) >= 0.2:
+			aim_input_generation += 1
 	# Keep an authoritative edge-backed movement state. Some embedded runners
 	# synthesize InputEventAction edges without updating Input's polling cache;
 	# Warden can consume this state during its physics tick just like a native
@@ -483,6 +495,8 @@ func _mcp_state() -> Dictionary:
 		"last_device_receipt":last_device_receipt,
 		"movement_vector":movement_vector,
 		"movement_actions":_movement_actions,
+		"mouse_look_generation":mouse_look_generation,
+		"aim_input_generation":aim_input_generation,
 		"zoom_step_delta":zoom_step_delta,
 	}
 
