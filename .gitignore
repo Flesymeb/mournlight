@@ -18,6 +18,12 @@ runs/
 *.mov
 *.mp4
 
+# Private GameLoop product direction. The frozen copies under the run directory
+# remain role inputs and must not be published with the playable repository.
+/PRD.md
+/prd_assets/
+/visual-references/
+
 # Reusable generated game assets remain in the host asset pool. Keep compact
 # manifests, receipts, scenes, scripts, and configuration in the game repo.
 game/assets/**/*.glb
