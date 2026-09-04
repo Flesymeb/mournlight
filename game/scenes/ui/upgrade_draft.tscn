@@ -66,6 +66,21 @@ grow_horizontal = 2
 mouse_filter = 2
 modulate = Color(0.92, 0.69, 0.33, 0.72)
 
+[node name="ChoiceAnchor" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -190.0
+offset_top = 188.0
+offset_right = 190.0
+offset_bottom = 190.0
+grow_horizontal = 2
+mouse_filter = 2
+color = Color(0.76, 0.49, 1, 0.62)
+metadata/visual_role = "authored_choice_hierarchy_anchor"
+metadata/decision_surface_revision = "release_convergence_choice_anchor_v1"
+
 [node name="Cards" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 8

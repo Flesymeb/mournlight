@@ -34,6 +34,7 @@ var movement_vector := Vector2.ZERO
 ## upgrade-confirm transactions.
 var mouse_look_delta := Vector2.ZERO
 var mouse_look_generation := 0
+var zoom_step_delta := 0
 var _movement_actions := {
 	&"move_left": false, &"move_right": false,
 	&"move_forward": false, &"move_back": false,
@@ -92,6 +93,34 @@ func _input(event: InputEvent) -> void:
 		_dispatch_press("confirm", &"dash")
 		get_viewport().set_input_as_handled()
 		return
+	# Synthetic dash releases (and some embedded keyboard runners) do not carry
+	# the context_confirm release event. Resolve the transaction directly from
+	# the dash semantic so a later cooldown press is never treated as a duplicate.
+	if event.is_action_released(&"dash") and active_transactions.has("confirm"):
+		var dash_transaction: Dictionary = active_transactions.get("confirm", {})
+		if String(dash_transaction.get("logical_action", "")) == "dash":
+			# _dispatch_release emits a synthetic logical release for legacy
+			# observers. That event re-enters _input synchronously; only the
+			# originating physical release may retire the transaction.
+			if not bool(dash_transaction.get("logical_release_dispatched", false)):
+				_dispatch_release("confirm")
+			get_viewport().set_input_as_handled()
+			return
+	if context in ["active", "boss"]:
+		if event.is_action_pressed(&"camera_zoom_in"):
+			zoom_step_delta -= 1
+			get_viewport().set_input_as_handled()
+			return
+		if event.is_action_pressed(&"camera_zoom_out"):
+			zoom_step_delta += 1
+			get_viewport().set_input_as_handled()
+			return
+	if event is InputEventMouseButton and context in ["active", "boss"]:
+		var wheel := event as InputEventMouseButton
+		if wheel.pressed and wheel.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+			zoom_step_delta += -1 if wheel.button_index == MOUSE_BUTTON_WHEEL_UP else 1
+			get_viewport().set_input_as_handled()
+			return
 	# Escape/Start owns the pause transaction. It is intentionally separate from
 	# context_back (B/View on gamepad) so a single physical activation can never
 	# dispatch both pause and UI-cancel/back semantics.
@@ -149,8 +178,14 @@ func consume_mouse_look() -> Vector2:
 	mouse_look_delta = Vector2.ZERO
 	return result
 
+func consume_zoom_steps() -> int:
+	var result := zoom_step_delta
+	zoom_step_delta = 0
+	return result
+
 func clear_movement_latch(reason := "reset") -> void:
 	reset_generation += 1
+	zoom_step_delta = 0
 	for action in _movement_actions.keys():
 		_movement_actions[action] = false
 	movement_vector = Vector2.ZERO
@@ -340,7 +375,7 @@ func _dispatch_press(physical: String, action: StringName) -> void:
 		# Pause is consumed by the router/controller signal above. Re-emitting a
 		# synthetic InputEventAction named "pause" would satisfy the same physical
 		# binding again and can create duplicate activations in embedded runners.
-		if action not in [PAUSE_PHYSICAL, CONTEXT_BACK_LOGICAL]:
+		if action not in [PAUSE_PHYSICAL, CONTEXT_BACK_LOGICAL, &"dash"]:
 			_parse_action(action, true)
 
 func _dispatch_release(physical: String) -> void:
@@ -414,7 +449,7 @@ func transaction_receipt(physical: String, expected_activation_generation: int) 
 	return {}
 
 func _release_action(action: StringName) -> void:
-	if action != &"" and action not in [PAUSE_PHYSICAL, CONTEXT_BACK_LOGICAL]:
+	if action != &"" and action not in [PAUSE_PHYSICAL, CONTEXT_BACK_LOGICAL, &"dash"]:
 		_parse_action(action, false)
 
 func _parse_action(action: StringName, pressed: bool) -> void:
@@ -448,6 +483,7 @@ func _mcp_state() -> Dictionary:
 		"last_device_receipt":last_device_receipt,
 		"movement_vector":movement_vector,
 		"movement_actions":_movement_actions,
+		"zoom_step_delta":zoom_step_delta,
 	}
 
 func get_binding_audit() -> Dictionary:

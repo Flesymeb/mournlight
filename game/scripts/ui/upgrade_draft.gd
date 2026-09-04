@@ -59,6 +59,7 @@ const RELEASE_CONVERGENCE_UI_DIFF := "upgrade_draft_authored_icon_hierarchy_v7"
 @onready var title_label: Label = $Title
 @onready var subtitle_label: Label = $Subtitle
 @onready var footer_label: Label = $Footer
+@onready var choice_anchor: ColorRect = $ChoiceAnchor
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -71,6 +72,8 @@ func _ready() -> void:
 	set_meta("publication_surface_revision", PUBLICATION_SURFACE_REVISION)
 	set_meta("release_convergence_ui_implementation_revision", RELEASE_CONVERGENCE_UI_IMPLEMENTATION_REVISION)
 	set_meta("release_convergence_ui_diff", RELEASE_CONVERGENCE_UI_DIFF)
+	choice_anchor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	choice_anchor.set_meta("visual_role", "authored_choice_hierarchy_anchor")
 	set_meta("publication_contract", {
 		"icon_first": true,
 		"decision_delta_cap": MAX_DECISION_DELTAS,
@@ -223,6 +226,11 @@ func present(next_cards: Array[Dictionary]) -> void:
 		buttons[index].disabled = not bool(card.get("available", true))
 		_refresh_card_state(index)
 	_refresh_focus_neighbors()
+	var available_count := 0
+	for card in cards:
+		if bool(card.get("available", false)):
+			available_count += 1
+	choice_anchor.modulate = Color(0.76, 0.49, 1.0, 0.45 + 0.14 * float(available_count))
 	visible = true
 	if not buttons[0].disabled:
 		buttons[0].grab_focus()

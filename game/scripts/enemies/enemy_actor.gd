@@ -54,6 +54,13 @@ var _vitality_updates := 0
 var _vitality_skips := 0
 var _priority_presentation_updates := 0
 var _staggered_presentation_updates := 0
+## Collision-aware blocked-route recovery. EnemyActor remains the sole owner of
+## approach velocity; a bounded lateral escape lane breaks contact with
+## authored coffins, gravestones, walls, and landmark footprints.
+var _stuck_time := 0.0
+var _recovery_sign := 1.0
+var _blocked_route_recoveries := 0
+var _last_motion_position := Vector3.ZERO
 ## Hurt is a presentation interrupt, not a second gameplay state.  Keep the
 ## authoritative attack/approach state intact while the authored presenter
 ## runs its short recoil clip, then restore the current semantic deterministically.
@@ -107,6 +114,10 @@ func activate(next_profile: EnemyProfile, next_target: WardenController, at_posi
 	_vitality_skips = 0
 	_priority_presentation_updates = 0
 	_staggered_presentation_updates = 0
+	_stuck_time = 0.0
+	_recovery_sign = -1.0 if (String(stable_id).hash() + generation) % 2 == 0 else 1.0
+	_blocked_route_recoveries = 0
+	_last_motion_position = at_position
 	health.actor_id = stable_id
 	health.maximum_health = profile.maximum_health
 	health.current_health = profile.maximum_health
@@ -181,6 +192,13 @@ func retire_from_pressure(reason: String, reconciliation_id: int) -> Dictionary:
 func _physics_process(delta: float) -> void:
 	_physics_steps_total += 1
 	_lifetime += delta
+	if state == "approach" and _last_motion_position != Vector3.ZERO and is_instance_valid(target):
+		var moved_since_last := global_position.distance_to(_last_motion_position)
+		if moved_since_last < 0.012:
+			_stuck_time += delta
+		else:
+			_stuck_time = maxf(0.0, _stuck_time - delta * 2.0)
+	_last_motion_position = global_position
 	_hurt_light_remaining = maxf(0.0, _hurt_light_remaining - delta)
 	_hurt_motion_remaining = maxf(0.0, _hurt_motion_remaining - delta)
 	if _hurt_motion_remaining <= 0.0 and is_instance_valid(model_pivot) and model_pivot.semantic_state == "hurt":
@@ -259,6 +277,15 @@ func _steer_approach(delta: float) -> void:
 	var target_distance_squared := to_target.length_squared()
 	if profile.attack_kind == "flank" and target_distance_squared > 5.76:
 		desired = (desired + Vector3(-desired.z, 0.0, desired.x) * _flank_sign * 0.62).normalized()
+	if _stuck_time >= 0.30 and target_distance_squared > (profile.attack_range + 0.9) * (profile.attack_range + 0.9):
+		# Slide around a blocking authored prop instead of repeatedly pushing
+		# into its collider. The sign is deterministic per pooled generation.
+		var lateral := Vector3(-desired.z, 0.0, desired.x) * _recovery_sign
+		desired = (desired * 0.58 + lateral * 0.92).normalized()
+		if _stuck_time >= 0.72:
+			_recovery_sign *= -1.0
+			_blocked_route_recoveries += 1
+			_stuck_time = 0.0
 	# Neighbor broad-phase queries are the dominant dense-wave CPU cost. Keep
 	# steering deterministic while staggering the expensive query across three
 	# stable actor buckets; the cached vector is blended into every frame's
@@ -474,6 +501,8 @@ func _mcp_state() -> Dictionary:
 		"hurt_light_active": _hurt_light_active,
 		"presentation_descriptor": model_pivot.presentation_descriptor() if is_instance_valid(model_pivot) else "none",
 		"presentation_variant_id": model_pivot.variant_id if is_instance_valid(model_pivot) else "none",
+		"blocked_route_recoveries": _blocked_route_recoveries,
+		"stuck_time": _stuck_time,
 		"semantic_state": model_pivot.semantic_state if is_instance_valid(model_pivot) else state,
 		"active_motion_id": model_pivot.active_motion_id if is_instance_valid(model_pivot) else "none",
 		"lifecycle_trace": _lifecycle_trace.duplicate(true),
@@ -511,6 +540,8 @@ func reset_workload_counters() -> void:
 	_vitality_skips = 0
 	_priority_presentation_updates = 0
 	_staggered_presentation_updates = 0
+	_stuck_time = 0.0
+	_blocked_route_recoveries = 0
 
 func get_workload_counters() -> Dictionary:
 	return {
@@ -530,6 +561,8 @@ func get_workload_counters() -> Dictionary:
 		"vitality_bucket_count":DenseProfile.VITALITY_BUCKET_COUNT,
 		"priority_presentation_updates":_priority_presentation_updates,
 		"staggered_presentation_updates":_staggered_presentation_updates,
+		"blocked_route_recoveries":_blocked_route_recoveries,
+		"stuck_time":_stuck_time,
 		"priority_threat_radius":DenseProfile.PRIORITY_THREAT_RADIUS,
-		"space_query_policy":"registry_neighbors_and_move_and_slide_only",
+		"space_query_policy":"registry_neighbors_move_and_slide_and_bounded_lateral_recovery",
 	}

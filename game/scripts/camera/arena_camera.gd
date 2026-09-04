@@ -29,6 +29,9 @@ extends Camera3D
 @export var framing_bias: Vector3 = Vector3(0.0, 0.0, -6.0)
 @export var arena_limit := Vector2(34.0, 32.0)
 @export var normal_fov := 78.0
+@export_range(45.0, 85.0, 1.0) var zoom_min_fov := 64.0
+@export_range(70.0, 120.0, 1.0) var zoom_max_fov := 96.0
+@export var zoom_step_fov := 4.0
 @export var safe_frame_fraction := Vector2(0.08, 0.10)
 @export var safe_frame_activation_buffer := 0.04
 @export var safe_frame_correction_damping := 11.0
@@ -119,6 +122,8 @@ var _coverage_occluder_original_visibility: Dictionary = {}
 var _tall_occluder_bindings: Array[Dictionary] = []
 var _camera_response_allowed := false
 var _mouse_look_receipt: Dictionary = {}
+var _zoom_fov_offset := 0.0
+var _zoom_receipt: Dictionary = {}
 var _live_framing_contract: Dictionary = {}
 const LIVE_FRAMING_CONTRACT_REVISION := "arena_live_landmark_coverage_v1"
 
@@ -264,6 +269,7 @@ func _process(delta: float) -> void:
 	if not _camera_response_allowed:
 		return
 	_update_mouse_look()
+	_update_zoom()
 	_coverage_members_refresh_remaining = maxf(0.0, _coverage_members_refresh_remaining - delta)
 	var desired_lead := Vector3.ZERO
 	if movement_velocity.length_squared() > 0.04:
@@ -326,7 +332,8 @@ func _process(delta: float) -> void:
 		0.0,
 		1.0
 	)
-	fov = normal_fov + dense_fov_boost * dense_fraction + obstruction_fov_boost * _obstruction_response_strength
+	var dynamic_fov := normal_fov + dense_fov_boost * dense_fraction + obstruction_fov_boost * _obstruction_response_strength
+	fov = clampf(dynamic_fov + _zoom_fov_offset, zoom_min_fov, zoom_max_fov)
 	var effective_height := follow_height + obstruction_height_boost * _obstruction_response_strength
 	var effective_distance := follow_distance - obstruction_distance_reduction * _obstruction_response_strength
 	# The authored mausoleum is a tall native landmark. Keep a little more
@@ -842,10 +849,14 @@ func reset_view() -> void:
 	# remains bounded around this authored baseline.
 	mouse_yaw_degrees = 0.0
 	mouse_pitch_degrees = 49.0
+	_zoom_fov_offset = 0.0
+	_zoom_receipt = {"steps":0, "fov_offset":0.0, "fov":normal_fov, "bounds":[zoom_min_fov, normal_fov, zoom_max_fov], "context":"reset_view"}
 	_mouse_look_receipt.clear()
 	var router := get_node_or_null("../../InputContextRouter")
 	if is_instance_valid(router) and router.has_method("consume_mouse_look"):
 		router.consume_mouse_look()
+	if is_instance_valid(router) and router.has_method("consume_zoom_steps"):
+		router.consume_zoom_steps()
 
 func _collect_visuals(root: Node) -> Array[VisualInstance3D]:
 	var result: Array[VisualInstance3D] = []
@@ -970,6 +981,22 @@ func _update_mouse_look() -> void:
 		"camera_forward":(-global_transform.basis.z).normalized(),
 	}
 
+func _update_zoom() -> void:
+	var router := get_node_or_null("../../InputContextRouter")
+	if not is_instance_valid(router) or not router.has_method("consume_zoom_steps"):
+		return
+	var steps := int(router.consume_zoom_steps())
+	if steps == 0:
+		return
+	_zoom_fov_offset = clampf(_zoom_fov_offset + float(steps) * zoom_step_fov, zoom_min_fov - normal_fov, zoom_max_fov - normal_fov)
+	_zoom_receipt = {
+		"steps":steps,
+		"fov_offset":_zoom_fov_offset,
+		"fov":clampf(normal_fov + _zoom_fov_offset, zoom_min_fov, zoom_max_fov),
+		"bounds":[zoom_min_fov, normal_fov, zoom_max_fov],
+		"context":"active_camera",
+	}
+
 func _coverage_occluders_restored() -> bool:
 	# Camera containment also contributes to the shared response strength. It does
 	# not fade any landmark when there is no registered occluder, so restoration
@@ -1046,6 +1073,16 @@ func _mcp_state() -> Dictionary:
 			"pitch_bounds":[mouse_pitch_min, mouse_pitch_max],
 			"last_receipt":_mouse_look_receipt.duplicate(true),
 			"camera_relative":true,
+		},
+		"zoom": {
+			"fov":fov,
+			"offset":_zoom_fov_offset,
+			"min_fov":zoom_min_fov,
+			"default_fov":normal_fov,
+			"max_fov":zoom_max_fov,
+			"step_fov":zoom_step_fov,
+			"last_receipt":_zoom_receipt.duplicate(true),
+			"input_isolated_to_active_context":true,
 		},
 		"follow_height": follow_height,
 		"follow_distance": follow_distance,

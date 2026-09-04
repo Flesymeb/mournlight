@@ -2198,6 +2198,19 @@ func _advance_final_profile() -> void:
 	_emit_snapshot()
 
 func _arm_passive_ordinary_profile(wave_snapshot: Dictionary) -> void:
+	# Passive profiling is an editor/tester evidence aid only.  The ordinary
+	# route must remain completely inert in an exported build, including the
+	# brief fifth-wave arming edge before a density gate is observed.
+	if not DenseWaveProfileClass.tester_guard():
+		_profile_armed = false
+		_profile_arm_receipt = {
+			"status":"release_disabled",
+			"run_serial":run_serial,
+			"wave":int(wave_snapshot.get("wave", 0)),
+			"diagnostic_mutation":false,
+			"instrumentation_active":false,
+		}
+		return
 	if run_route_kind != "ordinary" or _profile_active or _profile_armed:
 		return
 	if int(wave_snapshot.get("wave", 0)) != 5 or int(wave_snapshot.get("diagnostic_jump_count", 0)) != 0:
@@ -2266,6 +2279,14 @@ func _missing_profile_coverage(coverage: Dictionary) -> Array[String]:
 	return missing
 
 func _try_begin_passive_ordinary_profile() -> void:
+	# Do not even enable renderer timing or sample counters during a normal
+	# release run.  The explicit tester guard is checked at both arming and
+	# activation so stale serialized flags cannot leak instrumentation overhead.
+	if not DenseWaveProfileClass.tester_guard():
+		_profile_armed = false
+		_profile_active = false
+		_profile_paused = false
+		return
 	if not _profile_armed or _profile_active or get_tree().paused or result_committed:
 		return
 	var wave_snapshot := wave_director.get_snapshot()
