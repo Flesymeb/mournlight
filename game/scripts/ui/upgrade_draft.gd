@@ -33,6 +33,7 @@ var _rank_nodes: Array[Label] = []
 var _consequence_nodes: Array[Label] = []
 var _state_nodes: Array[Label] = []
 var _badge_nodes: Array[Label] = []
+var _icon_frame_nodes: Array[PanelContainer] = []
 var _stat_bodies: Array[VBoxContainer] = []
 var _card_styles: Array[StyleBoxFlat] = []
 var _presentation_serial := 0
@@ -50,11 +51,11 @@ const PUBLICATION_SURFACE_REVISION := "release_convergence_icon_led_cards_v12"
 ## Candidate-owned implementation revision for the release-convergence card
 ## surface. This is intentionally behavior-bound (focus routing below), not a
 ## metadata-only publication marker.
-const RELEASE_CONVERGENCE_UI_IMPLEMENTATION_REVISION := "upgrade_draft_focus_routing_v8"
+const RELEASE_CONVERGENCE_UI_IMPLEMENTATION_REVISION := "upgrade_draft_focus_routing_v9"
 ## Candidate-owned release diff marker.  Keep this on the real presenter so
 ## publication tooling can distinguish the authored card surface from an
 ## unchanged shell-only revision.
-const RELEASE_CONVERGENCE_UI_DIFF := "upgrade_draft_authored_icon_hierarchy_v7"
+const RELEASE_CONVERGENCE_UI_DIFF := "upgrade_draft_authored_icon_hierarchy_v8"
 
 @onready var title_label: Label = $Title
 @onready var subtitle_label: Label = $Subtitle
@@ -484,15 +485,34 @@ func _build_card_content(button: Button) -> void:
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(badge)
 	_badge_nodes.append(badge)
+	# Give the authored silhouette a dedicated brass/midnight presentation plate
+	# before the compact name/rank/delta stack. The frame is candidate-owned UI
+	# hierarchy (not metadata): it makes the icon the first visual anchor while
+	# keeping the existing fixed card dimensions and focus surface unchanged.
+	var icon_frame := PanelContainer.new()
+	icon_frame.custom_minimum_size = Vector2(0, 148)
+	icon_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	icon_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var icon_surface := StyleBoxFlat.new()
+	icon_surface.bg_color = Color(0.025, 0.038, 0.085, 0.84)
+	icon_surface.border_width_left = 1
+	icon_surface.border_width_top = 1
+	icon_surface.border_width_right = 1
+	icon_surface.border_width_bottom = 1
+	icon_surface.border_color = Color(0.74, 0.56, 0.32, 0.72)
+	icon_surface.corner_radius_top_left = 8
+	icon_surface.corner_radius_top_right = 8
+	icon_surface.corner_radius_bottom_right = 8
+	icon_surface.corner_radius_bottom_left = 8
+	icon_frame.add_theme_stylebox_override("panel", icon_surface)
+	column.add_child(icon_frame)
+	_icon_frame_nodes.append(icon_frame)
 	var icon := TextureRect.new()
-	# Give the authored silhouette the dominant share of the fixed card before
-	# the compact name/rank/delta stack. This is a shipped visual change, not a
-	# telemetry or metadata-only publication marker.
 	icon.custom_minimum_size = Vector2(0, 140)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_child(icon)
+	icon_frame.add_child(icon)
 	_icon_nodes.append(icon)
 	var title_label := Label.new()
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -740,12 +760,37 @@ func _refresh_card_state(index: int) -> void:
 		state_color = Color(0.43, 0.96, 0.86)
 	_state_nodes[index].add_theme_color_override("font_color", state_color)
 	_apply_card_style(index, state)
+	_apply_icon_frame_style(index, state)
 	buttons[index].modulate = Color(0.56, 0.58, 0.65) if not available else Color.WHITE
 	# Theme minimums are presentation data, never layout ownership. Reassert only
 	# this card's authored slot after replacing its per-state style resources.
 	buttons[index].position = Vector2(CARD_OFFSETS[index], 0.0)
 	buttons[index].size = CARD_SIZE
 	buttons[index].queue_redraw()
+
+func _apply_icon_frame_style(index: int, state: String) -> void:
+	if index < 0 or index >= _icon_frame_nodes.size():
+		return
+	var frame := _icon_frame_nodes[index]
+	var surface := frame.get_theme_stylebox("panel") as StyleBoxFlat
+	if not surface:
+		return
+	# Mirror the card's interaction state on the icon plate so focus/hover/press
+	# remains legible even when the player reads the silhouette first.
+	surface.border_color = Color(0.74, 0.56, 0.32, 0.72)
+	surface.bg_color = Color(0.025, 0.038, 0.085, 0.84)
+	if "FOCUS" in state:
+		surface.border_color = Color(0.88, 0.91, 0.78, 1.0)
+		surface.bg_color = Color(0.045, 0.06, 0.075, 0.98)
+	elif "HOVER" in state or state.begins_with("PRESSED"):
+		surface.border_color = Color(0.43, 0.96, 0.86, 1.0)
+	elif state.begins_with("SELECTED"):
+		surface.border_color = Color(1.0, 0.76, 0.31, 1.0)
+		surface.bg_color = Color(0.105, 0.072, 0.035, 0.97)
+	elif state == "NEW WEAPON":
+		surface.border_color = Color(0.72, 0.57, 0.95, 0.95)
+	elif state in ["UNAVAILABLE", "CHOICE LOCKED"]:
+		surface.border_color = Color(0.32, 0.34, 0.4, 0.7)
 
 func _apply_card_style(index: int, state: String) -> void:
 	if index < 0 or index >= _card_styles.size():

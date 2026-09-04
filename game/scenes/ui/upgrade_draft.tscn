@@ -19,8 +19,8 @@ metadata/surface_contract_revision = "upgrade_draft_icon_led_v4"
 metadata/route_transaction_binding = "ordinary_first_upgrade_pause_commit_resume_v2"
 metadata/publication_surface_revision = "release_convergence_icon_led_cards_v12"
 metadata/authored_ui_diff = "icon_first_focusable_cards_truthful_deltas_v3"
-metadata/release_convergence_ui_diff = "upgrade_draft_authored_icon_hierarchy_v7"
-metadata/release_convergence_ui_implementation_revision = "upgrade_draft_focus_routing_v8"
+metadata/release_convergence_ui_diff = "upgrade_draft_authored_icon_hierarchy_v8"
+metadata/release_convergence_ui_implementation_revision = "upgrade_draft_focus_routing_v9"
 
 [node name="Shade" type="ColorRect" parent="."]
 layout_mode = 1

@@ -123,6 +123,7 @@ var _tall_occluder_bindings: Array[Dictionary] = []
 var _camera_response_allowed := false
 var _mouse_look_receipt: Dictionary = {}
 var _zoom_fov_offset := 0.0
+var _zoom_target_offset := 0.0
 var _zoom_receipt: Dictionary = {}
 var _live_framing_contract: Dictionary = {}
 const LIVE_FRAMING_CONTRACT_REVISION := "arena_live_landmark_coverage_v1"
@@ -159,8 +160,12 @@ func _ready() -> void:
 	# combat pad.  A 24 m orbit keeps the Warden and nearby telegraphs legible
 	# while giving the mausoleum/bell silhouettes enough breathing room so the
 	# shipped frame reads as an arena instead of a wall of crypt facade.
-	follow_height = 24.0
-	follow_distance = 24.0
+	# The enlarged map previously left ordinary silhouettes at dot scale in the
+	# shipped framebuffer. Bring the authored high-angle rig into the readable
+	# combat band while retaining landmark/external-depth context through the
+	# bounded composition and coverage correction below.
+	follow_height = 19.0
+	follow_distance = 19.0
 	# Hold the orbit on the east/south sight lane.  This lateral separation keeps
 	# the mausoleum facade from sitting directly over the Warden while preserving
 	# the native street and keeper/bell silhouettes in the frame.
@@ -203,7 +208,7 @@ func _ready() -> void:
 	# native spawn lane. A modestly wider lens preserves the readable Warden and
 	# mausoleum silhouettes while bringing the bell and its approach lane into
 	# the same ordinary gameplay frame (without moving authored geometry).
-	normal_fov = 86.0
+	normal_fov = 78.0
 	fov = normal_fov
 	# Keep the shipped camera's visibility query bound to the same dedicated
 	# landmark layer as CemeterySpatialContract.  The scene resource historically
@@ -270,6 +275,10 @@ func _process(delta: float) -> void:
 		return
 	_update_mouse_look()
 	_update_zoom()
+	# Zoom steps are discrete input, but the lens settles over a short bounded
+	# ease so a wheel/gamepad edge never snaps the combat composition. The target
+	# remains clamped while the rendered offset interpolates toward it.
+	_zoom_fov_offset = lerpf(_zoom_fov_offset, _zoom_target_offset, 1.0 - exp(-12.0 * delta))
 	_coverage_members_refresh_remaining = maxf(0.0, _coverage_members_refresh_remaining - delta)
 	var desired_lead := Vector3.ZERO
 	if movement_velocity.length_squared() > 0.04:
@@ -850,6 +859,7 @@ func reset_view() -> void:
 	mouse_yaw_degrees = 0.0
 	mouse_pitch_degrees = 49.0
 	_zoom_fov_offset = 0.0
+	_zoom_target_offset = 0.0
 	_zoom_receipt = {"steps":0, "fov_offset":0.0, "fov":normal_fov, "bounds":[zoom_min_fov, normal_fov, zoom_max_fov], "context":"reset_view"}
 	_mouse_look_receipt.clear()
 	var router := get_node_or_null("../../InputContextRouter")
@@ -988,13 +998,15 @@ func _update_zoom() -> void:
 	var steps := int(router.consume_zoom_steps())
 	if steps == 0:
 		return
-	_zoom_fov_offset = clampf(_zoom_fov_offset + float(steps) * zoom_step_fov, zoom_min_fov - normal_fov, zoom_max_fov - normal_fov)
+	_zoom_target_offset = clampf(_zoom_target_offset + float(steps) * zoom_step_fov, zoom_min_fov - normal_fov, zoom_max_fov - normal_fov)
 	_zoom_receipt = {
 		"steps":steps,
-		"fov_offset":_zoom_fov_offset,
-		"fov":clampf(normal_fov + _zoom_fov_offset, zoom_min_fov, zoom_max_fov),
+		"fov_offset":_zoom_target_offset,
+		"current_fov_offset":_zoom_fov_offset,
+		"fov":clampf(normal_fov + _zoom_target_offset, zoom_min_fov, zoom_max_fov),
 		"bounds":[zoom_min_fov, normal_fov, zoom_max_fov],
 		"context":"active_camera",
+		"easing":"exponential_settle",
 	}
 
 func _coverage_occluders_restored() -> bool:
@@ -1077,10 +1089,12 @@ func _mcp_state() -> Dictionary:
 		"zoom": {
 			"fov":fov,
 			"offset":_zoom_fov_offset,
+			"target_offset":_zoom_target_offset,
 			"min_fov":zoom_min_fov,
 			"default_fov":normal_fov,
 			"max_fov":zoom_max_fov,
 			"step_fov":zoom_step_fov,
+			"easing":"exponential_settle",
 			"last_receipt":_zoom_receipt.duplicate(true),
 			"input_isolated_to_active_context":true,
 		},

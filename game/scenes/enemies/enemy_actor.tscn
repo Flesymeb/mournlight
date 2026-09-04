@@ -41,7 +41,11 @@ shape = SubResource("Shape")
 [node name="PresentationRoot" type="Node3D" parent="."]
 
 [node name="ModelPivot" type="Node3D" parent="PresentationRoot"]
-scale = Vector3(0.55, 0.55, 0.55)
+## Candidate-owned readability binding: ordinary silhouettes must remain legible
+## beside the enlarged authored cemetery without changing collision or target
+## extents. Profiles still provide role-specific scale variation below this
+## shared presentation datum.
+scale = Vector3(0.9, 0.9, 0.9)
 script = ExtResource("4_presenter")
 
 [node name="TelegraphRing" type="MeshInstance3D" parent="."]
