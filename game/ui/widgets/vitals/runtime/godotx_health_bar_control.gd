@@ -102,9 +102,7 @@ func _update_fill_rect() -> void:
 	if r.size.x <= 0 or r.size.y <= 0:
 		_cached_fill_rect = r
 		return
-	var t = clampf((_display_value - min_value) / maxf(0.001, max_value - min_value), 0, 1)
-	var norm = t * 100.0
-	t = clampf(norm / 100.0, 0, 1)
+	var t = clampf(_display_value / 100.0, 0, 1)
 	_cached_fill_rect = Rect2(r.position, Vector2(r.size.x * t, r.size.y))
 
 func set_value(v: float, animate: bool = true) -> void:
@@ -180,7 +178,7 @@ func _draw() -> void:
 	if fill_rect.size.x > 0 and fill_rect.size.y > 0:
 		GodotxHealthBarDraw.draw_rounded_rect_filled(self, fill_rect, fill_color, radius)
 	elif inner_rect.size.x > 0 and inner_rect.size.y > 0:
-		var fill_w = inner_rect.size.x * clampf((_display_value - min_value) / maxf(0.001, max_value - min_value), 0, 1)
+		var fill_w = inner_rect.size.x * clampf(_display_value / 100.0, 0, 1)
 		if fill_w > 0:
 			GodotxHealthBarDraw.draw_rounded_rect_filled(self, Rect2(inner_rect.position, Vector2(fill_w, inner_rect.size.y)), fill_color, radius)
 

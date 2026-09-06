@@ -23,8 +23,8 @@ modulate = Color(0.34, 0.40, 0.62, 1)
 mouse_filter = 2
 
 [node name="MenuContainer" parent="." parent_id_path=PackedInt32Array(781937481) index="3" unique_id=396616752]
-theme_override_constants/margin_left = 310
-theme_override_constants/margin_right = 310
+theme_override_constants/margin_left = 148
+theme_override_constants/margin_right = 472
 
 [node name="TitleMargin" parent="MenuContainer" parent_id_path=PackedInt32Array(396616752) index="0" unique_id=2112060331]
 theme_override_constants/margin_top = 58
